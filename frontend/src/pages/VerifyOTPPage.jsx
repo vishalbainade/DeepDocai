@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { FileText, ArrowLeft } from 'lucide-react';
 import { verifyOTP } from '../services/api';
-import LexRayLogo from '../components/LexRayLogo';
+import DeepDocAILogo from '../components/DeepDocAILogo';
 
 const VerifyOTPPage = () => {
   const navigate = useNavigate();
@@ -11,13 +11,20 @@ const VerifyOTPPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [email, setEmail] = useState('');
+  const [otpType, setOtpType] = useState('registration');
   const inputRefs = useRef([]);
 
   useEffect(() => {
     if (location.state?.email) {
       setEmail(location.state.email);
+      setOtpType(location.state.type || 'registration');
     } else {
-      navigate('/register');
+      // If no email in state, redirect based on OTP type
+      if (location.state?.type === 'login') {
+        navigate('/login');
+      } else {
+        navigate('/register');
+      }
     }
   }, [location, navigate]);
 
@@ -57,7 +64,7 @@ const VerifyOTPPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const otpString = otp.join('');
-    
+
     if (otpString.length !== 6) {
       setError('Please enter the complete 6-digit OTP');
       return;
@@ -67,7 +74,7 @@ const VerifyOTPPage = () => {
     setLoading(true);
 
     try {
-      const result = await verifyOTP(email, otpString);
+      const result = await verifyOTP(email, otpString, otpType);
       if (result.success) {
         navigate('/chat');
       }
@@ -79,14 +86,16 @@ const VerifyOTPPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center py-12 px-4">
+    <div className="min-h-screen bg-[#F4F6FB] flex items-center justify-center py-12 px-4">
       <div className="max-w-md w-full">
         <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
           <div className="text-center mb-8">
             <div className="flex justify-center mb-4">
-              <LexRayLogo size="large" />
+              <DeepDocAILogo size="large" />
             </div>
-            <h1 className="text-3xl font-bold text-slate-900 mb-2">Verify Your Email</h1>
+            <h1 className="text-3xl font-bold text-slate-900 mb-2">
+              {otpType === 'login' ? 'Verify Your Login' : 'Verify Your Email'}
+            </h1>
             <p className="text-slate-600">
               We've sent a 6-digit OTP to <strong>{email}</strong>
             </p>
@@ -111,7 +120,7 @@ const VerifyOTPPage = () => {
                   onChange={(e) => handleChange(index, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(index, e)}
                   onPaste={handlePaste}
-                  className="w-14 h-14 text-center text-2xl font-bold border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                  className="w-14 h-14 text-center text-2xl font-bold border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8E84B8] focus:border-[#8E84B8] transition-all"
                 />
               ))}
             </div>
@@ -119,7 +128,7 @@ const VerifyOTPPage = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-3 bg-[#8E84B8] text-white rounded-lg hover:bg-[#7A70A8] transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Verifying...' : 'Verify OTP'}
             </button>
@@ -128,8 +137,8 @@ const VerifyOTPPage = () => {
           <p className="mt-6 text-center text-sm text-slate-500">
             Didn't receive the OTP? Check your spam folder or{' '}
             <button
-              onClick={() => navigate('/register')}
-              className="text-indigo-600 hover:text-indigo-700 font-medium"
+              onClick={() => navigate(otpType === 'login' ? '/login' : '/register')}
+              className="text-[#8E84B8] hover:text-[#7A70A8] font-medium"
             >
               try again
             </button>

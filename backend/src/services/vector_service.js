@@ -29,9 +29,10 @@ export const storeEmbeddings = async (embeddings, chunks, documentId) => {
           console.warn(`⚠️ Chunk ${i}: Embedding dimension is ${embedding.length}, expected 768`);
         }
 
-        const chunkText = typeof chunk === 'string' ? chunk : (chunk.text || '');
-        const chunkType = typeof chunk === 'object' && chunk.type ? chunk.type : 'text';
+        const chunkText = typeof chunk === 'string' ? chunk : (chunk.text || chunk.content || '');
+        const chunkType = typeof chunk === 'object' && chunk.chunk_type ? chunk.chunk_type : 'text';
         const pageNumber = typeof chunk === 'object' && chunk.page_number ? chunk.page_number : null;
+        const metadata = typeof chunk === 'object' && chunk.metadata ? JSON.stringify(chunk.metadata) : null;
         
         if (!chunkText || chunkText.trim().length === 0) {
           console.warn(`⚠️ Chunk ${i}: Empty chunk text, skipping...`);
@@ -41,9 +42,9 @@ export const storeEmbeddings = async (embeddings, chunks, documentId) => {
         const vectorString = `[${embedding.join(',')}]`;
 
         await client.query(
-          `INSERT INTO embeddings (document_id, chunk_index, chunk_text, embedding, chunk_type, page_number)
-           VALUES ($1, $2, $3, $4::vector, $5, $6)`,
-          [documentId, i, chunkText, vectorString, chunkType, pageNumber]
+          `INSERT INTO chunks (document_id, chunk_index, content, embedding, chunk_type, page_number, metadata)
+           VALUES ($1, $2, $3, $4::vector, $5, $6, $7)`,
+          [documentId, i, chunkText, vectorString, chunkType, pageNumber, metadata]
         );
         successCount++;
         
@@ -98,12 +99,13 @@ export const searchSimilarChunks = async (queryEmbedding, documentId, topK = 4) 
         id,
         document_id,
         chunk_index,
-        chunk_text,
+        content as chunk_text,
         chunk_type,
         page_number,
+        metadata,
         1 - (embedding <=> $1::vector) as similarity,
         embedding <=> $1::vector as distance
-       FROM embeddings
+       FROM chunks
        WHERE embedding IS NOT NULL
          AND document_id = $2
        ORDER BY embedding <=> $1::vector
@@ -151,10 +153,11 @@ export const getTopChunksByOrder = async (documentId, topK = 10) => {
         id,
         document_id,
         chunk_index,
-        chunk_text,
+        content as chunk_text,
         chunk_type,
-        page_number
-       FROM embeddings
+        page_number,
+        metadata
+       FROM chunks
        WHERE embedding IS NOT NULL
          AND document_id = $1
        ORDER BY chunk_index ASC
@@ -210,12 +213,13 @@ export const getAllDocumentChunks = async (documentId, prioritizeTables = false)
         id,
         document_id,
         chunk_index,
-        chunk_text,
+        content as chunk_text,
         chunk_type,
         page_number,
+        metadata,
         0.5 as similarity,
         0.5 as distance
-       FROM embeddings
+       FROM chunks
        WHERE embedding IS NOT NULL
          AND document_id = $1
        ${orderBy}`,
@@ -253,61 +257,7 @@ export const getAllDocumentChunks = async (documentId, prioritizeTables = false)
   }
 };
 
-/**
- * Hybrid search: combines vector similarity with fallback strategies
- * CRITICAL: For table queries, retrieves ALL chunks
- */
-export const hybridSearch = async (queryEmbedding, documentId, topK = 6, isGenericQuery = false, isTableQuery = false) => {
-  try {
-    // For table queries, retrieve ALL chunks from entire document
-    if (isTableQuery) {
-      console.log('📊 Table query: Retrieving ALL chunks');
-      const allChunks = await getAllDocumentChunks(documentId, true);
-      
-      if (allChunks.length === 0) {
-        throw new Error(`No chunks found for document ${documentId}`);
-      }
-      
-      return allChunks;
-    }
-    
-    // For generic queries, use ordered chunks
-    if (isGenericQuery) {
-      console.log('📝 Generic query: Using ordered chunks');
-      return await getTopChunksByOrder(documentId, topK);
-    }
 
-    // For specific queries, use vector similarity
-    console.log('🔍 Specific query: Using vector similarity');
-    const vectorResults = await searchSimilarChunks(queryEmbedding, documentId, topK);
-    
-    if (vectorResults.length === 0) {
-      console.log('⚠️ Vector search empty, falling back to ordered chunks');
-      const fallbackChunks = await getTopChunksByOrder(documentId, topK);
-      
-      if (fallbackChunks.length === 0) {
-        throw new Error(`No chunks found for document ${documentId}`);
-      }
-      
-      return fallbackChunks;
-    }
-    
-    return vectorResults;
-  } catch (error) {
-    console.error('Error in hybrid search:', error);
-    
-    // Try fallback
-    try {
-      const fallbackChunks = await getTopChunksByOrder(documentId, topK);
-      if (fallbackChunks.length === 0) {
-        throw new Error(`No chunks available for document ${documentId}`);
-      }
-      return fallbackChunks;
-    } catch (fallbackError) {
-      throw new Error(`Hybrid search failed: ${fallbackError.message}`);
-    }
-  }
-};
 
 /**
  * Delete all embeddings for a document
@@ -315,7 +265,7 @@ export const hybridSearch = async (queryEmbedding, documentId, topK = 6, isGener
 export const deleteDocumentEmbeddings = async (documentId) => {
   try {
     const result = await query(
-      'DELETE FROM embeddings WHERE document_id = $1 RETURNING id',
+      'DELETE FROM chunks WHERE document_id = $1 RETURNING id',
       [documentId]
     );
 
@@ -338,9 +288,9 @@ export const getDocumentStats = async (documentId) => {
         COUNT(*) as total_chunks,
         COUNT(CASE WHEN chunk_type = 'table' THEN 1 END) as table_chunks,
         COUNT(CASE WHEN chunk_type = 'text' THEN 1 END) as text_chunks,
-        SUM(LENGTH(chunk_text)) as total_characters,
-        AVG(LENGTH(chunk_text)) as avg_chunk_size
-       FROM embeddings
+        SUM(LENGTH(content)) as total_characters,
+        AVG(LENGTH(content)) as avg_chunk_size
+       FROM chunks
        WHERE document_id = $1`,
       [documentId]
     );

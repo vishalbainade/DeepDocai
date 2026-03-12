@@ -1,5 +1,5 @@
 import { Upload, Menu } from 'lucide-react';
-import LexRayLogo from './LexRayLogo';
+import DeepDocAILogo from './DeepDocAILogo';
 
 const Navbar = ({ onUploadClick, onMenuClick }) => {
   return (
@@ -16,13 +16,13 @@ const Navbar = ({ onUploadClick, onMenuClick }) => {
             <Menu size={24} className="text-slate-700" />
           </button>
           <div className="flex items-center gap-2">
-            <LexRayLogo size="default" showText={false} useOriginalLogo={true} />
-            <span className="text-2xl font-serif font-bold text-slate-900">LexRay</span>
+            <DeepDocAILogo size="default" showText={false} useOriginalLogo={true} />
+            <span className="text-2xl font-serif font-bold text-slate-900">DeepDoc AI</span>
           </div>
         </div>
         <button
           onClick={onUploadClick}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+          className="flex items-center gap-2 px-4 py-2 bg-[#8E84B8] text-white rounded-lg hover:bg-[#7A70A8] transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-[#8E84B8] focus:ring-offset-2"
         >
           <Upload size={18} />
           Upload New

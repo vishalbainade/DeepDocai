@@ -44,9 +44,8 @@ const UploadZone = ({ onUpload, isUploading, uploadProgress, uploadStage }) => {
 
   return (
     <div
-      className={`h-full flex items-center justify-center p-8 transition-all duration-300 ${
-        isDragging ? 'bg-indigo-50 border-indigo-300' : 'bg-gray-50'
-      }`}
+      className={`h-full flex items-center justify-center p-8 transition-all duration-300 ${isDragging ? 'bg-indigo-50 border-indigo-300' : 'bg-gray-50'
+        }`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -61,22 +60,21 @@ const UploadZone = ({ onUpload, isUploading, uploadProgress, uploadStage }) => {
         />
         <div
           onClick={handleClick}
-          className={`cursor-pointer border-2 border-dashed rounded-xl p-12 transition-all duration-300 ${
-            isDragging
+          className={`cursor-pointer border-2 border-dashed rounded-xl p-12 transition-all duration-300 ${isDragging
               ? 'border-indigo-400 bg-indigo-50'
               : 'border-gray-300 hover:border-indigo-400 hover:bg-indigo-50'
-          } ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            } ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           {isUploading ? (
             <div className="flex flex-col items-center gap-4 w-full">
-              <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
+              <Loader2 className="w-12 h-12 text-[#8E84B8] animate-spin" />
               <p className="text-slate-700 font-medium">{uploadStage || 'Uploading document...'}</p>
-              
+
               {/* Progress Bar */}
               <div className="w-full max-w-xs">
                 <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
                   <div
-                    className="bg-gradient-to-r from-indigo-600 to-purple-600 h-2.5 rounded-full transition-all duration-300 ease-out"
+                    className="bg-[#8E84B8] h-2.5 rounded-full transition-all duration-300 ease-out"
                     style={{ width: `${uploadProgress || 0}%` }}
                   />
                 </div>
@@ -89,7 +87,7 @@ const UploadZone = ({ onUpload, isUploading, uploadProgress, uploadStage }) => {
             <>
               <div className="flex justify-center mb-4">
                 <div className="p-4 bg-indigo-100 rounded-full">
-                  <Upload className="w-8 h-8 text-indigo-600" />
+                  <Upload className="w-8 h-8 text-[#8E84B8]" />
                 </div>
               </div>
               <h3 className="text-xl font-semibold text-slate-900 mb-2">

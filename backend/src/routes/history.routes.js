@@ -13,7 +13,7 @@ router.get('/documents', async (req, res) => {
       `SELECT 
         id,
         file_name,
-        gcs_url,
+        storage_url,
         created_at,
         (SELECT COUNT(*) FROM chat_history WHERE document_id = documents.id) as message_count
        FROM documents
@@ -27,7 +27,7 @@ router.get('/documents', async (req, res) => {
       documents: result.rows.map((row) => ({
         id: row.id,
         fileName: row.file_name,
-        gcsUrl: row.gcs_url,
+        storageUrl: row.storage_url,
         createdAt: row.created_at,
         messageCount: parseInt(row.message_count) || 0,
       })),

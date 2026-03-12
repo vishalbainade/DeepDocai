@@ -13,38 +13,54 @@ const generateOTP = () => {
 
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
+  console.log('\n🔐 ========== REGISTRATION REQUEST ==========');
+  console.log('📩 Body:', JSON.stringify({ ...req.body, password: '***' }));
+  
   try {
     const { name, surname, email, password, profession, country, state, city } = req.body;
 
     // Validation
+    console.log('[1/7] Validating input...');
     if (!name || !surname || !email || !password) {
+      console.log('❌ Missing required fields');
       return res.status(400).json({ error: 'Name, surname, email, and password are required' });
     }
 
     if (password.length < 8) {
+      console.log('❌ Password too short');
       return res.status(400).json({ error: 'Password must be at least 8 characters long' });
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
+      console.log('❌ Invalid email format');
       return res.status(400).json({ error: 'Invalid email format' });
     }
+    console.log('✅ Input valid');
 
     // Check if email already exists
+    console.log('[2/7] Checking if email exists...');
     const existingUser = await query('SELECT id FROM users WHERE email = $1', [email]);
     if (existingUser.rows.length > 0) {
+      console.log('❌ Email already registered:', email);
       return res.status(400).json({ error: 'Email already registered' });
     }
+    console.log('✅ Email is available');
 
     // Hash password
+    console.log('[3/7] Hashing password...');
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(password, saltRounds);
+    console.log('✅ Password hashed');
 
     // Generate OTP
+    console.log('[4/7] Generating OTP...');
     const otp = generateOTP();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+    console.log('✅ OTP generated (expires:', expiresAt.toISOString(), ')');
 
     // Delete any existing OTP for this email
+    console.log('[5/7] Cleaning up old OTPs...');
     await query('DELETE FROM otp_verifications WHERE email = $1 AND type = $2', [email, 'registration']);
 
     // Store OTP
@@ -52,28 +68,38 @@ router.post('/register', async (req, res) => {
       'INSERT INTO otp_verifications (email, otp, type, expires_at) VALUES ($1, $2, $3, $4)',
       [email, otp, 'registration', expiresAt]
     );
+    console.log('✅ OTP stored in database');
 
-    // Store user data temporarily (we'll create account after OTP verification)
-    // For now, we'll just send OTP. User creation happens in verify-otp
-    // Store hashed password in a temporary way - we'll use it in verify-otp
-    // Actually, let's store user with is_verified=false, then update after OTP verification
+    // Create user with is_verified=false
+    console.log('[6/7] Creating user account...');
     const userResult = await query(
       `INSERT INTO users (name, surname, email, password_hash, profession, country, state, city, is_verified)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING id, name, surname, email`,
       [name, surname, email, passwordHash, profession || null, country || null, state || null, city || null, false]
     );
+    console.log('✅ User created:', userResult.rows[0].id);
 
     // Send OTP email
+    console.log('[7/7] Sending OTP email via SMTP...');
+    console.log('   SMTP_HOST:', process.env.SMTP_HOST);
+    console.log('   SMTP_PORT:', process.env.SMTP_PORT);
+    console.log('   SMTP_USER:', process.env.SMTP_USER);
+    console.log('   SMTP_FROM:', process.env.SMTP_FROM);
+    console.log('   To:', email);
     await sendOTPEmail(email, otp, 'registration');
+    console.log('✅ OTP email sent successfully!');
 
+    console.log('🎉 ========== REGISTRATION COMPLETE ==========\n');
     res.status(200).json({
       success: true,
       message: 'OTP sent to your email',
       userId: userResult.rows[0].id,
     });
   } catch (error) {
-    console.error('Registration error:', error);
+    console.error('❌ ========== REGISTRATION FAILED ==========');
+    console.error('   Error:', error.message);
+    console.error('   Stack:', error.stack);
     res.status(500).json({ error: 'Registration failed', message: error.message });
   }
 });
@@ -81,16 +107,22 @@ router.post('/register', async (req, res) => {
 // POST /api/auth/verify-otp
 router.post('/verify-otp', async (req, res) => {
   try {
-    const { email, otp } = req.body;
+    const { email, otp, type = 'registration' } = req.body;
 
     if (!email || !otp) {
       return res.status(400).json({ error: 'Email and OTP are required' });
     }
 
+    // Validate OTP type
+    const validTypes = ['registration', 'login', 'password_reset'];
+    if (!validTypes.includes(type)) {
+      return res.status(400).json({ error: 'Invalid OTP type' });
+    }
+
     // Find OTP
     const otpResult = await query(
       'SELECT * FROM otp_verifications WHERE email = $1 AND type = $2 ORDER BY created_at DESC LIMIT 1',
-      [email, 'registration']
+      [email, type]
     );
 
     if (otpResult.rows.length === 0) {
@@ -109,51 +141,66 @@ router.post('/verify-otp', async (req, res) => {
       return res.status(400).json({ error: 'Invalid OTP' });
     }
 
-    // Update user to verified
-    await query('UPDATE users SET is_verified = TRUE WHERE email = $1', [email]);
+    // Handle different OTP types
+    if (type === 'registration') {
+      // Update user to verified
+      await query('UPDATE users SET is_verified = TRUE WHERE email = $1', [email]);
+    }
 
     // Delete used OTP
-    await query('DELETE FROM otp_verifications WHERE email = $1 AND type = $2', [email, 'registration']);
+    await query('DELETE FROM otp_verifications WHERE email = $1 AND type = $2', [email, type]);
 
     // Get user
     const userResult = await query(
-      'SELECT id, name, surname, email, profession, country, state, city FROM users WHERE email = $1',
+      'SELECT id, name, surname, email, profession, country, state, city, is_verified FROM users WHERE email = $1',
       [email]
     );
 
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
     const user = userResult.rows[0];
 
-    // Check if user has existing chats (to determine if it's a new or returning user)
-    // For new registrations, they won't have chats yet, so isNewUser will be true
-    const chatCountResult = await query(
-      'SELECT COUNT(*) as count FROM chats WHERE user_id = $1',
-      [user.id]
-    );
-    const hasExistingChats = parseInt(chatCountResult.rows[0].count) > 0;
+    // For login and registration, generate JWT token
+    if (type === 'login' || type === 'registration') {
+      // Check if user has existing chats (to determine if it's a new or returning user)
+      const chatCountResult = await query(
+        'SELECT COUNT(*) as count FROM chats WHERE user_id = $1',
+        [user.id]
+      );
+      const hasExistingChats = parseInt(chatCountResult.rows[0].count) > 0;
 
-    // Generate JWT token
-    const token = jwt.sign(
-      { userId: user.id, email: user.email },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+      // Generate JWT token
+      const token = jwt.sign(
+        { userId: user.id, email: user.email },
+        process.env.JWT_SECRET,
+        { expiresIn: '7d' }
+      );
 
-    res.status(200).json({
-      success: true,
-      message: 'Account verified successfully',
-      token,
-      isNewUser: !hasExistingChats,
-      user: {
-        id: user.id,
-        name: user.name,
-        surname: user.surname,
-        email: user.email,
-        profession: user.profession,
-        country: user.country,
-        state: user.state,
-        city: user.city,
-      },
-    });
+      res.status(200).json({
+        success: true,
+        message: type === 'login' ? 'Login successful' : 'Account verified successfully',
+        token,
+        isNewUser: !hasExistingChats,
+        user: {
+          id: user.id,
+          name: user.name,
+          surname: user.surname,
+          email: user.email,
+          profession: user.profession,
+          country: user.country,
+          state: user.state,
+          city: user.city,
+        },
+      });
+    } else {
+      // For password reset, just confirm success
+      res.status(200).json({
+        success: true,
+        message: 'OTP verified successfully',
+      });
+    }
   } catch (error) {
     console.error('OTP verification error:', error);
     res.status(500).json({ error: 'OTP verification failed', message: error.message });
@@ -191,31 +238,34 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    // Check if user has existing chats (to determine if it's a new or returning user)
-    const chatCountResult = await query(
-      'SELECT COUNT(*) as count FROM chats WHERE user_id = $1',
-      [user.id]
-    );
-    const hasExistingChats = parseInt(chatCountResult.rows[0].count) > 0;
+    // Generate OTP for login verification
+    const otp = generateOTP();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
-    // Generate JWT token
-    const token = jwt.sign(
-      { userId: user.id, email: user.email },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
+    // Delete any existing login OTP for this email
+    await query('DELETE FROM otp_verifications WHERE email = $1 AND type = $2', [email, 'login']);
+
+    // Store OTP
+    await query(
+      'INSERT INTO otp_verifications (email, otp, type, expires_at) VALUES ($1, $2, $3, $4)',
+      [email, otp, 'login', expiresAt]
     );
+
+    // Send OTP email
+    try {
+      await sendOTPEmail(email, otp, 'login');
+      console.log(`✅ Login OTP sent successfully to ${email}`);
+    } catch (emailError) {
+      console.error('❌ Error sending login OTP email:', emailError);
+      // Still return success to user (security: don't reveal if email exists)
+      // But log the error for debugging
+      // Optionally, you could return a different error message here
+    }
 
     res.status(200).json({
       success: true,
-      message: 'Login successful',
-      token,
-      isNewUser: !hasExistingChats,
-      user: {
-        id: user.id,
-        name: user.name,
-        surname: user.surname,
-        email: user.email,
-      },
+      message: 'OTP sent to your email. Please verify to complete login.',
+      email: email,
     });
   } catch (error) {
     console.error('Login error:', error);

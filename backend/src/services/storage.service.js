@@ -1,254 +1,147 @@
-import { Storage } from '@google-cloud/storage';
+import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-/**
- * Normalize private key from environment variable
- * Handles various encoding formats and ensures proper newline characters
- */
-const normalizePrivateKey = (key) => {
-  if (!key) return null;
-  
-  let normalized = key;
-  
-  // Handle different newline encodings
-  // Replace \\n (escaped newline) with actual newline
-  normalized = normalized.replace(/\\n/g, '\n');
-  
-  // Handle double-escaped newlines
-  normalized = normalized.replace(/\\\\n/g, '\n');
-  
-  // Handle literal string "\n"
-  normalized = normalized.replace(/"\\n"/g, '\n');
-  
-  // Trim leading/trailing whitespace but preserve internal formatting
-  normalized = normalized.trim();
-  
-  // Ensure proper line endings (some systems might have \r\n)
-  normalized = normalized.replace(/\r\n/g, '\n');
-  
-  return normalized;
-};
+// Initialize Supabase client
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.warn('⚠️ SUPABASE_URL or SUPABASE_SERVICE_KEY not set. Storage features will not work.');
+}
+
+const supabase = createClient(supabaseUrl || '', supabaseKey || '');
+
+// Bucket names
+const INPUT_BUCKET = process.env.SUPABASE_INPUT_BUCKET || 'file-inputs';
+const OUTPUT_BUCKET = process.env.SUPABASE_OUTPUT_BUCKET || 'file-outputs';
 
 /**
- * Check if a string is base64-encoded JSON
+ * Ensure storage buckets exist, create them if they don't
  */
-const isBase64Json = (str) => {
+const ensureBucketsExist = async () => {
   try {
-    const decoded = Buffer.from(str, 'base64').toString('utf-8');
-    JSON.parse(decoded);
-    return true;
-  } catch {
-    return false;
-  }
-};
+    // Check/create input bucket
+    const { data: buckets } = await supabase.storage.listBuckets();
+    const bucketNames = (buckets || []).map(b => b.name);
 
-/**
- * Decode base64-encoded service account JSON
- */
-const decodeServiceAccountJson = (base64String) => {
-  try {
-    const decoded = Buffer.from(base64String, 'base64').toString('utf-8');
-    return JSON.parse(decoded);
+    if (!bucketNames.includes(INPUT_BUCKET)) {
+      const { error } = await supabase.storage.createBucket(INPUT_BUCKET, {
+        public: false,
+        fileSizeLimit: 52428800, // 50MB
+        allowedMimeTypes: ['application/pdf'],
+      });
+      if (error && !error.message.includes('already exists')) {
+        console.error(`Error creating bucket ${INPUT_BUCKET}:`, error.message);
+      } else {
+        console.log(`✅ Created storage bucket: ${INPUT_BUCKET}`);
+      }
+    }
+
+    if (!bucketNames.includes(OUTPUT_BUCKET)) {
+      const { error } = await supabase.storage.createBucket(OUTPUT_BUCKET, {
+        public: false,
+        fileSizeLimit: 10485760, // 10MB
+        allowedMimeTypes: ['application/json'],
+      });
+      if (error && !error.message.includes('already exists')) {
+        console.error(`Error creating bucket ${OUTPUT_BUCKET}:`, error.message);
+      } else {
+        console.log(`✅ Created storage bucket: ${OUTPUT_BUCKET}`);
+      }
+    }
   } catch (error) {
-    throw new Error(`Failed to decode base64 service account JSON: ${error.message}`);
+    console.error('Error ensuring buckets exist:', error.message);
   }
 };
+
+// Initialize buckets on first import
+ensureBucketsExist();
 
 /**
- * Initialize Google Cloud Storage client
- * Supports multiple authentication methods:
- * 1. Service account JSON file path
- * 2. Base64-encoded service account JSON in GCLOUD_PRIVATE_KEY
- * 3. Explicit credentials from environment variables
- * 4. Default credentials (for GCP environments)
- */
-const initializeStorage = () => {
-  try {
-    // Option 1: Use service account JSON file path (GOOGLE_APPLICATION_CREDENTIALS)
-    if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-      console.log('Initializing GCS with service account file:', process.env.GOOGLE_APPLICATION_CREDENTIALS);
-      return new Storage({
-        keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-        projectId: process.env.GCLOUD_PROJECT_ID,
-      });
-    }
-
-    // Option 2: Use base64-encoded service account JSON in GCLOUD_PRIVATE_KEY
-    if (process.env.GCLOUD_PRIVATE_KEY && isBase64Json(process.env.GCLOUD_PRIVATE_KEY)) {
-      console.log('Initializing GCS with base64-encoded service account JSON');
-      
-      const serviceAccount = decodeServiceAccountJson(process.env.GCLOUD_PRIVATE_KEY);
-      
-      if (!serviceAccount.project_id || !serviceAccount.client_email || !serviceAccount.private_key) {
-        throw new Error('Invalid service account JSON: Missing required fields (project_id, client_email, private_key)');
-      }
-
-      // Normalize the private key from the JSON
-      const privateKey = normalizePrivateKey(serviceAccount.private_key);
-
-      return new Storage({
-        projectId: serviceAccount.project_id,
-        credentials: {
-          client_email: serviceAccount.client_email,
-          private_key: privateKey,
-        },
-      });
-    }
-
-    // Option 3: Use explicit credentials from environment variables
-    if (process.env.GCLOUD_PROJECT_ID && process.env.GCLOUD_CLIENT_EMAIL && process.env.GCLOUD_PRIVATE_KEY) {
-      console.log('Initializing GCS with explicit credentials from environment variables');
-      
-      const privateKey = normalizePrivateKey(process.env.GCLOUD_PRIVATE_KEY);
-      
-      if (!privateKey) {
-        throw new Error('GCLOUD_PRIVATE_KEY is empty or invalid');
-      }
-      
-      // Validate that the key has the proper format
-      if (!privateKey.includes('BEGIN') || !privateKey.includes('END')) {
-        throw new Error('Invalid private key format: Must contain BEGIN and END markers');
-      }
-
-      return new Storage({
-        projectId: process.env.GCLOUD_PROJECT_ID.trim(),
-        credentials: {
-          client_email: process.env.GCLOUD_CLIENT_EMAIL.trim(),
-          private_key: privateKey,
-        },
-      });
-    }
-
-    // Option 4: Default credentials (for GCP environments like Cloud Run, App Engine)
-    console.log('Initializing GCS with default credentials');
-    return new Storage({
-      projectId: process.env.GCLOUD_PROJECT_ID,
-    });
-  } catch (error) {
-    console.error('Error initializing Google Cloud Storage:', error.message);
-    throw new Error(`Failed to initialize GCS client: ${error.message}`);
-  }
-};
-
-let storage = null;
-
-// Lazy initialization - only create storage client when needed
-const getStorage = () => {
-  if (!storage) {
-    storage = initializeStorage();
-  }
-  return storage;
-};
-
-// Bucket names from environment variables
-const INPUT_BUCKET_NAME = process.env.GCS_INPUT_BUCKET || 'fileinputbucket';
-const OUTPUT_BUCKET_NAME = process.env.GCS_OUTPUT_BUCKET || 'fileoutputbucket';
-
-// Get bucket references (lazy initialization)
-const getInputBucket = () => {
-  return getStorage().bucket(INPUT_BUCKET_NAME);
-};
-
-const getOutputBucket = () => {
-  return getStorage().bucket(OUTPUT_BUCKET_NAME);
-};
-
-/**
- * Upload a file to the input bucket (fileinputbucket)
- * @param {Buffer|Stream} fileBuffer - File buffer or stream
- * @param {string} fileName - Name for the file in GCS
+ * Upload a file to the input bucket
+ * @param {Buffer} fileBuffer - File buffer
+ * @param {string} fileName - Name for the file in storage
  * @param {string} contentType - MIME type (e.g., 'application/pdf')
- * @returns {Promise<string>} Public URL or GCS path
+ * @returns {Promise<string>} Storage path
  */
 export const uploadToInputBucket = async (fileBuffer, fileName, contentType = 'application/pdf') => {
   try {
-    const file = getInputBucket().file(fileName);
+    const { data, error } = await supabase.storage
+      .from(INPUT_BUCKET)
+      .upload(fileName, fileBuffer, {
+        contentType,
+        upsert: true,
+      });
 
-    // Upload file with metadata
-    await file.save(fileBuffer, {
-      metadata: {
-        contentType: contentType,
-      },
-      resumable: false, // For smaller files, use non-resumable upload
-    });
+    if (error) {
+      throw new Error(`Supabase upload error: ${error.message}`);
+    }
 
-    console.log(`File ${fileName} uploaded to ${INPUT_BUCKET_NAME}`);
-
-    // Return the GCS path (gs://bucket/file) or public URL if bucket is public
-    return `gs://${INPUT_BUCKET_NAME}/${fileName}`;
+    console.log(`✅ File ${fileName} uploaded to ${INPUT_BUCKET}`);
+    return `${INPUT_BUCKET}/${data.path}`;
   } catch (error) {
     console.error('Error uploading to input bucket:', error);
-    throw new Error(`Failed to upload file to GCS: ${error.message}`);
+    throw new Error(`Failed to upload file: ${error.message}`);
   }
 };
 
 /**
  * Upload a file stream to the input bucket (for large files)
  * @param {Stream} fileStream - Readable stream
- * @param {string} fileName - Name for the file in GCS
+ * @param {string} fileName - Name for the file in storage
  * @param {string} contentType - MIME type
- * @returns {Promise<string>} GCS path
+ * @returns {Promise<string>} Storage path
  */
 export const uploadStreamToInputBucket = async (fileStream, fileName, contentType = 'application/pdf') => {
   try {
-    const file = getInputBucket().file(fileName);
+    // Collect stream into buffer
+    const chunks = [];
+    for await (const chunk of fileStream) {
+      chunks.push(chunk);
+    }
+    const buffer = Buffer.concat(chunks);
 
-    // Create a write stream
-    const writeStream = file.createWriteStream({
-      metadata: {
-        contentType: contentType,
-      },
-      resumable: true, // Use resumable upload for larger files
-    });
-
-    return new Promise((resolve, reject) => {
-      fileStream
-        .pipe(writeStream)
-        .on('error', (error) => {
-          console.error('Error uploading stream:', error);
-          reject(new Error(`Failed to upload stream to GCS: ${error.message}`));
-        })
-        .on('finish', () => {
-          console.log(`Stream ${fileName} uploaded to ${INPUT_BUCKET_NAME}`);
-          resolve(`gs://${INPUT_BUCKET_NAME}/${fileName}`);
-        });
-    });
+    return await uploadToInputBucket(buffer, fileName, contentType);
   } catch (error) {
     console.error('Error uploading stream to input bucket:', error);
-    throw new Error(`Failed to upload stream to GCS: ${error.message}`);
+    throw new Error(`Failed to upload stream: ${error.message}`);
   }
 };
 
 /**
- * Upload JSON log to the output bucket (fileoutputbucket)
+ * Upload JSON log to the output bucket
  * @param {Object} logData - JSON object to upload
- * @param {string} fileName - Name for the JSON file in GCS
- * @returns {Promise<string>} GCS path
+ * @param {string} fileName - Name for the JSON file
+ * @returns {Promise<string>} Storage path
  */
 export const uploadLogToOutputBucket = async (logData, fileName) => {
   try {
-    const file = getOutputBucket().file(fileName);
     const jsonString = JSON.stringify(logData, null, 2);
+    const buffer = Buffer.from(jsonString, 'utf-8');
 
-    await file.save(jsonString, {
-      metadata: {
+    const { data, error } = await supabase.storage
+      .from(OUTPUT_BUCKET)
+      .upload(fileName, buffer, {
         contentType: 'application/json',
-      },
-    });
+        upsert: true,
+      });
 
-    console.log(`Log ${fileName} uploaded to ${OUTPUT_BUCKET_NAME}`);
-    return `gs://${OUTPUT_BUCKET_NAME}/${fileName}`;
+    if (error) {
+      throw new Error(`Supabase upload error: ${error.message}`);
+    }
+
+    console.log(`✅ Log ${fileName} uploaded to ${OUTPUT_BUCKET}`);
+    return `${OUTPUT_BUCKET}/${data.path}`;
   } catch (error) {
     console.error('Error uploading log to output bucket:', error);
-    throw new Error(`Failed to upload log to GCS: ${error.message}`);
+    throw new Error(`Failed to upload log: ${error.message}`);
   }
 };
 
 /**
  * Generate a log filename with timestamp
- * Format: log-{documentId}-{timestamp}.json
  * @param {string} documentId - Document ID
  * @returns {string} Filename
  */
@@ -258,47 +151,94 @@ export const generateLogFileName = (documentId) => {
 };
 
 /**
- * Check if buckets exist and are accessible
- * @returns {Promise<{inputExists: boolean, outputExists: boolean}>}
+ * Download a file from the input bucket
+ * @param {string} fileName - Name of the file in storage
+ * @returns {Promise<Buffer>} File buffer
  */
-export const checkBuckets = async () => {
+export const downloadFromInputBucket = async (fileName) => {
   try {
-    const [inputExists] = await getInputBucket().exists();
-    const [outputExists] = await getOutputBucket().exists();
+    const { data, error } = await supabase.storage
+      .from(INPUT_BUCKET)
+      .download(fileName);
 
-    return {
-      inputExists,
-      outputExists,
-    };
+    if (error) {
+      throw new Error(`Supabase download error: ${error.message}`);
+    }
+
+    // Convert Blob to Buffer
+    const arrayBuffer = await data.arrayBuffer();
+    return Buffer.from(arrayBuffer);
   } catch (error) {
-    console.error('Error checking buckets:', error);
-    throw new Error(`Failed to check buckets: ${error.message}`);
+    console.error('Error downloading from input bucket:', error);
+    throw new Error(`Failed to download file: ${error.message}`);
   }
 };
 
 /**
- * Generate a signed URL for uploading a file to GCS
- * @param {string} fileName - Name for the file in GCS
- * @param {string} contentType - MIME type (e.g., 'application/pdf')
- * @param {number} expiresInMinutes - URL expiration time in minutes (default: 15)
- * @returns {Promise<{uploadUrl: string, gcsPath: string}>}
+ * Check if a file exists in the input bucket
+ * @param {string} fileName - Name of the file
+ * @returns {Promise<boolean>}
  */
-export const generateSignedUploadUrl = async (fileName, contentType = 'application/pdf', expiresInMinutes = 15) => {
+export const fileExistsInInputBucket = async (fileName) => {
   try {
-    const file = getInputBucket().file(fileName);
+    // List files to check existence (Supabase doesn't have a direct exists method)
+    const dir = fileName.includes('/') ? fileName.substring(0, fileName.lastIndexOf('/')) : '';
+    const name = fileName.includes('/') ? fileName.substring(fileName.lastIndexOf('/') + 1) : fileName;
     
-    const [url] = await file.getSignedUrl({
-      version: 'v4',
-      action: 'write',
-      expires: Date.now() + expiresInMinutes * 60 * 1000,
-      contentType: contentType,
-    });
+    const { data, error } = await supabase.storage
+      .from(INPUT_BUCKET)
+      .list(dir, { search: name });
 
-    const gcsPath = `gs://${INPUT_BUCKET_NAME}/${fileName}`;
-    
+    if (error) return false;
+    return data && data.some(f => f.name === name);
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Generate a signed URL for reading/downloading a file
+ * @param {string} fileName - Name of the file in storage
+ * @param {number} expiresInSeconds - URL expiration time in seconds (default: 3600 = 1 hour)
+ * @returns {Promise<string>} Signed URL
+ */
+export const generateSignedReadUrl = async (fileName, expiresInSeconds = 3600) => {
+  try {
+    const { data, error } = await supabase.storage
+      .from(INPUT_BUCKET)
+      .createSignedUrl(fileName, expiresInSeconds);
+
+    if (error) {
+      throw new Error(`Supabase signed URL error: ${error.message}`);
+    }
+
+    return data.signedUrl;
+  } catch (error) {
+    console.error('Error generating signed read URL:', error);
+    throw new Error(`Failed to generate signed read URL: ${error.message}`);
+  }
+};
+
+/**
+ * Generate a signed URL for uploading a file
+ * @param {string} fileName - Name for the file in storage
+ * @param {number} expiresInSeconds - URL expiration time in seconds (default: 900 = 15 min)
+ * @returns {Promise<{uploadUrl: string, storagePath: string, fileName: string}>}
+ */
+export const generateSignedUploadUrl = async (fileName, expiresInSeconds = 900) => {
+  try {
+    const { data, error } = await supabase.storage
+      .from(INPUT_BUCKET)
+      .createSignedUploadUrl(fileName);
+
+    if (error) {
+      throw new Error(`Supabase signed upload URL error: ${error.message}`);
+    }
+
     return {
-      uploadUrl: url,
-      gcsPath: gcsPath,
+      uploadUrl: data.signedUrl,
+      token: data.token,
+      storagePath: `${INPUT_BUCKET}/${fileName}`,
       fileName: fileName,
     };
   } catch (error) {
@@ -308,43 +248,37 @@ export const generateSignedUploadUrl = async (fileName, contentType = 'applicati
 };
 
 /**
- * Generate a signed URL for reading/downloading a file from GCS
- * @param {string} fileName - Name of the file in GCS
- * @param {number} expiresInMinutes - URL expiration time in minutes (default: 60)
- * @returns {Promise<string>} Signed URL
+ * Check if buckets exist and are accessible
+ * @returns {Promise<{inputExists: boolean, outputExists: boolean}>}
  */
-export const generateSignedReadUrl = async (fileName, expiresInMinutes = 60) => {
+export const checkBuckets = async () => {
   try {
-    const file = getInputBucket().file(fileName);
-    
-    const [url] = await file.getSignedUrl({
-      version: 'v4',
-      action: 'read',
-      expires: Date.now() + expiresInMinutes * 60 * 1000,
-    });
+    const { data: buckets, error } = await supabase.storage.listBuckets();
+    if (error) throw error;
 
-    return url;
+    const bucketNames = (buckets || []).map(b => b.name);
+    return {
+      inputExists: bucketNames.includes(INPUT_BUCKET),
+      outputExists: bucketNames.includes(OUTPUT_BUCKET),
+    };
   } catch (error) {
-    console.error('Error generating signed read URL:', error);
-    throw new Error(`Failed to generate signed read URL: ${error.message}`);
+    console.error('Error checking buckets:', error);
+    throw new Error(`Failed to check buckets: ${error.message}`);
   }
 };
 
 /**
  * Get public URL for a file (if bucket is public)
- * @param {string} fileName - Name of the file in GCS
+ * @param {string} fileName - Name of the file in storage
  * @returns {string} Public URL
  */
 export const getPublicUrl = (fileName) => {
-  return `https://storage.googleapis.com/${INPUT_BUCKET_NAME}/${fileName}`;
+  const { data } = supabase.storage
+    .from(INPUT_BUCKET)
+    .getPublicUrl(fileName);
+  return data.publicUrl;
 };
 
-// Export both named and default
-export { getStorage };
-export default getStorage;
-
-
-
-
-
-
+// Export supabase client for reuse
+export { supabase };
+export default supabase;

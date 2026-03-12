@@ -59,27 +59,31 @@ const initializeDatabase = async () => {
     const schemaPath = path.join(__dirname, 'db', 'schema.sql');
     const schema = await fs.readFile(schemaPath, 'utf-8');
     
-    // Split schema into individual statements and execute them
-    const statements = schema
+    // Strip full-line comments first, then split into statements
+    const cleaned = schema
+      .split('\n')
+      .map(line => line.trim().startsWith('--') ? '' : line)
+      .join('\n');
+    
+    const statements = cleaned
       .split(';')
       .map(stmt => stmt.trim())
-      .filter(stmt => stmt.length > 0 && !stmt.startsWith('--'));
+      .filter(stmt => stmt.length > 0);
     
     for (const statement of statements) {
       try {
         await query(statement);
       } catch (error) {
-        // Ignore errors for IF NOT EXISTS statements
+        // Ignore errors for IF NOT EXISTS / already exists
         if (!error.message.includes('already exists') && 
             !error.message.includes('duplicate') &&
-            !error.message.includes('extension') &&
             !error.message.includes('does not exist')) {
           console.warn(`Schema statement warning: ${error.message}`);
         }
       }
     }
     
-    console.log('Database schema initialized');
+    console.log('✅ Database schema initialized successfully');
   } catch (error) {
     console.error('Error initializing database:', error);
     // Don't exit - schema might already exist
@@ -102,7 +106,7 @@ const startServer = async () => {
     await fs.mkdir(uploadsDir, { recursive: true });
 
     app.listen(PORT, () => {
-      console.log(`LexRay backend server running on port ${PORT}`);
+      console.log(`DeepDoc AI backend server running on port ${PORT}`);
       console.log(`Health check: http://localhost:${PORT}/health`);
     });
   } catch (error) {

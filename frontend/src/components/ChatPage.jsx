@@ -38,7 +38,7 @@ const ChatPage = () => {
       // Reset PDF URL when switching chats to ensure document reloads
       setPdfUrl(null);
       setShowUploadZone(false);
-      
+
       loadChatMessages(chatId)
         .then(() => {
           // Document will be loaded in the next useEffect
@@ -67,7 +67,7 @@ const ChatPage = () => {
       setShowUploadZone(true);
       return;
     }
-    
+
     try {
       const previewData = await getDocumentPreview(documentId);
       setPdfUrl(previewData.previewUrl);
@@ -86,7 +86,7 @@ const ChatPage = () => {
       const result = await uploadDocument(file);
       setCurrentDocumentId(result.documentId);
       setCurrentFileName(result.fileName);
-      
+
       try {
         const previewData = await getDocumentPreview(result.documentId);
         setPdfUrl(previewData.previewUrl);
@@ -95,7 +95,7 @@ const ChatPage = () => {
         const url = URL.createObjectURL(file);
         setPdfUrl(url);
       }
-      
+
       setShowUploadZone(false);
     } catch (error) {
       console.error('Upload error:', error);
@@ -136,267 +136,267 @@ const ChatPage = () => {
 
     let responseChatId = currentChatId || chatId;
 
-//     try {
-//       let accumulatedContent = '';
-//       let finalSources = null;
-//       let streamingFailed = false;
-//       let finalTableData = null;
-//       let finalAnswerType = 'text';
+    //     try {
+    //       let accumulatedContent = '';
+    //       let finalSources = null;
+    //       let streamingFailed = false;
+    //       let finalTableData = null;
+    //       let finalAnswerType = 'text';
 
-//       try {
-//         await askQuestionStream(
-//           currentDocumentId,
-//           message,
-//           responseChatId,
-//           // onChunk
-//           (chunk) => {
-//             accumulatedContent += chunk;
-//             updateMessage(aiMessageId, {
-//               content: accumulatedContent,
-//               isStreaming: true,
-//             });
-//           },
-//           // onSources
-//           (sources) => {
-//             finalSources = sources;
-//             updateMessage(aiMessageId, {
-//               sources: sources,
-//               isStreaming: true,
-//             });
-//           },
-//           // onChatId
-//           (newChatId) => {
-//             if (!responseChatId && newChatId) {
-//               responseChatId = newChatId;
-//               setCurrentChatId(newChatId);
-//               // Update URL if chat was just created
-//               if (newChatId !== chatId) {
-//                 navigate(`/chat/${newChatId}`, { replace: true });
-//               }
-//             }
-//           },
-//           // onError
-//           async (error) => {
-//             console.error('Streaming error:', error);
-//             streamingFailed = true;
-            
-//             let errorMessage = 'Sorry, I encountered an error while processing your question. Please try again.';
-//             if (error.message) {
-//               if (error.message.includes('embedding') || error.message.includes('fetch failed') || error.message.includes('network')) {
-//                 errorMessage = 'Unable to connect to the AI service. Please check your internet connection and API configuration, then try again.';
-//               } else {
-//                 errorMessage = error.message;
-//               }
-//             }
-            
-//             updateMessage(aiMessageId, {
-//               content: errorMessage,
-//               isStreaming: false,
-//             });
-//             setIsThinking(false);
-//           },
-//           // onComplete - handles final response with table or text data
-//           (completeData) => {
-//             if (completeData) {
-//               if (completeData.answer_type === 'table' && completeData.table) {
-//                 finalAnswerType = 'table';
-//                 finalTableData = completeData.table;
-//                 // Use the answer as fallback text if provided
-//                 if (completeData.answer) {
-//                   accumulatedContent = completeData.answer;
-//                 }
-//               } else if (completeData.answer_type === 'text' && completeData.answer) {
-//                 // For text responses, update accumulated content
-//                 finalAnswerType = 'text';
-//                 accumulatedContent = completeData.answer;
-//               }
-//             }
-//           }
-//         );
+    //       try {
+    //         await askQuestionStream(
+    //           currentDocumentId,
+    //           message,
+    //           responseChatId,
+    //           // onChunk
+    //           (chunk) => {
+    //             accumulatedContent += chunk;
+    //             updateMessage(aiMessageId, {
+    //               content: accumulatedContent,
+    //               isStreaming: true,
+    //             });
+    //           },
+    //           // onSources
+    //           (sources) => {
+    //             finalSources = sources;
+    //             updateMessage(aiMessageId, {
+    //               sources: sources,
+    //               isStreaming: true,
+    //             });
+    //           },
+    //           // onChatId
+    //           (newChatId) => {
+    //             if (!responseChatId && newChatId) {
+    //               responseChatId = newChatId;
+    //               setCurrentChatId(newChatId);
+    //               // Update URL if chat was just created
+    //               if (newChatId !== chatId) {
+    //                 navigate(`/chat/${newChatId}`, { replace: true });
+    //               }
+    //             }
+    //           },
+    //           // onError
+    //           async (error) => {
+    //             console.error('Streaming error:', error);
+    //             streamingFailed = true;
 
-// //////////////////////////////////////////////////////
+    //             let errorMessage = 'Sorry, I encountered an error while processing your question. Please try again.';
+    //             if (error.message) {
+    //               if (error.message.includes('embedding') || error.message.includes('fetch failed') || error.message.includes('network')) {
+    //                 errorMessage = 'Unable to connect to the AI service. Please check your internet connection and API configuration, then try again.';
+    //               } else {
+    //                 errorMessage = error.message;
+    //               }
+    //             }
 
-// if (!streamingFailed) {
-//   updateMessage(aiMessageId, (prevMessage) => {
-//     // For table responses
-//     if (finalAnswerType === 'table' && finalTableData) {
-//       return {
-//         ...prevMessage,
-//         content: '', // Tables don't need text content
-//         isStreaming: false,
-//         sources: finalSources || prevMessage.sources || [],
-//         answer_type: 'table',
-//         table: finalTableData,
-//       };
-//     }
-    
-//     // For text responses - preserve accumulated content that's already in the message
-//     return {
-//       ...prevMessage,
-//       content: prevMessage.content || accumulatedContent || 'No response generated.',
-//       isStreaming: false,
-//       sources: finalSources || prevMessage.sources || [],
-//       answer_type: 'text',
-//     };
-//   });
-  
-//   refreshChats(); // Refresh to update timestamps
-// }
-try {
-  let accumulatedContent = '';
-  let finalSources = null;
-  let streamingFailed = false;
-  let finalTableData = null;
-  let finalAnswerType = 'text';
+    //             updateMessage(aiMessageId, {
+    //               content: errorMessage,
+    //               isStreaming: false,
+    //             });
+    //             setIsThinking(false);
+    //           },
+    //           // onComplete - handles final response with table or text data
+    //           (completeData) => {
+    //             if (completeData) {
+    //               if (completeData.answer_type === 'table' && completeData.table) {
+    //                 finalAnswerType = 'table';
+    //                 finalTableData = completeData.table;
+    //                 // Use the answer as fallback text if provided
+    //                 if (completeData.answer) {
+    //                   accumulatedContent = completeData.answer;
+    //                 }
+    //               } else if (completeData.answer_type === 'text' && completeData.answer) {
+    //                 // For text responses, update accumulated content
+    //                 finalAnswerType = 'text';
+    //                 accumulatedContent = completeData.answer;
+    //               }
+    //             }
+    //           }
+    //         );
 
-  try {
-    await askQuestionStream(
-      currentDocumentId,
-      message,
-      responseChatId,
-      // onChunk
-      (chunk) => {
-        accumulatedContent += chunk;
-        updateMessage(aiMessageId, (prevMessage) => ({
-          ...prevMessage,
-          content: accumulatedContent,
-          isStreaming: true,
-        }));
-      },
-      // onSources
-      (sources) => {
-        finalSources = sources;
-        updateMessage(aiMessageId, (prevMessage) => ({
-          ...prevMessage,
-          sources: sources,
-          isStreaming: true,
-        }));
-      },
-      // onChatId
-      (newChatId) => {
-        if (!responseChatId && newChatId) {
-          responseChatId = newChatId;
-          setCurrentChatId(newChatId);
-          if (newChatId !== chatId) {
-            navigate(`/chat/${newChatId}`, { replace: true });
-          }
-        }
-      },
-      // onError
-      async (error) => {
-        console.error('Streaming error:', error);
-        streamingFailed = true;
-        
-        let errorMessage = 'Sorry, I encountered an error while processing your question. Please try again.';
-        if (error.message) {
-          if (error.message.includes('embedding') || error.message.includes('fetch failed') || error.message.includes('network')) {
-            errorMessage = 'Unable to connect to the AI service. Please check your internet connection and API configuration, then try again.';
-          } else {
-            errorMessage = error.message;
-          }
-        }
-        
-        updateMessage(aiMessageId, {
-          content: errorMessage,
-          isStreaming: false,
-        });
-        setIsThinking(false);
-      },
-      // onComplete - handles final response with table or text data
-      (completeData) => {
-        if (completeData) {
-          if (completeData.answer_type === 'table' && completeData.table) {
-            finalAnswerType = 'table';
-            finalTableData = completeData.table;
-            if (completeData.answer) {
-              accumulatedContent = completeData.answer;
+    // //////////////////////////////////////////////////////
+
+    // if (!streamingFailed) {
+    //   updateMessage(aiMessageId, (prevMessage) => {
+    //     // For table responses
+    //     if (finalAnswerType === 'table' && finalTableData) {
+    //       return {
+    //         ...prevMessage,
+    //         content: '', // Tables don't need text content
+    //         isStreaming: false,
+    //         sources: finalSources || prevMessage.sources || [],
+    //         answer_type: 'table',
+    //         table: finalTableData,
+    //       };
+    //     }
+
+    //     // For text responses - preserve accumulated content that's already in the message
+    //     return {
+    //       ...prevMessage,
+    //       content: prevMessage.content || accumulatedContent || 'No response generated.',
+    //       isStreaming: false,
+    //       sources: finalSources || prevMessage.sources || [],
+    //       answer_type: 'text',
+    //     };
+    //   });
+
+    //   refreshChats(); // Refresh to update timestamps
+    // }
+    try {
+      let accumulatedContent = '';
+      let finalSources = null;
+      let streamingFailed = false;
+      let finalTableData = null;
+      let finalAnswerType = 'text';
+
+      try {
+        await askQuestionStream(
+          currentDocumentId,
+          message,
+          responseChatId,
+          // onChunk
+          (chunk) => {
+            accumulatedContent += chunk;
+            updateMessage(aiMessageId, (prevMessage) => ({
+              ...prevMessage,
+              content: accumulatedContent,
+              isStreaming: true,
+            }));
+          },
+          // onSources
+          (sources) => {
+            finalSources = sources;
+            updateMessage(aiMessageId, (prevMessage) => ({
+              ...prevMessage,
+              sources: sources,
+              isStreaming: true,
+            }));
+          },
+          // onChatId
+          (newChatId) => {
+            if (!responseChatId && newChatId) {
+              responseChatId = newChatId;
+              setCurrentChatId(newChatId);
+              if (newChatId !== chatId) {
+                navigate(`/chat/${newChatId}`, { replace: true });
+              }
             }
-          } else if (completeData.answer_type === 'text' && completeData.answer) {
-            finalAnswerType = 'text';
-            // Don't overwrite accumulated content if chunks were streamed
-            if (!accumulatedContent) {
-              accumulatedContent = completeData.answer;
+          },
+          // onError
+          async (error) => {
+            console.error('Streaming error:', error);
+            streamingFailed = true;
+
+            let errorMessage = 'Sorry, I encountered an error while processing your question. Please try again.';
+            if (error.message) {
+              if (error.message.includes('embedding') || error.message.includes('fetch failed') || error.message.includes('network')) {
+                errorMessage = 'Unable to connect to the AI service. Please check your internet connection and API configuration, then try again.';
+              } else {
+                errorMessage = error.message;
+              }
+            }
+
+            updateMessage(aiMessageId, {
+              content: errorMessage,
+              isStreaming: false,
+            });
+            setIsThinking(false);
+          },
+          // onComplete - handles final response with table or text data
+          (completeData) => {
+            if (completeData) {
+              if (completeData.answer_type === 'table' && completeData.table) {
+                finalAnswerType = 'table';
+                finalTableData = completeData.table;
+                if (completeData.answer) {
+                  accumulatedContent = completeData.answer;
+                }
+              } else if (completeData.answer_type === 'text' && completeData.answer) {
+                finalAnswerType = 'text';
+                // Don't overwrite accumulated content if chunks were streamed
+                if (!accumulatedContent) {
+                  accumulatedContent = completeData.answer;
+                }
+              }
             }
           }
-        }
-      }
-    );
+        );
 
-    // If streaming finished but produced no visible text (common when SSE parsing fails),
-// fallback to non-streaming once so UI never shows "No response generated."
-// if (!streamingFailed && finalAnswerType === 'text' && !accumulatedContent.trim()) {
-//   try {
-//     const result = await askQuestion(currentDocumentId, message, responseChatId);
-//     accumulatedContent = (result.answer || '').trim();
-//     finalSources = result.sources || finalSources;
-//   } catch (e) {
-//     console.error('Non-stream fallback after empty streaming failed:', e);
-//   }
-// }
-
-// If streaming ended but we got neither text nor table, fallback once to non-stream
-if (!streamingFailed && !accumulatedContent.trim() && !finalTableData) {
-  try {
-    const result = await askQuestion(currentDocumentId, message, responseChatId);
-
-    // Update final outputs from fallback
-    finalAnswerType = result.answer_type || 'text';
-    finalTableData = result.table || null;
-    finalSources = result.sources || finalSources;
-
-    if (finalAnswerType === 'text') {
-      accumulatedContent = (result.answer || '').trim();
-    } else if (finalAnswerType === 'table') {
-      // optional: keep a short caption if backend sends it
-      accumulatedContent = (result.answer || '').trim();
-    }
-  } catch (e) {
-    console.error('Fallback after empty streaming failed:', e);
-  }
-}
-
-
-
-    if (!streamingFailed) {
-      updateMessage(aiMessageId, (prevMessage) => {
-        // For table responses
-        // if (finalAnswerType === 'table' && finalTableData) {
-        //   return {
-        //     ...prevMessage,
-        //     content: '',
-        //     isStreaming: false,
-        //     sources: finalSources || prevMessage.sources || [],
-        //     answer_type: 'table',
-        //     table: finalTableData,
-        //   };
+        // If streaming finished but produced no visible text (common when SSE parsing fails),
+        // fallback to non-streaming once so UI never shows "No response generated."
+        // if (!streamingFailed && finalAnswerType === 'text' && !accumulatedContent.trim()) {
+        //   try {
+        //     const result = await askQuestion(currentDocumentId, message, responseChatId);
+        //     accumulatedContent = (result.answer || '').trim();
+        //     finalSources = result.sources || finalSources;
+        //   } catch (e) {
+        //     console.error('Non-stream fallback after empty streaming failed:', e);
+        //   }
         // }
-        if (finalAnswerType === 'table' && finalTableData) {
-          return {
-            ...prevMessage,
-            content: '',                // keep empty so markdown doesn't interfere
-            answer: accumulatedContent, // ✅ allows fallback text under table
-            isStreaming: false,
-            sources: finalSources || prevMessage.sources || [],
-            answer_type: 'table',
-            table: finalTableData,
-          };
+
+        // If streaming ended but we got neither text nor table, fallback once to non-stream
+        if (!streamingFailed && !accumulatedContent.trim() && !finalTableData) {
+          try {
+            const result = await askQuestion(currentDocumentId, message, responseChatId);
+
+            // Update final outputs from fallback
+            finalAnswerType = result.answer_type || 'text';
+            finalTableData = result.table || null;
+            finalSources = result.sources || finalSources;
+
+            if (finalAnswerType === 'text') {
+              accumulatedContent = (result.answer || '').trim();
+            } else if (finalAnswerType === 'table') {
+              // optional: keep a short caption if backend sends it
+              accumulatedContent = (result.answer || '').trim();
+            }
+          } catch (e) {
+            console.error('Fallback after empty streaming failed:', e);
+          }
         }
-        
-        // For text responses - use accumulated content
-        return {
-          ...prevMessage,
-          content: accumulatedContent || prevMessage.content || 'No response generated.',
-          isStreaming: false,
-          sources: finalSources || prevMessage.sources || [],
-          answer_type: 'text',
-        };
-      });
-      
-      refreshChats();
-    }
 
 
-////////////////////////////////////////////////////////
+
+        if (!streamingFailed) {
+          updateMessage(aiMessageId, (prevMessage) => {
+            // For table responses
+            // if (finalAnswerType === 'table' && finalTableData) {
+            //   return {
+            //     ...prevMessage,
+            //     content: '',
+            //     isStreaming: false,
+            //     sources: finalSources || prevMessage.sources || [],
+            //     answer_type: 'table',
+            //     table: finalTableData,
+            //   };
+            // }
+            if (finalAnswerType === 'table' && finalTableData) {
+              return {
+                ...prevMessage,
+                content: '',                // keep empty so markdown doesn't interfere
+                answer: accumulatedContent, // ✅ allows fallback text under table
+                isStreaming: false,
+                sources: finalSources || prevMessage.sources || [],
+                answer_type: 'table',
+                table: finalTableData,
+              };
+            }
+
+            // For text responses - use accumulated content
+            return {
+              ...prevMessage,
+              content: accumulatedContent || prevMessage.content || 'No response generated.',
+              isStreaming: false,
+              sources: finalSources || prevMessage.sources || [],
+              answer_type: 'text',
+            };
+          });
+
+          refreshChats();
+        }
+
+
+        ////////////////////////////////////////////////////////
 
 
 
@@ -419,10 +419,10 @@ if (!streamingFailed && !accumulatedContent.trim() && !finalTableData) {
         //   const messageContent = finalAnswerType === 'table' && finalTableData 
         //     ? '' // Table responses don't have text content
         //     : (accumulatedContent || 'No response generated.');
-          
+
         //   // Ensure we always have answer_type set
         //   const answerType = finalAnswerType || 'text';
-          
+
         //   // Ensure table data is valid if answer_type is table
         //   let tableData = finalTableData;
         //   if (answerType === 'table' && !tableData) {
@@ -432,7 +432,7 @@ if (!streamingFailed && !accumulatedContent.trim() && !finalTableData) {
         //       rows: [],
         //     };
         //   }
-          
+
         //   updateMessage(aiMessageId, {
         //     content: messageContent,
         //     isStreaming: false,
@@ -456,12 +456,12 @@ if (!streamingFailed && !accumulatedContent.trim() && !finalTableData) {
             setCurrentChatId(result.chatId);
             navigate(`/chat/${result.chatId}`, { replace: true });
           }
-          
+
           // Ensure we have valid response data
           const answerType = result.answer_type || 'text';
           const answerContent = result.answer || 'No response generated.';
           const tableData = result.table || null;
-          
+
           updateMessage(aiMessageId, {
             content: answerType === 'table' ? '' : answerContent,
             sources: result.sources || [],
@@ -498,10 +498,10 @@ if (!streamingFailed && !accumulatedContent.trim() && !finalTableData) {
   useEffect(() => {
     const handleMouseMove = (e) => {
       if (!isResizing || !containerRef.current) return;
-      
+
       const containerRect = containerRef.current.getBoundingClientRect();
       const newWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100;
-      
+
       // Constrain between 20% and 80%
       const constrainedWidth = Math.max(20, Math.min(80, newWidth));
       setLeftPanelWidth(constrainedWidth);
@@ -539,7 +539,7 @@ if (!streamingFailed && !accumulatedContent.trim() && !finalTableData) {
   return (
     <div ref={containerRef} className="h-full w-full flex overflow-hidden relative">
       {/* Left Panel - PDF Viewer / Upload Zone */}
-      <div 
+      <div
         className="overflow-hidden flex-shrink-0 border-r border-gray-200"
         style={{ width: `${leftPanelWidth}%` }}
       >
@@ -569,7 +569,7 @@ if (!streamingFailed && !accumulatedContent.trim() && !finalTableData) {
       </div>
 
       {/* Right Panel - Chat Interface */}
-      <div 
+      <div
         className="overflow-hidden flex-shrink-0"
         style={{ width: `${100 - leftPanelWidth}%` }}
       >

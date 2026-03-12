@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, Navigate } from 'react-router-dom';
 import { FileText, ArrowLeft, Eye, EyeOff } from 'lucide-react';
-import { register } from '../services/api';
-import LexRayLogo from '../components/LexRayLogo';
+import { register, isAuthenticated } from '../services/api';
+import DeepDocAILogo from '../components/DeepDocAILogo';
 
 const RegisterPage = () => {
   const navigate = useNavigate();
@@ -19,6 +19,11 @@ const RegisterPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  // If user is already authenticated, redirect to chat
+  if (isAuthenticated()) {
+    return <Navigate to="/chat" replace />;
+  }
 
   const professions = [
     'Lawyer',
@@ -68,9 +73,9 @@ const RegisterPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center py-12 px-4">
+    <div className="min-h-screen bg-[#F4F6FB] flex items-center justify-center py-12 px-4">
       <div className="max-w-md w-full">
-        <Link to="/" className="inline-flex items-center gap-2 text-slate-600 hover:text-indigo-600 mb-6">
+        <Link to="/" className="inline-flex items-center gap-2 text-slate-600 hover:text-[#8E84B8] mb-6">
           <ArrowLeft size={20} />
           Back to Home
         </Link>
@@ -78,10 +83,10 @@ const RegisterPage = () => {
         <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
           <div className="text-center mb-8">
             <div className="flex justify-center mb-4">
-              <LexRayLogo size="large" useOriginalLogo={true} />
+              <DeepDocAILogo size="large" useOriginalLogo={true} />
             </div>
             <h1 className="text-3xl font-bold text-slate-900 mb-2">Create Account</h1>
-            <p className="text-slate-600">Join LexRay to get started</p>
+            <p className="text-slate-600">Join DeepDoc AI to get started</p>
           </div>
 
           {error && (
@@ -100,7 +105,7 @@ const RegisterPage = () => {
                   value={formData.name}
                   onChange={handleChange}
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8E84B8] focus:border-transparent"
                 />
               </div>
               <div>
@@ -111,7 +116,7 @@ const RegisterPage = () => {
                   value={formData.surname}
                   onChange={handleChange}
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8E84B8] focus:border-transparent"
                 />
               </div>
             </div>
@@ -124,7 +129,7 @@ const RegisterPage = () => {
                 value={formData.email}
                 onChange={handleChange}
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8E84B8] focus:border-transparent"
               />
             </div>
 
@@ -138,7 +143,7 @@ const RegisterPage = () => {
                   onChange={handleChange}
                   required
                   minLength={8}
-                  className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8E84B8] focus:border-transparent"
                 />
                 <button
                   type="button"
@@ -158,7 +163,7 @@ const RegisterPage = () => {
                 name="profession"
                 value={formData.profession}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8E84B8] focus:border-transparent"
               >
                 <option value="">Select profession</option>
                 {professions.map((prof) => (
@@ -175,7 +180,7 @@ const RegisterPage = () => {
                 name="country"
                 value={formData.country}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8E84B8] focus:border-transparent"
               >
                 <option value="">Select country</option>
                 {countries.map((country) => (
@@ -194,7 +199,7 @@ const RegisterPage = () => {
                   name="state"
                   value={formData.state}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8E84B8] focus:border-transparent"
                 />
               </div>
               <div>
@@ -204,7 +209,7 @@ const RegisterPage = () => {
                   name="city"
                   value={formData.city}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8E84B8] focus:border-transparent"
                 />
               </div>
             </div>
@@ -212,7 +217,7 @@ const RegisterPage = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-3 bg-[#8E84B8] text-white rounded-lg hover:bg-[#7A70A8] transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Creating Account...' : 'Create Account'}
             </button>
@@ -220,7 +225,7 @@ const RegisterPage = () => {
 
           <p className="mt-6 text-center text-sm text-slate-600">
             Already have an account?{' '}
-            <Link to="/login" className="text-indigo-600 hover:text-indigo-700 font-medium">
+            <Link to="/login" className="text-[#8E84B8] hover:text-[#7A70A8] font-medium">
               Sign in
             </Link>
           </p>

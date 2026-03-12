@@ -5,13 +5,12 @@ dotenv.config();
 
 const { Pool } = pg;
 
+// Use DATABASE_URL for Neon PostgreSQL (connection pooler)
 const pool = new Pool({
-  host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 5432,
-  database: process.env.DB_NAME || 'lexray',
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || '',
-  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  },
 });
 
 pool.on('error', (err) => {
@@ -24,7 +23,7 @@ export const query = async (text, params) => {
   try {
     const res = await pool.query(text, params);
     const duration = Date.now() - start;
-    console.log('Executed query', { text, duration, rows: res.rowCount });
+    console.log('Executed query', { text: text.substring(0, 80), duration, rows: res.rowCount });
     return res;
   } catch (error) {
     console.error('Database query error', error);
@@ -37,4 +36,3 @@ export const getClient = () => {
 };
 
 export default pool;
-

@@ -1,7 +1,8 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import dotenv from 'dotenv';
 import { generateEmbedding } from './embedding.service.js';
-import { searchSimilarChunks, hybridSearch, getAllDocumentChunks } from './vector_service.js';
+import { searchSimilarChunks, getAllDocumentChunks } from './vector_service.js';
+import { hybridSearch } from './retrievalService.js';
 
 dotenv.config();
 
@@ -484,7 +485,7 @@ export const generateAnswer = async (question, documentId, intent = null) => {
       console.log('📊 Table query: Retrieving ALL document chunks');
       documentChunks = await getAllDocumentChunks(documentId, true);
     } else {
-      documentChunks = await hybridSearch(questionEmbedding, documentId, 10, isGeneric, false);
+      documentChunks = await hybridSearch(searchQuery, questionEmbedding, documentId, isGeneric, false);
     }
 
     if (documentChunks.length === 0) {
@@ -579,7 +580,7 @@ export const generateAnswerStream = async function* (question, documentId, inten
     if (isTable) {
       documentChunks = await getAllDocumentChunks(documentId, true);
     } else {
-      documentChunks = await hybridSearch(questionEmbedding, documentId, 10, isGeneric, false);
+      documentChunks = await hybridSearch(searchQuery, questionEmbedding, documentId, isGeneric, false);
     }
 
     if (documentChunks.length === 0) {
@@ -691,9 +692,9 @@ export const diagnoseTableFormat = async (question, documentId) => {
     // Step 3: Retrieve chunks
     try {
       const documentChunks = await hybridSearch(
+        question,
         await generateEmbedding(question),
         documentId,
-        10,
         isGenericQuery(question),
         isTable
       );

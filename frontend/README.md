@@ -1,6 +1,6 @@
-# LexRay Frontend
+# DeepDoc AI Frontend
 
-A modern, responsive React frontend for LexRay - an AI-powered legal document analysis platform. Built with React 18, Vite, Tailwind CSS, and React Router.
+A modern, responsive React frontend for DeepDoc AI - an AI-powered legal document analysis platform. Built with React 18, Vite, Tailwind CSS, and React Router.
 
 ## 📋 Table of Contents
 
@@ -17,7 +17,7 @@ A modern, responsive React frontend for LexRay - an AI-powered legal document an
 
 ## 🎯 Overview
 
-LexRay Frontend provides a professional, user-friendly interface for:
+DeepDoc AI Frontend provides a professional, user-friendly interface for:
 1. **User Authentication**: Registration, login, email verification, password reset
 2. **Document Upload**: Drag-and-drop PDF upload with progress tracking
 3. **Document Viewing**: PDF viewer with zoom, navigation, and page controls
@@ -302,7 +302,7 @@ SSE Stream Received
 
 ### Utility Components
 
-#### `LexRayLogo.jsx`
+#### `DeepDocAILogo.jsx`
 - Reusable logo component
 - Size variants (small, default, large)
 - Text toggle
@@ -421,7 +421,7 @@ frontend/
 │   │   ├── PDFViewer.jsx
 │   │   ├── ChatTable.jsx
 │   │   ├── UploadZone.jsx
-│   │   ├── LexRayLogo.jsx
+│   │   ├── DeepDocAILogo.jsx
 │   │   └── ProtectedRoute.jsx
 │   │
 │   ├── contexts/              # React Context providers
@@ -435,8 +435,8 @@ frontend/
 │   │   └── tableParser.js
 │   │
 │   └── assets/                # Images, logos
-│       ├── lexray-logo.png
-│       └── lexray-logo1.png
+│       ├── DeepDoc AI-logo.png
+│       └── DeepDoc AI-logo1.png
 │
 ├── index.html                 # HTML template
 ├── vite.config.js             # Vite configuration

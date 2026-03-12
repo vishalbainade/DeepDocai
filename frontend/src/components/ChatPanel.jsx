@@ -5,12 +5,12 @@ import SourceCard from './SourceCard';
 import ChatTable from './ChatTable';
 import { extractTableFromContent } from '../utils/tableParser';
 
-const ChatPanel = ({ 
-  chatHistory, 
-  onSendMessage, 
-  onSummarize, 
-  isThinking, 
-  currentDocumentId 
+const ChatPanel = ({
+  chatHistory,
+  onSendMessage,
+  onSummarize,
+  isThinking,
+  currentDocumentId
 }) => {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
@@ -103,27 +103,27 @@ const ChatPanel = ({
   // Local fallback text improvement function
   const improveTextLocally = (text) => {
     if (!text.trim()) return text;
-    
+
     // Capitalize first letter
     let improved = text.trim();
     improved = improved.charAt(0).toUpperCase() + improved.slice(1);
-    
+
     // Ensure it ends with proper punctuation if it's a question
-    if (improved.toLowerCase().includes('what') || 
-        improved.toLowerCase().includes('how') || 
-        improved.toLowerCase().includes('why') || 
-        improved.toLowerCase().includes('when') || 
-        improved.toLowerCase().includes('where') || 
-        improved.toLowerCase().includes('who') ||
-        improved.toLowerCase().includes('can you') ||
-        improved.toLowerCase().includes('could you')) {
+    if (improved.toLowerCase().includes('what') ||
+      improved.toLowerCase().includes('how') ||
+      improved.toLowerCase().includes('why') ||
+      improved.toLowerCase().includes('when') ||
+      improved.toLowerCase().includes('where') ||
+      improved.toLowerCase().includes('who') ||
+      improved.toLowerCase().includes('can you') ||
+      improved.toLowerCase().includes('could you')) {
       if (!improved.endsWith('?') && !improved.endsWith('.')) {
         improved += '?';
       }
     } else if (!improved.endsWith('.') && !improved.endsWith('?') && !improved.endsWith('!')) {
       improved += '.';
     }
-    
+
     return improved;
   };
 
@@ -140,7 +140,7 @@ const ChatPanel = ({
 
         // Build markdown table
         textToCopy = `${title}\n\n`;
-        
+
         if (columns.length > 0 && rows.length > 0) {
           // Add header row
           textToCopy += '| ' + columns.join(' | ') + ' |\n';
@@ -167,7 +167,7 @@ const ChatPanel = ({
 
       // Copy to clipboard
       await navigator.clipboard.writeText(textToCopy);
-      
+
       // Show feedback
       setCopiedMessageId(messageId);
       setTimeout(() => {
@@ -196,7 +196,7 @@ const ChatPanel = ({
       } else {
         textToCopy = message.content || '';
       }
-      
+
       const textArea = document.createElement('textarea');
       textArea.value = textToCopy;
       document.body.appendChild(textArea);
@@ -225,9 +225,9 @@ const ChatPanel = ({
           <div className="h-full flex items-center justify-center">
             <div className="text-center max-w-md">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-indigo-100 mb-4">
-                <MessageSquare className="w-8 h-8 text-indigo-600" />
+                <MessageSquare className="w-8 h-8 text-[#8E84B8]" />
               </div>
-              <h3 className="text-xl font-semibold text-slate-800 mb-2">Welcome to LexRay</h3>
+              <h3 className="text-xl font-semibold text-slate-800 mb-2">Welcome to DeepDoc AI</h3>
               <p className="text-slate-500 text-sm leading-relaxed">
                 Upload a document to start asking questions and get intelligent insights
               </p>
@@ -244,7 +244,7 @@ const ChatPanel = ({
             const hasTable = message.answer_type === 'table' && message.table;
             const hasAnyContent = hasContent || hasTable;
             const showAnalyzing = isStreaming && !hasAnyContent;
-            
+
             // Determine message role (case-insensitive check)
             const messageRole = message.role?.toLowerCase() || 'user';
             const isUserMessage = messageRole === 'user';
@@ -258,11 +258,10 @@ const ChatPanel = ({
                 className={`flex items-start gap-3 ${isUserMessage ? 'flex-row-reverse' : 'flex-row'}`}
               >
                 {/* Avatar */}
-                <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                  isUserMessage 
-                    ? 'bg-indigo-600 text-white shadow-md' 
-                    : 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-md'
-                }`}>
+                <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${isUserMessage
+                    ? 'bg-[#8E84B8] text-white shadow-md'
+                    : 'bg-[#8E84B8] text-white shadow-md'
+                  }`}>
                   {isUserMessage ? (
                     <User size={16} />
                   ) : (
@@ -271,11 +270,10 @@ const ChatPanel = ({
                 </div>
 
                 {/* Message Bubble */}
-                <div className={`relative max-w-[75%] rounded-2xl px-5 py-3.5 transition-all duration-200 group shadow-sm ${
-                  isUserMessage
-                    ? 'bg-indigo-600 text-white rounded-tr-sm'
+                <div className={`relative max-w-[75%] rounded-2xl px-5 py-3.5 transition-all duration-200 group shadow-sm ${isUserMessage
+                    ? 'bg-[#8E84B8] text-white rounded-tr-sm'
                     : 'bg-white text-slate-800 border border-slate-200 rounded-tl-sm'
-                }`}>
+                  }`}>
                   {/* Copy button for AI messages */}
                   {isAiMessage && hasAnyContent && !isStreaming && (
                     <button
@@ -283,7 +281,7 @@ const ChatPanel = ({
                         e.stopPropagation();
                         handleCopyMessage(message, messageKey);
                       }}
-                      className="absolute -top-1 -right-1 p-1.5 rounded-full bg-white shadow-md hover:bg-slate-50 transition-all text-slate-500 hover:text-indigo-600 opacity-0 group-hover:opacity-100"
+                      className="absolute -top-1 -right-1 p-1.5 rounded-full bg-white shadow-md hover:bg-slate-50 transition-all text-slate-500 hover:text-[#8E84B8] opacity-0 group-hover:opacity-100"
                       title={isCopied ? 'Copied!' : 'Copy message'}
                       aria-label="Copy message"
                     >
@@ -300,7 +298,7 @@ const ChatPanel = ({
                       {showAnalyzing ? (
                         // Show "Analyzing..." until first chunk arrives
                         <div className="flex items-center gap-2.5 text-slate-600">
-                          <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+                          <Loader2 className="w-4 h-4 animate-spin text-[#8E84B8]" />
                           <span className="text-sm font-medium">Analyzing document...</span>
                         </div>
                       ) : !hasAnyContent && !isStreaming ? (
@@ -508,7 +506,7 @@ const ChatPanel = ({
                   title="Improve your question"
                 >
                   {isImproving ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+                    <Loader2 className="w-4 h-4 animate-spin text-[#8E84B8]" />
                   ) : (
                     <div className="relative">
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="star-blink">
@@ -532,7 +530,7 @@ const ChatPanel = ({
               )}
               {isThinking && (
                 <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                  <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+                  <Loader2 className="w-4 h-4 animate-spin text-[#8E84B8]" />
                 </div>
               )}
             </div>
@@ -540,7 +538,7 @@ const ChatPanel = ({
               type="button"
               onClick={handleSummarize}
               disabled={!currentDocumentId || isThinking}
-              className="px-4 py-3 bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 rounded-xl hover:from-indigo-100 hover:to-purple-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm border border-indigo-100"
+              className="px-4 py-3 bg-[#8E84B8]/10 text-[#8E84B8] rounded-xl hover:bg-[#8E84B8]/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm border border-[#8E84B8]/20"
               title="Summarize document"
             >
               <Sparkles size={18} />
@@ -549,7 +547,7 @@ const ChatPanel = ({
             <button
               type="submit"
               disabled={!input.trim() || !currentDocumentId || isThinking}
-              className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-xl hover:from-indigo-700 hover:to-indigo-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-md hover:shadow-lg font-medium"
+              className="px-6 py-3 bg-[#8E84B8] text-white rounded-xl hover:bg-[#7A70A8] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-md hover:shadow-lg font-medium"
             >
               <Send size={18} />
               <span className="hidden sm:inline">Send</span>
