@@ -403,7 +403,7 @@ router.use(authenticateToken);
  */
 router.post('/', async (req, res) => {
   try {
-    const { documentId, question, chatId, intent } = req.body;
+    const { documentId, question, chatId, intent, model } = req.body;
     const userId = req.user.id;
 
     if (!documentId || !question) {
@@ -417,7 +417,7 @@ router.post('/', async (req, res) => {
     console.log(`   Intent: ${intent || 'auto-detect'}`);
 
     // Generate answer using RAG
-    const result = await generateAnswer(question, documentId, intent);
+    const result = await generateAnswer(question, documentId, intent, model);
 
     // Create or get chat
     let currentChatId = chatId;
@@ -481,7 +481,7 @@ router.post('/', async (req, res) => {
  */
 router.post('/stream', async (req, res) => {
   try {
-    const { documentId, question, chatId, intent } = req.body;
+    const { documentId, question, chatId, intent, model } = req.body;
     const userId = req.user.id;
 
     if (!documentId || !question) {
@@ -523,7 +523,7 @@ router.post('/stream', async (req, res) => {
     );
 
     // Generate answer using streaming RAG
-    const generator = generateAnswerStream(question, documentId, intent);
+    const generator = generateAnswerStream(question, documentId, intent, model);
     
     let accumulatedText = '';
     let finalResult = null;

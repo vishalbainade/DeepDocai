@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, Loader2, Copy, Check, User, Bot, MessageSquare } from 'lucide-react';
+import { Send, Sparkles, Loader2, Copy, Check, User, Bot, MessageSquare, ChevronDown } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import SourceCard from './SourceCard';
 import ChatTable from './ChatTable';
@@ -10,7 +10,9 @@ const ChatPanel = ({
   onSendMessage,
   onSummarize,
   isThinking,
-  currentDocumentId
+  currentDocumentId,
+  selectedModel,
+  onModelChange
 }) => {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
@@ -215,11 +217,32 @@ const ChatPanel = ({
   };
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-b from-slate-50 to-white">
+    <div className="h-full flex flex-col bg-gradient-to-b from-slate-50 to-white relative">
+      {/* Top Left Model Selector Overlay */}
+      <div className="absolute top-4 left-6 z-10">
+        <div className="relative inline-block">
+          <select
+            value={selectedModel}
+            onChange={(e) => onModelChange(e.target.value)}
+            disabled={isThinking}
+            className="appearance-none bg-white border border-slate-200 rounded-lg px-3 py-1.5 pr-8 text-sm font-medium text-slate-600 hover:border-slate-300 hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors shadow-sm"
+          >
+            <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+            <option value="gemini-3-flash">Gemini 3 Flash</option>
+            <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
+            <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite</option>
+            <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+          </select>
+          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+            <ChevronDown size={14} />
+          </div>
+        </div>
+      </div>
+
       {/* Chat Messages */}
       <div
         ref={chatContainerRef}
-        className="flex-1 overflow-y-auto px-4 py-6 space-y-6 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent"
+        className="flex-1 overflow-y-auto px-4 pt-16 pb-6 space-y-6 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent"
       >
         {chatHistory.length === 0 ? (
           <div className="h-full flex items-center justify-center">

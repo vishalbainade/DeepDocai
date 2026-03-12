@@ -226,12 +226,13 @@ export const getDocumentPreview = async (documentId) => {
  * @param {string|null} intent - Query intent: 'table', 'summary', or null (auto-detect)
  * @returns {Promise<{answer: string, sources: Array, documentId: string, chatId: string}>}
  */
-export const askQuestion = async (documentId, question, chatId = null, intent = null) => {
+export const askQuestion = async (documentId, question, chatId = null, intent = null, model = null) => {
   const response = await api.post('/api/ask', {
     documentId,
     question,
     chatId: chatId || null,
     intent: intent || null, // Send intent for table-aware retrieval
+    model: model || null,
   });
 
   return response.data;
@@ -445,7 +446,8 @@ export const askQuestionStream = async (
   onChatId,
   onError,
   onComplete,
-  intent = null
+  intent = null,
+  model = null
 ) => {
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
   const token = getToken();
@@ -497,6 +499,7 @@ export const askQuestionStream = async (
         question,
         chatId: chatId || null,
         intent: intent || null,
+        model: model || null,
       }),
     });
 
