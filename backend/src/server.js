@@ -23,8 +23,15 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
-// 1. Enable CORS for all origins (Required for frontend integration)
-app.use(cors());
+// 1. Enable CORS for allowed origins
+app.use(cors({
+  origin: [
+    'https://deepdocai.netlify.app',
+    'http://localhost:5173',
+    'http://localhost:5174',
+  ],
+  credentials: true,
+}));
 
 // 2. Increase payload limits to handle large PDFs (set to 50MB)
 app.use(express.json({ limit: '50mb' }));
