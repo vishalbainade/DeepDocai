@@ -1,8 +1,6 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { generateSignedUploadUrl, generateSignedReadUrl, uploadToInputBucket, downloadFromInputBucket } from '../services/storage.service.js';
-import { extractTextWithTesseract } from '../services/tesseract.service.js';
-import { extractTextAndTablesWithOCR } from '../services/ocr_service.js';
 import { extractDocumentWithSarvam } from '../services/sarvam.service.js';
 import fs from 'fs/promises';
 import path from 'path';

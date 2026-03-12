@@ -1,9 +1,7 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import dotenv from 'dotenv';
+import geminiClient from './gemini-client.js';
 
 dotenv.config();
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 /**
  * Generate embeddings using Gemini gemini-embedding-001 model
@@ -14,12 +12,16 @@ export const generateEmbedding = async (text) => {
       throw new Error('Text input is empty or invalid');
     }
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
-    
-    const result = await model.embedContent({
-      content: { parts: [{ text: text }] },
-      outputDimensionality: 768
-    });
+    const result = await geminiClient.executeWithFallback(
+      async (genAI, modelName) => {
+        const model = genAI.getGenerativeModel({ model: modelName });
+        return await model.embedContent({
+          content: { parts: [{ text: text }] },
+          outputDimensionality: 768
+        });
+      },
+      { taskLabel: 'Embedding Generation', preferredModel: geminiClient.MODELS.EMBEDDING, fallbackModels: [] }
+    );
     
     // Handle different possible response structures
     let embedding;

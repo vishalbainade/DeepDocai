@@ -389,6 +389,8 @@ import express from 'express';
 import { generateAnswer, generateAnswerStream } from '../services/rag_service.js';
 import { query } from '../db/index.js';
 import { authenticateToken } from '../middleware/auth.middleware.js';
+import { z } from 'zod';
+import geminiClient from '../services/gemini-client.js';
 
 const router = express.Router();
 
@@ -760,17 +762,19 @@ router.post('/improve-text', async (req, res) => {
       return res.status(400).json({ error: 'Text is required' });
     }
 
-    const { GoogleGenerativeAI } = await import('@google/generative-ai');
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-
     const prompt = `Improve and enhance the following question or query to make it clearer, more specific, and better suited for document analysis. Keep the original intent and meaning, but make it more professional and effective. Only return the improved text, no explanations:
 
 Original: ${text}
 
 Improved:`;
 
-    const result = await model.generateContent(prompt);
+    const result = await geminiClient.executeWithFallback(
+      async (genAI, modelName) => {
+        const model = genAI.getGenerativeModel({ model: modelName });
+        return await model.generateContent(prompt);
+      },
+      { taskLabel: 'Prompt Enhancement', preferredModel: geminiClient.MODELS.TEXT }
+    );
     const improvedText = result.response.text().trim();
 
     res.json({ improvedText });
