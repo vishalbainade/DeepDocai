@@ -3,18 +3,34 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+const smtpPort = parseInt(process.env.SMTP_PORT || '465');
+
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: process.env.SMTP_HOST || 'smtp.hostinger.com',
+  port: smtpPort,
+  secure: smtpPort === 465, // true for 465 (SSL), false for 587 (STARTTLS)
   auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_APP_PASSWORD,
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
   },
 });
 
 export const sendOTPEmail = async (email, otp, type = 'registration') => {
-  const subject = type === 'registration' 
-    ? 'LexRay Account Verification OTP'
-    : 'LexRay Password Reset OTP';
+  let subject, title, message;
+  
+  if (type === 'registration') {
+    subject = 'DeepDoc AI Account Verification OTP';
+    title = 'Verify Your Account';
+    message = 'Thank you for signing up for DeepDoc AI! Please use the OTP below to verify your account:';
+  } else if (type === 'login') {
+    subject = 'DeepDoc AI Login Verification OTP';
+    title = 'Verify Your Login';
+    message = 'Please use the OTP below to complete your login to DeepDoc AI:';
+  } else {
+    subject = 'DeepDoc AI Password Reset OTP';
+    title = 'Reset Your Password';
+    message = 'You requested to reset your password. Please use the OTP below to proceed:';
+  }
 
   const html = `
     <!DOCTYPE html>
@@ -26,15 +42,13 @@ export const sendOTPEmail = async (email, otp, type = 'registration') => {
     </head>
     <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
       <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 28px;">LexRay</h1>
+        <h1 style="color: white; margin: 0; font-size: 28px;">DeepDoc AI</h1>
         <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">AI Legal Assistant</p>
       </div>
       <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e0e0e0; border-top: none;">
-        <h2 style="color: #333; margin-top: 0;">${type === 'registration' ? 'Verify Your Account' : 'Reset Your Password'}</h2>
+        <h2 style="color: #333; margin-top: 0;">${title}</h2>
         <p style="color: #666; font-size: 16px;">
-          ${type === 'registration' 
-            ? 'Thank you for signing up for LexRay! Please use the OTP below to verify your account:'
-            : 'You requested to reset your password. Please use the OTP below to proceed:'}
+          ${message}
         </p>
         <div style="background: white; border: 2px dashed #667eea; border-radius: 8px; padding: 20px; text-align: center; margin: 30px 0;">
           <p style="font-size: 14px; color: #666; margin: 0 0 10px 0; text-transform: uppercase; letter-spacing: 1px;">Your OTP Code</p>
@@ -45,25 +59,43 @@ export const sendOTPEmail = async (email, otp, type = 'registration') => {
         </p>
         <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 30px 0;">
         <p style="color: #999; font-size: 12px; margin: 0; text-align: center;">
-          © ${new Date().getFullYear()} LexRay. All rights reserved.
+          © ${new Date().getFullYear()} DeepDoc AI. All rights reserved.
         </p>
       </div>
     </body>
     </html>
   `;
 
+  // Validate email configuration
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.error('❌ Email configuration missing: SMTP_USER or SMTP_PASS not set');
+    throw new Error('Email service not configured. Please set SMTP_USER and SMTP_PASS environment variables.');
+  }
+
   try {
+    console.log(`📧 Attempting to send ${type} OTP email to ${email}...`);
     const info = await transporter.sendMail({
-      from: `"LexRay" <${process.env.GMAIL_USER}>`,
+      from: process.env.SMTP_FROM || `"DeepDoc AI" <${process.env.SMTP_USER}>`,
       to: email,
       subject: subject,
       html: html,
     });
-    console.log('OTP email sent:', info.messageId);
+    console.log(`✅ OTP email sent successfully (${type}):`, info.messageId);
+    console.log(`   To: ${email}`);
+    console.log(`   Subject: ${subject}`);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error('Error sending OTP email:', error);
-    throw new Error('Failed to send OTP email');
+    console.error(`❌ Error sending OTP email (${type}):`, error.message);
+    console.error('   Full error:', error);
+    
+    // Provide more specific error messages
+    if (error.code === 'EAUTH') {
+      console.error('   Authentication failed. Check GMAIL_USER and GMAIL_APP_PASSWORD.');
+    } else if (error.code === 'ECONNECTION') {
+      console.error('   Connection failed. Check internet connection and Gmail SMTP settings.');
+    }
+    
+    throw new Error(`Failed to send OTP email: ${error.message}`);
   }
 };
 
@@ -78,7 +110,7 @@ export const sendPasswordResetConfirmation = async (email, name) => {
     </head>
     <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
       <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 28px;">LexRay</h1>
+        <h1 style="color: white; margin: 0; font-size: 28px;">DeepDoc AI</h1>
         <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">AI Legal Assistant</p>
       </div>
       <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e0e0e0; border-top: none;">
@@ -96,7 +128,7 @@ export const sendPasswordResetConfirmation = async (email, name) => {
         </div>
         <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 30px 0;">
         <p style="color: #999; font-size: 12px; margin: 0; text-align: center;">
-          © ${new Date().getFullYear()} LexRay. All rights reserved.
+          © ${new Date().getFullYear()} DeepDoc AI. All rights reserved.
         </p>
       </div>
     </body>
@@ -105,9 +137,9 @@ export const sendPasswordResetConfirmation = async (email, name) => {
 
   try {
     const info = await transporter.sendMail({
-      from: `"LexRay" <${process.env.GMAIL_USER}>`,
+      from: process.env.SMTP_FROM || `"DeepDoc AI" <${process.env.SMTP_USER}>`,
       to: email,
-      subject: 'LexRay Password Reset Confirmation',
+      subject: 'DeepDoc AI Password Reset Confirmation',
       html: html,
     });
     console.log('Password reset confirmation email sent:', info.messageId);

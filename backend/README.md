@@ -1,4 +1,4 @@
-# LexRay Backend
+# DeepDoc AI Backend
 
 A comprehensive Node.js backend for a Legal AI RAG (Retrieval Augmented Generation) application using Google Gemini AI and PostgreSQL with pgvector extension.
 
@@ -18,7 +18,7 @@ A comprehensive Node.js backend for a Legal AI RAG (Retrieval Augmented Generati
 
 ## 🎯 Overview
 
-LexRay is an intelligent legal document analysis system that enables users to:
+DeepDoc AI is an intelligent legal document analysis system that enables users to:
 1. **Upload PDF documents** (legal documents, contracts, agreements, etc.)
 2. **Ask questions** about uploaded documents using natural language
 3. **Get accurate answers** based solely on document content with source citations
@@ -551,11 +551,11 @@ npm install
 3. **Set up PostgreSQL database:**
 ```bash
 # Create database
-createdb lexray
+createdb DeepDoc AI
 
 # Connect and enable extensions
-psql lexray -c "CREATE EXTENSION IF NOT EXISTS vector;"
-psql lexray -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
+psql DeepDoc AI -c "CREATE EXTENSION IF NOT EXISTS vector;"
+psql DeepDoc AI -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
 ```
 
 4. **Configure environment variables:**
@@ -587,7 +587,7 @@ NODE_ENV=development
 # Database Configuration
 DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=lexray
+DB_NAME=DeepDoc AI
 DB_USER=postgres
 DB_PASSWORD=your_password
 
@@ -608,7 +608,7 @@ EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
 EMAIL_USER=your_email@gmail.com
 EMAIL_PASSWORD=your_app_password
-EMAIL_FROM=noreply@lexray.com
+EMAIL_FROM=noreply@DeepDoc AI.com
 ```
 
 ## 📁 Project Structure

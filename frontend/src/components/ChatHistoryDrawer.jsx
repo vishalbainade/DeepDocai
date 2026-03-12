@@ -247,7 +247,7 @@ const ChatHistoryDrawer = ({
                     <MessageSquare
                       size={18}
                       className={`mt-0.5 flex-shrink-0 ${
-                        currentChatId === chat.id ? 'text-indigo-600' : 'text-slate-500'
+                        currentChatId === chat.id ? 'text-[#8E84B8]' : 'text-slate-500'
                       }`}
                     />
                     <div className="flex-1 min-w-0">

@@ -52,9 +52,8 @@ const ChatTable = ({ title, columns, rows }) => {
               {normalizedRows.map((row, rowIndex) => (
                 <tr
                   key={rowIndex}
-                  className={`transition-colors hover:bg-slate-50 ${
-                    rowIndex % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'
-                  }`}
+                  className={`transition-colors hover:bg-slate-50 ${rowIndex % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'
+                    }`}
                 >
                   {finalColumns.map((_, colIndex) => (
                     <td

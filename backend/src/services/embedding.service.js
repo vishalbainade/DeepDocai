@@ -6,7 +6,7 @@ dotenv.config();
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 /**
- * Generate embeddings using Gemini text-embedding-004 model
+ * Generate embeddings using Gemini gemini-embedding-001 model
  */
 export const generateEmbedding = async (text) => {
   try {
@@ -14,9 +14,12 @@ export const generateEmbedding = async (text) => {
       throw new Error('Text input is empty or invalid');
     }
 
-    const model = genAI.getGenerativeModel({ model: 'text-embedding-004' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
     
-    const result = await model.embedContent(text);
+    const result = await model.embedContent({
+      content: { parts: [{ text: text }] },
+      outputDimensionality: 768
+    });
     
     // Handle different possible response structures
     let embedding;
@@ -40,7 +43,7 @@ export const generateEmbedding = async (text) => {
       throw new Error('Invalid embedding response: empty or not an array');
     }
 
-    // Validate embedding dimensions (text-embedding-004 produces 768-dimensional vectors)
+    // Validate embedding dimensions (gemini-embedding-001 produces 768-dimensional vectors)
     if (embedding.length !== 768) {
       console.error(`❌ ERROR: Embedding dimension is ${embedding.length}, expected 768`);
       console.error(`   - Input text length: ${text.length} characters`);
@@ -77,10 +80,8 @@ export const generateEmbeddings = async (texts) => {
       
       embeddings.push(embedding);
       
-      // Log progress every 10 chunks
-      if ((i + 1) % 10 === 0) {
-        console.log(`   Progress: ${i + 1}/${texts.length} embeddings generated (dimension: ${embedding.length})`);
-      }
+      // Log progress for every chunk
+      console.log(`   ⚙️ [Chunk ${i + 1}/${texts.length}] Embedding generated (dimension: ${embedding.length}, input length: ${text.length} chars)`);
     }
     
     console.log(`✅ Generated ${embeddings.length} embeddings, all with dimension 768`);

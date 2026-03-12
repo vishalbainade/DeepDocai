@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://jurinex-backend-120280829617.asia-south1.run.app';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -42,8 +42,8 @@ export const register = async (userData) => {
   return response.data;
 };
 
-export const verifyOTP = async (email, otp) => {
-  const response = await api.post('/api/auth/verify-otp', { email, otp });
+export const verifyOTP = async (email, otp, type = 'registration') => {
+  const response = await api.post('/api/auth/verify-otp', { email, otp, type });
   if (response.data.token) {
     localStorage.setItem('token', response.data.token);
     localStorage.setItem('user', JSON.stringify(response.data.user));
@@ -447,7 +447,7 @@ export const askQuestionStream = async (
   onComplete,
   intent = null
 ) => {
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://jurinex-backend-120280829617.asia-south1.run.app';
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
   const token = getToken();
 
   const safeCall = (fn, ...args) => {

@@ -200,7 +200,7 @@ const ChatHistoryPage = () => {
                 <div className="flex items-start gap-3 pr-10">
                   <MessageSquare
                     size={20}
-                    className="mt-0.5 flex-shrink-0 text-indigo-600"
+                    className="mt-0.5 flex-shrink-0 text-[#8E84B8]"
                   />
                   <div className="flex-1 min-w-0">
                     {editingChatId === chat.id ? (

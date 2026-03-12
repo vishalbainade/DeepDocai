@@ -1,4 +1,4 @@
-# LexRay - AI Legal Assistant
+# DeepDoc AI - AI Legal Assistant
 
 A complete authentication system and AI-powered legal document assistant built with React, Node.js, and PostgreSQL.
 
@@ -40,11 +40,11 @@ A complete authentication system and AI-powered legal document assistant built w
 
 ```bash
 # Create PostgreSQL database
-createdb lexray
+createdb DeepDoc AI
 
 # Or using psql
 psql -U postgres
-CREATE DATABASE lexray;
+CREATE DATABASE DeepDoc AI;
 ```
 
 ### 2. Backend Setup
@@ -95,7 +95,7 @@ npm run dev
 PORT=3000
 DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=lexray
+DB_NAME=DeepDoc AI
 DB_USER=postgres
 DB_PASSWORD=your_password
 DB_SSL=false

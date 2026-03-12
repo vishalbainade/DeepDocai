@@ -18,7 +18,7 @@ router.get('/embeddings/:documentId', async (req, res) => {
 
     // Get document info
     const docResult = await query(
-      'SELECT id, file_name, gcs_url, created_at FROM documents WHERE id = $1',
+      'SELECT id, file_name, storage_url, created_at FROM documents WHERE id = $1',
       [documentId]
     );
 
