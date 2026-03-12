@@ -544,7 +544,7 @@ Answer:`;
         });
         return await model.generateContent(prompt);
       },
-      { taskLabel: 'Standard Q&A', preferredModel: geminiClient.MODELS.TEXT }
+      { taskLabel: 'Standard Q&A', preferredModel: preferredModel || geminiClient.MODELS.TEXT }
     );
 
     const response = await result.response;
@@ -642,7 +642,7 @@ Answer clearly and comprehensively:`;
         });
         return await model.generateContentStream(prompt);
       },
-      { taskLabel: 'Streaming Q&A', preferredModel: geminiClient.MODELS.TEXT }
+      { taskLabel: 'Streaming Q&A', preferredModel: preferredModel || geminiClient.MODELS.TEXT }
     );
     
     let fullText = '';

@@ -18,6 +18,7 @@ const Workspace = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [currentFileName, setCurrentFileName] = useState(null);
   const [chatListRefreshTrigger, setChatListRefreshTrigger] = useState(0);
+  const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
 
   const handleUpload = async (file) => {
     setIsUploading(true);
@@ -254,7 +255,8 @@ const Workspace = () => {
               );
             }
           },
-          intent // Pass intent for table-aware retrieval
+          intent, // Pass intent for table-aware retrieval
+          selectedModel // Pass preferred model
         );
 
         // Streaming completed successfully: mark message as no longer streaming
@@ -292,7 +294,7 @@ const Workspace = () => {
         // If streaming setup fails, try non-streaming
         console.error('Streaming setup failed, using non-streaming:', streamError);
         try {
-          const result = await askQuestion(currentDocumentId, message, currentChatId, intent);
+          const result = await askQuestion(currentDocumentId, message, currentChatId, intent, selectedModel);
           if (result.chatId && !responseChatId) {
             responseChatId = result.chatId;
             setCurrentChatId(result.chatId);
@@ -420,6 +422,8 @@ const Workspace = () => {
             onSummarize={handleSummarize}
             isThinking={isThinking}
             currentDocumentId={currentDocumentId}
+            selectedModel={selectedModel}
+            onModelChange={setSelectedModel}
           />
         </div>
       </div>
