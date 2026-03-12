@@ -1,12 +1,10 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import dotenv from 'dotenv';
 import { generateEmbedding } from './embedding.service.js';
 import { searchSimilarChunks, getAllDocumentChunks } from './vector_service.js';
 import { hybridSearch } from './retrievalService.js';
+import geminiClient from './gemini-client.js';
 
 dotenv.config();
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 /**
  * Clean query for vector search by removing formatting instructions
@@ -282,18 +280,22 @@ IMPORTANT:
 Return ONLY the JSON object, nothing else:`;
 
   try {
-    const model = genAI.getGenerativeModel({ 
-      model: 'gemini-2.5-flash',
-      generationConfig: {
-        temperature: 0.3,
-        topP: 0.95,
-        topK: 40,
-        responseMimeType: 'application/json',
+    const result = await geminiClient.executeWithFallback(
+      async (genAI, modelName) => {
+        const model = genAI.getGenerativeModel({ 
+          model: modelName,
+          generationConfig: {
+            temperature: 0.3,
+            topP: 0.95,
+            topK: 40,
+            responseMimeType: 'application/json',
+          },
+        });
+        return await model.generateContent(prompt);
       },
-    });
+      { taskLabel: 'Table Extraction', preferredModel: geminiClient.MODELS.TEXT }
+    );
 
-    console.log('🤖 Calling Gemini for table extraction...');
-    const result = await model.generateContent(prompt);
     const response = await result.response;
     const rawText = response.text();
     
@@ -405,15 +407,6 @@ Return ONLY the JSON object, nothing else:`;
  * Fallback table extraction with simpler prompt
  */
 const fallbackTableExtraction = async (question, context, suggestedColumns) => {
-  const model = genAI.getGenerativeModel({ 
-    model: 'gemini-2.5-flash',
-    generationConfig: {
-      temperature: 0.5,
-      topP: 0.95,
-      responseMimeType: 'application/json',
-    },
-  });
-
   const simplePrompt = `Extract key information from this text as JSON.
 
 TEXT:
@@ -429,7 +422,20 @@ Return JSON ONLY:
   "rows": [["point 1", "description 1"], ["point 2", "description 2"], ...]
 }`;
 
-  const result = await model.generateContent(simplePrompt);
+  const result = await geminiClient.executeWithFallback(
+    async (genAI, modelName) => {
+      const model = genAI.getGenerativeModel({ 
+        model: modelName,
+        generationConfig: {
+          temperature: 0.5,
+          topP: 0.95,
+          responseMimeType: 'application/json',
+        },
+      });
+      return await model.generateContent(simplePrompt);
+    },
+    { taskLabel: 'Fallback Table Extraction', preferredModel: geminiClient.MODELS.TEXT }
+  );
   const response = await result.response;
   const rawText = response.text();
   
@@ -527,15 +533,20 @@ INSTRUCTIONS:
 
 Answer:`;
 
-    const model = genAI.getGenerativeModel({ 
-      model: 'gemini-2.5-flash',
-      generationConfig: {
-        temperature: 0.7,
-        topP: 0.95,
+    const result = await geminiClient.executeWithFallback(
+      async (genAI, modelName) => {
+        const model = genAI.getGenerativeModel({ 
+          model: modelName,
+          generationConfig: {
+            temperature: 0.7,
+            topP: 0.95,
+          },
+        });
+        return await model.generateContent(prompt);
       },
-    });
+      { taskLabel: 'Standard Q&A', preferredModel: geminiClient.MODELS.TEXT }
+    );
 
-    const result = await model.generateContent(prompt);
     const response = await result.response;
     const answer = response.text();
 
@@ -620,15 +631,19 @@ QUESTION: ${question}
 
 Answer clearly and comprehensively:`;
 
-    const model = genAI.getGenerativeModel({ 
-      model: 'gemini-2.5-flash',
-      generationConfig: {
-        temperature: 0.7,
-        topP: 0.95,
+    const result = await geminiClient.executeWithFallback(
+      async (genAI, modelName) => {
+        const model = genAI.getGenerativeModel({ 
+          model: modelName,
+          generationConfig: {
+            temperature: 0.7,
+            topP: 0.95,
+          },
+        });
+        return await model.generateContentStream(prompt);
       },
-    });
-
-    const result = await model.generateContentStream(prompt);
+      { taskLabel: 'Streaming Q&A', preferredModel: geminiClient.MODELS.TEXT }
+    );
     
     let fullText = '';
     for await (const chunk of result.stream) {
