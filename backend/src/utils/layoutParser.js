@@ -10,9 +10,12 @@ export const parseLayoutBlocks = (ocrMetadataPages) => {
     
     // Sort blocks essentially top-to-bottom within the page
     const sortedBlocks = [...page.blocks].sort((a, b) => {
-      const aY = a.coordinates ? Math.min(a.coordinates[1], a.coordinates[3]) : 0;
-      const bY = b.coordinates ? Math.min(b.coordinates[1], b.coordinates[3]) : 0;
-      return aY - bY;
+      const getMinY = (coords) => {
+        if (!coords) return 0;
+        if (Array.isArray(coords)) return Math.min(coords[1], coords[3]);
+        return Math.min(coords.y1, coords.y2);
+      };
+      return getMinY(a.coordinates) - getMinY(b.coordinates);
     });
 
     sortedBlocks.forEach((block) => {

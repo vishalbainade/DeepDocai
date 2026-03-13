@@ -1,116 +1,113 @@
 import { estimateTokens, truncateToTokenLimit } from '../utils/tokenizer.js';
 import { cleanText } from '../utils/cleanup.js';
+import logger from '../utils/logger.js';
 
-/**
- * Layout-aware chunking service.
- * Consumes Sarvam's OCR metadata pages and extracts structured chunks.
- * 
- * Rules:
- * - Tables -> 1 chunk intact
- * - Headings -> split boundary
- * - Paragraphs -> merged until ~300 tokens (max 400 safeguard)
- */
+const normalizeBbox = (rawBbox) => {
+  if (Array.isArray(rawBbox) && rawBbox.length === 4) {
+    return rawBbox.map((value) => Number(Number(value).toFixed(2)));
+  }
+
+  if (rawBbox && typeof rawBbox === 'object' && 'x1' in rawBbox && 'y1' in rawBbox) {
+    return [
+      Number(Number(rawBbox.x1).toFixed(2)),
+      Number(Number(rawBbox.y1).toFixed(2)),
+      Number(Number(rawBbox.x2).toFixed(2)),
+      Number(Number(rawBbox.y2).toFixed(2)),
+    ];
+  }
+
+  return null;
+};
+
+const resolveChunkType = (type) => {
+  if (type.includes('table')) return 'table';
+  if (type.includes('heading') || type.includes('title')) return 'heading';
+  if (type.includes('list')) return 'list';
+  return 'paragraph';
+};
+
 export const extractLayoutChunks = (ocrMetadataPages, documentId) => {
-  console.log('\n[CHUNKING] Layout-aware chunking started');
-  const chunks = [];
-  
-  let currentSectionTitle = 'General';
-  let currentMerge = {
-    text: '',
-    tokens: 0,
-    pageNumbers: new Set(),
-    bboxes: []
-  };
+  logger.info('CHUNKING', 'Layout-aware chunking started', { documentId });
 
-  const pushCurrentMerge = () => {
-    if (currentMerge.tokens > 0) {
+  const chunks = [];
+  let currentSectionTitle = 'General';
+  let headingCount = 0;
+  let paragraphCount = 0;
+  let tableCount = 0;
+
+  for (let pageIndex = 0; pageIndex < ocrMetadataPages.length; pageIndex += 1) {
+    const page = ocrMetadataPages[pageIndex];
+    if (!page || !Array.isArray(page.blocks)) {
+      continue;
+    }
+
+    const pageNumber = page.page_num || pageIndex + 1;
+
+    for (const block of page.blocks) {
+      const text = cleanText(block?.text || '');
+      if (!text) {
+        continue;
+      }
+
+      const rawType = String(block?.block_type || block?.type || block?.label || 'paragraph').toLowerCase();
+      const chunkType = resolveChunkType(rawType);
+      const tokenCount = estimateTokens(text);
+      const pageWidth = block?.page_width || page?.image_width || page?.page_width || null;
+      const pageHeight = block?.page_height || page?.image_height || page?.page_height || null;
+      const bbox = normalizeBbox(block?.coordinates || block?.box || null);
+      const boundedContent =
+        chunkType === 'table'
+          ? truncateToTokenLimit(text, 700)
+          : tokenCount > 400
+            ? truncateToTokenLimit(text, 400)
+            : text;
+
+      if (chunkType === 'heading') {
+        currentSectionTitle = boundedContent.substring(0, 100);
+        headingCount += 1;
+      } else if (chunkType === 'table') {
+        tableCount += 1;
+      } else {
+        paragraphCount += 1;
+      }
+
       chunks.push({
         document_id: documentId,
-        content: currentMerge.text.trim(),
-        chunk_type: 'section',
-        page_number: Array.from(currentMerge.pageNumbers)[0] || 1, // Store primary page
+        content: boundedContent.trim(),
+        chunk_type: chunkType,
+        page_number: pageNumber,
+        bbox,
+        page_width: pageWidth,
+        page_height: pageHeight,
         metadata: {
           section: currentSectionTitle,
-          pages: Array.from(currentMerge.pageNumbers),
-          bboxes: currentMerge.bboxes,
-          source: 'sarvam'
-        }
+          source: 'sarvam',
+          originalBlockType: rawType,
+          tokenCount: chunkType === 'table' ? Math.min(tokenCount, 700) : Math.min(tokenCount, 400),
+          bbox,
+          pageWidth,
+          pageHeight,
+        },
       });
-      // Reset merge state
-      currentMerge = { text: '', tokens: 0, pageNumbers: new Set(), bboxes: [] };
     }
-  };
+  }
 
-  let tableCount = 0;
-  let paragraphCount = 0;
-
-  ocrMetadataPages.forEach((page, pageIndex) => {
-    if (!page || !page.blocks) return;
-    const pageNum = page.page_num || pageIndex + 1;
-
-    page.blocks.forEach((block) => {
-      const text = cleanText(block.text || '');
-      if (!text) return;
-
-      const type = (block.block_type || block.type || block.label || 'paragraph').toLowerCase();
-      const tokens = estimateTokens(text);
-      const bbox = block.coordinates || block.box || null;
-
-      if (type.includes('table')) {
-        // Force push existing merge before a table
-        pushCurrentMerge();
-        // Add table as dedicated chunk, untouchable
-        chunks.push({
-          document_id: documentId,
-          content: text.trim(),
-          chunk_type: 'table',
-          page_number: pageNum,
-          metadata: {
-            section: currentSectionTitle,
-            bboxes: bbox ? [bbox] : [],
-            source: 'sarvam'
-          }
-        });
-        tableCount++;
-      } else if (type.includes('heading') || type.includes('title')) {
-        // Force push existing merge at section boundaries
-        pushCurrentMerge();
-        currentSectionTitle = text.substring(0, 100); 
-        
-        currentMerge.text += text + '\n\n';
-        currentMerge.tokens += tokens;
-        currentMerge.pageNumbers.add(pageNum);
-        if (bbox) currentMerge.bboxes.push(bbox);
-      } else {
-        // Standard mergeable block (Paragraph/List/etc)
-        // If we breach the ~300 target (buffer allowed up to max token threshold ideally), push.
-        if (currentMerge.tokens + tokens > 300 && currentMerge.tokens > 0) {
-          pushCurrentMerge();
-        }
-
-        // SAFEGUARD: Hard limit single giant blocks from hitting 1000s of tokens
-        if (tokens > 400) {
-          const truncated = truncateToTokenLimit(text, 400);
-          currentMerge.text += truncated + '\n\n';
-          currentMerge.tokens += 400; // Heuristic
-        } else {
-          currentMerge.text += text + '\n\n';
-          currentMerge.tokens += tokens;
-        }
-
-        currentMerge.pageNumbers.add(pageNum);
-        if (bbox) currentMerge.bboxes.push(bbox);
-        paragraphCount++;
-      }
-    });
+  logger.info('CHUNKING', 'Layout chunks created', {
+    documentId,
+    totalChunks: chunks.length,
+    headingChunks: headingCount,
+    paragraphChunks: paragraphCount,
+    tableChunks: tableCount,
   });
 
-  // Flush remaining paragraphs
-  pushCurrentMerge();
+  if (chunks.length > 0) {
+    const bboxChunks = chunks.filter((chunk) => Array.isArray(chunk.bbox) && chunk.bbox.length === 4).length;
+    logger.info('CHUNKING', 'BBox coverage calculated', {
+      documentId,
+      bboxChunks,
+      bboxCoverage: Number(((bboxChunks / chunks.length) * 100).toFixed(1)),
+    });
+  }
 
-  const sectionChunks = chunks.filter(c => c.chunk_type !== 'table').length;
-  console.log(`[CHUNKING] Section/Paragraph chunks created: ${sectionChunks}`);
-  console.log(`[CHUNKING] Table chunks created: ${tableCount}`);
-  
   return chunks;
 };

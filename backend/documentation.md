@@ -1,66 +1,161 @@
-# Document Ingestion & RAG Architecture
-DeepDoc AI0 Backend Documentation
+# DeepDocAI Backend and Frontend Extension Notes
 
----
+## 1. Citation System
+The citation system now uses paragraph-level positional metadata stored in the `chunks` table.
 
-## 1. System Architecture
-The DeepDoc AI0 backend is an Express Node.js application built to facilitate state-of-the-art Document Retrieval Augmented Generation (RAG).
+### Database shape
+`chunks` includes:
+- `id`
+- `document_id`
+- `content`
+- `embedding`
+- `chunk_type`
+- `page_number`
+- `bbox JSONB`
+- `metadata JSONB`
+- `search_vector`
 
-**Core Technologies:**
-- **Storage:** Supabase Object Storage (`file-inputs`)
-- **Database:** PostgreSQL with `pgvector` for Cosine similarity and `tsvector` for Full-Text Search
-- **OCR Engine:** Sarvam AI Document Intelligence API (hi-IN / English models)
-- **PDF Generation:** `pdf-lib` + `@pdf-lib/fontkit`
-- **LLM Wrapper:** Google Generative AI (`gemini-2.5-flash`)
+`bbox` is stored in `[x1, y1, x2, y2]` form and represents the paragraph or table region on the source PDF page.
 
----
+### Ingestion changes
+`backend/src/services/layoutChunkingService.js` now creates paragraph-preserving chunks instead of broad merged sections. Each chunk carries:
+- `page_number`
+- `bbox`
+- `page_width`
+- `page_height`
+- section metadata for retrieval context
 
-## 2. Document Ingestion Pipeline
-When a user uploads a PDF, it is processed through a strict 7-step orchestration defined in `src/controllers/document.controller.js`.
+`backend/src/services/vector_service.js` persists those values directly into PostgreSQL so retrieval can return citation-ready chunks.
 
-### Pipeline Execution
-1. **[UPLOAD]** Download the original static PDF from the Supabase `file-inputs/original` bucket.
-2. **[OCR]** Transport the temporary file to Sarvam with exponential backoff retries. Returns unstructured markdown strings and rich `ocrMetadataPages` containing specific Layout Block structures (`title`, `table`, `paragraph`).
-3. **[PDF RECONSTRUCTION]** Discards the raw scanned image and uses `documentReconstructionService.js` to build a clean, pure white digital A4 PDF. 
-   - Uses `utils/layoutParser.js` to order blocks chronologically.
-   - Uses `utils/pdfRenderer.js` to paginate and type-set fonts according to bounds.
-4. **[STORAGE]** Uploads the pure digital PDF back to Supabase as `ocr-...` enabling the React Frontend to stream crisp selectable data.
-5. **[CHUNKING]** Translates the metadata bounds through `layoutChunkingService.js`:
-   - Tables are kept entirely intact as singular chunks.
-   - Text paragraphs are accumulated safely under a strict ~300 max token `tokenizer.js` constraint boundary.
-6. **[EMBEDDING]** `text-embedding-004` applies pure semantic 768-D coordinates to each constructed text.
-7. **[DB INSERT]** The mapped items are mounted into the `chunks` DB table, associating vectors, bounds, and layout types securely. `search_vector` is computed securely via `GENERATED ALWAYS AS tsvector`.
+### Citation mapping
+`backend/src/services/citationService.js` builds two layers:
+- `citations`: the final deduplicated source badges shown for the answer
+- `paragraphCitations`: per-paragraph citation groups derived from lexical overlap between answer paragraphs and retrieved chunks
 
----
+Each citation includes:
+```json
+{
+  "page": 1,
+  "bbox": [120, 340, 450, 390],
+  "chunkId": "chunk_123",
+  "preview": "Validation must reject negative quantities"
+}
+```
 
-## 3. Hybrid RAG Retrieval Flow
-Requests originating from the `chat.controller.js` flow into `rag_service.js`.
+## 2. Streaming Architecture
+Streaming is handled through:
+- `backend/src/controllers/chat.controller.js`
+- `backend/src/services/streamingService.js`
+- `frontend/src/components/ChatStream.jsx`
 
-### Query Classification
-The RAG intent parser determines if a query is:
-- **Table Specific:** Drops the query limits and pulls *all* table-registered chunks from the DB and pushes it toward a heavy tabular Map/Reduce Gemini summarizer `buildTableAnswer`.
-- **Generic (Summarization):** Bypasses semantic matches and provides an arbitrarily chronologically ordered subset of text.
-- **Specific (Default):** Runs through `retrievalService.hybridSearch`.
+### Backend flow
+1. Client calls `GET /api/chat/stream` or the existing `POST /api/ask/stream`.
+2. Auth is accepted from either the `Authorization` header or `token` query param for native `EventSource`.
+3. The controller creates or reuses the chat, stores the user message, and delegates to `streamingService`.
+4. `streamingService` sets SSE headers and starts `generateAnswerStream`.
+5. Token chunks are emitted as standard SSE `data:` messages.
+6. Citation metadata is emitted as:
+```text
+event: citations
+data: { ... }
+```
+7. Final answer metadata is emitted as:
+```text
+event: complete
+data: { ... }
+```
+8. Completion is closed with:
+```text
+event: done
+data: { "ok": true }
+```
 
-### Hybrid Search Execution (`retrievalService.js`)
-To provide extreme accuracy to queries, `hybridSearch` maps against two disparate ranking models simultaneously:
+### Frontend flow
+`frontend/src/components/Workspace.jsx` creates an `activeStream` request object. `frontend/src/components/ChatStream.jsx` opens a native `EventSource` and forwards:
+- token events to the active AI message
+- citation payloads to answer badges
+- completion payloads to final answer state
 
-1. **Vector Embeddings (Top 10):** Matches the core meaning/semantics of a phrase leveraging `pgvector` cosine difference `embedding <=> $1`.
-2. **Keyword Embeddings (Top 10):** Matches exact linguistic terms leveraging ultra-fast Native PG GIN index indexing over `websearch_to_tsquery`.
+This keeps answer text progressive while still attaching final citations and table payloads at the end.
 
-**Merger Algorithm:**
-The two array datasets are blended together through the `utils/rrf.js` Reciprocal Rank Fusion component prioritizing results that appear independently high-ranked in *both* retrieval methodologies. Fallbacks immediately fire if the subset intersection drops below 3 results.
+## 3. PDF Highlight Algorithm
+PDF navigation and highlighting are handled by:
+- `frontend/src/components/PDFViewer.jsx`
+- `frontend/src/components/HighlightOverlay.jsx`
 
----
+When a citation badge is clicked, `Workspace.jsx` stores the citation as `activeHighlight`. The viewer automatically jumps to `activeHighlight.page`.
 
-## 4. Logging & Error Governance
-To protect the lengthy ingestion cycle, every sequence boundary outputs explicitly marked brackets:
-- `[UPLOAD] Processing document ...`
-- `[OCR] Sarvam Extracted 83 Pages ...`
-- `[LAYOUT PARSER] Breakdown: { paragraph: 60, heading: 4 ... }`
-- `[RENDER BLOCK] Type: heading | Pg 1 ...` 
-- `[PDF COMPLETE] Pages: 85 ...`
-- `[CHUNKING] Section chunks: 140 ...`
-- `[RETRIEVAL] Matches: 6 | Time: 42ms ...`
+Highlight positioning uses:
+```text
+scaleX = viewportWidth / pageWidth
+scaleY = viewportHeight / pageHeight
 
-All failures are natively trapped and propagate a `'failed'` hook back to the `documents.status` database column ensuring the React UI accurately displays execution failures without hanging. The Sarvam integration specifically features automatic exponentiating retries against sporadic Network timeouts.
+left = x1 * scaleX
+top = y1 * scaleY
+width = (x2 - x1) * scaleX
+height = (y2 - y1) * scaleY
+```
+
+The overlay is rendered above the PDF page with:
+```css
+background: rgba(255,255,0,0.4);
+```
+
+## 4. Logging System
+Structured logging is centralized in `backend/src/utils/logger.js`.
+
+The logger emits timestamps plus stage labels. The main flow now logs:
+- `[CHAT REQUEST] Query received`
+- `[RETRIEVAL] Hybrid retrieval started`
+- `[VECTOR SEARCH] Vector search completed`
+- `[KEYWORD SEARCH] Keyword search completed`
+- `[RERANK] Hybrid rerank completed`
+- `[LLM] Streaming started`
+- `[TOKEN STREAM] Token emitted`
+- `[CITATION MAP] Citation mapped`
+- `[STREAM COMPLETE] Streaming finished`
+
+Ingestion logs were also normalized so document processing stages are easier to trace in production.
+
+## 5. Error Handling
+Try/catch handling now wraps:
+- chat request initialization
+- retrieval
+- vector storage
+- streaming orchestration
+- document ingestion
+- frontend highlight rendering
+
+Representative error logs include:
+- `[ERROR][STREAM] Streaming connection closed`
+- `[ERROR][RETRIEVAL] Hybrid retrieval failed`
+- `[ERROR][PDF] Highlight rendering error`
+- `[ERROR][INGESTION] Document processing failed`
+
+Errors return JSON or SSE `error` events without crashing the API process.
+
+## 6. System Data Flow
+The updated end-to-end path is:
+
+1. User uploads PDF.
+2. OCR runs through Sarvam.
+3. `layoutChunkingService` creates paragraph-aware chunks with bbox metadata.
+4. Embeddings and search vectors are stored in PostgreSQL/pgvector.
+5. User asks a question.
+6. Chat controller logs the request and starts streaming.
+7. Retrieval generates the query embedding and runs hybrid search.
+8. Top chunks are sent to the LLM.
+9. Tokens stream to the UI progressively.
+10. Final citations and paragraph citation groups are emitted.
+11. `AnswerCard` renders citation badges.
+12. Clicking a badge navigates the PDF and highlights the cited paragraph.
+
+## 7. Frontend Components Added
+The UI additions are:
+- `frontend/src/components/ChatStream.jsx`
+- `frontend/src/components/AnswerCard.jsx`
+- `frontend/src/components/CitationBadge.jsx`
+- `frontend/src/components/PDFViewer.jsx`
+- `frontend/src/components/HighlightOverlay.jsx`
+
+Note: on this Windows workspace the repository already used `PDFViewer.jsx`, so the PDF viewer implementation remains in that file while still serving the requested viewer role.

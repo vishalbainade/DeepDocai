@@ -183,7 +183,7 @@ export const uploadDocument = async (file, onProgress) => {
     // Step 1: Get signed URL (10% progress)
     if (onProgress) onProgress(10, 'Preparing upload...');
     const signedUrlData = await getSignedUploadUrl(file.name);
-    
+
     // Step 2: Upload file directly to GCS (10-80% progress)
     if (onProgress) onProgress(15, 'Uploading file...');
     await uploadToGCS(file, signedUrlData.uploadUrl, (uploadProgress) => {
@@ -191,7 +191,7 @@ export const uploadDocument = async (file, onProgress) => {
       const mappedProgress = 15 + Math.round((uploadProgress / 100) * 65);
       if (onProgress) onProgress(mappedProgress, 'Uploading file...');
     });
-    
+
     // Step 3: Trigger processing (OCR, chunking, embeddings) (80-100% progress)
     if (onProgress) onProgress(85, 'Processing document...');
     const result = await processDocument(
@@ -199,7 +199,7 @@ export const uploadDocument = async (file, onProgress) => {
       file.name,
       signedUrlData.fileName
     );
-    
+
     if (onProgress) onProgress(100, 'Complete!');
     return result;
   } catch (error) {
@@ -215,6 +215,11 @@ export const uploadDocument = async (file, onProgress) => {
  */
 export const getDocumentPreview = async (documentId) => {
   const response = await api.get(`/api/upload/preview/${documentId}`);
+  return response.data;
+};
+
+export const getAvailableModels = async () => {
+  const response = await api.get('/api/ask/models');
   return response.data;
 };
 
@@ -254,195 +259,15 @@ export const askQuestion = async (documentId, question, chatId = null, intent = 
  */
 
 
-// export const askQuestionStream = async (
-//   documentId,
-//   question,
-//   chatId,
-//   onChunk,
-//   onSources,
-//   onChatId,
-//   onError,
-//   onComplete,
-//   intent = null
-// ) => {
-//   const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://jurinex-backend-120280829617.asia-south1.run.app';
-//   const token = getToken();
-
-//   const safeCall = (fn, ...args) => {
-//     try {
-//       if (typeof fn === 'function') fn(...args);
-//     } catch (e) {
-//       console.error('Callback error:', e);
-//     }
-//   };
-
 //   // Parse SSE blocks separated by a blank line (supports \n\n and \r\n\r\n)
-//   const parseSSEBlocks = (text) => {
-//     const blocks = text.split(/\r?\n\r?\n/);
-//     const remainder = blocks.pop() ?? '';
-//     return { blocks, remainder };
-//   };
 
-//   const parseSSEBlock = (block) => {
-//     const lines = block.split(/\r?\n/);
-//     let eventType = 'message';
-//     const dataLines = [];
-
-//     for (const line of lines) {
-//       if (line.startsWith('event:')) {
-//         eventType = line.slice('event:'.length).trim() || 'message';
-//       } else if (line.startsWith('data:')) {
-//         // supports "data:" and "data: "
-//         dataLines.push(line.slice('data:'.length).trim());
-//       }
-//       // ignore id:, retry:, etc.
-//     }
-
-//     const data = dataLines.join('\n').trim();
-//     return { eventType, data };
-//   };
-
-//   try {
-//     const headers = {
-//       'Content-Type': 'application/json',
-//       'Accept': 'text/event-stream',
-//     };
-
-//     if (token) headers['Authorization'] = `Bearer ${token}`;
-
-//     const response = await fetch(`${API_BASE_URL}/api/ask/stream`, {
-//       method: 'POST',
-//       headers,
-//       body: JSON.stringify({
-//         documentId,
-//         question,
-//         chatId: chatId || null,
-//         intent: intent || null,
-//       }),
-//     });
-
-//     if (!response.ok) {
-//       throw new Error(`HTTP error! status: ${response.status}`);
-//     }
-
-//     if (!response.body) {
-//       throw new Error('Streaming not supported by browser');
-//     }
-
-//     const reader = response.body.getReader();
-//     const decoder = new TextDecoder();
-
-//     let buffer = '';
-//     let streamEnded = false;
-
-//     try {
-//       while (true) {
-//         const { done, value } = await reader.read();
-//         if (done) break;
-
-//         buffer += decoder.decode(value, { stream: true });
-
-//         const { blocks, remainder } = parseSSEBlocks(buffer);
-//         buffer = remainder;
-
-//         for (const block of blocks) {
-//           if (!block.trim()) continue;
-
-//           const { eventType, data } = parseSSEBlock(block);
-
-//           if (eventType === 'start') continue;
-
-//           if (eventType === 'end') {
-//             streamEnded = true;
-//             break;
-//           }
-
-//           if (eventType === 'error') {
-//             // try parse JSON error
-//             try {
-//               const errObj = JSON.parse(data || '{}');
-//               const msg = errObj.error || errObj.details || 'Streaming error';
-//               safeCall(onError, new Error(msg));
-//             } catch {
-//               safeCall(onError, new Error(data || 'Streaming error'));
-//             }
-//             return;
-//           }
-
-//           // Normal message: try JSON, else treat as chunk
-//           if (!data) continue;
-
-//           try {
-//             const parsed = JSON.parse(data);
-
-//             if (parsed.type === 'chunk') {
-//               safeCall(onChunk, parsed.content ?? '');
-//             } else if (parsed.type === 'sources') {
-//               safeCall(onSources, parsed.sources || []);
-//             } else if (parsed.type === 'chatId') {
-//               safeCall(onChatId, parsed.chatId);
-//             } else if (parsed.type === 'complete') {
-//               safeCall(onComplete, {
-//                 answer_type: parsed.answer_type || 'text',
-//                 table: parsed.table,
-//                 answer: parsed.answer,
-//               });
-//             } else {
-//               // unknown JSON: show something instead of silence
-//               safeCall(onChunk, data);
-//             }
-//           } catch {
-//             // plain text fallback
-//             safeCall(onChunk, data);
-//           }
-//         }
-
-//         if (streamEnded) break;
-//       }
-
-//       // Flush leftover buffer if it contains a final SSE block without trailing blank line
-//       if (buffer.trim()) {
-//         const { eventType, data } = parseSSEBlock(buffer);
-//         if (eventType === 'error') {
-//           safeCall(onError, new Error(data || 'Streaming error'));
-//           return;
-//         }
-//         if (data) {
-//           try {
-//             const parsed = JSON.parse(data);
-//             if (parsed.type === 'chunk') safeCall(onChunk, parsed.content ?? '');
-//             if (parsed.type === 'sources') safeCall(onSources, parsed.sources || []);
-//             if (parsed.type === 'chatId') safeCall(onChatId, parsed.chatId);
-//             if (parsed.type === 'complete') {
-//               safeCall(onComplete, {
-//                 answer_type: parsed.answer_type || 'text',
-//                 table: parsed.table,
-//                 answer: parsed.answer,
-//               });
-//             }
-//           } catch {
-//             safeCall(onChunk, data);
-//           }
-//         }
-//       }
-//     } finally {
-//       reader.releaseLock();
-//     }
-//   } catch (error) {
-//     console.error('Streaming error:', error);
-//     safeCall(onError, error);
-//   }
-// };
-
-/////////////////////////////////////////////////////////////
-
-
-export const askQuestionStream = async (
+const askQuestionStream = async (
   documentId,
   question,
   chatId,
   onChunk,
   onSources,
+  onCitations,
   onChatId,
   onError,
   onComplete,
@@ -491,7 +316,7 @@ export const askQuestionStream = async (
     };
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const response = await fetch(`${API_BASE_URL}/api/ask/stream`, {
+    const response = await fetch(`${API_BASE_URL}/api/chat/stream`, {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -528,7 +353,7 @@ export const askQuestionStream = async (
           const { eventType, data } = parseSSEBlock(block);
 
           if (eventType === 'start') continue;
-          if (eventType === 'end') {
+          if (eventType === 'end' || eventType === 'done') {
             streamEnded = true;
             break;
           }
@@ -554,6 +379,7 @@ export const askQuestionStream = async (
             if (parsed && parsed.type) {
               if (parsed.type === 'chunk') safeCall(onChunk, parsed.content ?? '');
               else if (parsed.type === 'sources') safeCall(onSources, parsed.sources || []);
+              else if (parsed.type === 'citations') safeCall(onCitations, parsed.citations || []);
               else if (parsed.type === 'chatId') safeCall(onChatId, parsed.chatId);
               else if (parsed.type === 'complete') {
                 safeCall(onComplete, {
@@ -572,6 +398,11 @@ export const askQuestionStream = async (
                 table: parsed.table,
                 answer: parsed.answer,
               });
+              continue;
+            }
+
+            if (eventType === 'citations') {
+              safeCall(onCitations, parsed.citations || []);
               continue;
             }
 

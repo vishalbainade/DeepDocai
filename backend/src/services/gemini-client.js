@@ -1,168 +1,176 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import dotenv from 'dotenv';
+import {
+  DEFAULT_TEXT_MODEL,
+  getAvailableTextModels,
+  getTextFallbackModels,
+  isUnsupportedModelError,
+  resolveTextModel,
+} from '../config/modelRegistry.js';
+import logger from '../utils/logger.js';
 
 dotenv.config();
 
-/**
- * Gemini Client with Multi-Key Rotation & Model Fallback
- * 
- * Supports multiple API keys (comma-separated in GEMINI_API_KEYS env var)
- * and automatically falls back to alternate models on rate limit errors.
- * 
- * ENV VARS:
- *   GEMINI_API_KEY  - Single key (backward compatible)
- *   GEMINI_API_KEYS - Comma-separated list of keys for rotation
- * 
- * FALLBACK ORDER (text models):
- *   1. gemini-2.5-flash       (5 RPM, 250K TPM, 20 RPD)
- *   2. gemini-2.5-flash-lite  (10 RPM, 250K TPM, 20 RPD)
- *   3. gemini-2.0-flash       (15 RPM, 1M TPM, 1500 RPD)
- */
-
-// Load all API keys
 const loadApiKeys = () => {
   const multiKeys = process.env.GEMINI_API_KEYS;
   if (multiKeys) {
-    const keys = multiKeys.split(',').map(k => k.trim()).filter(Boolean);
+    const keys = multiKeys.split(',').map((key) => key.trim()).filter(Boolean);
     if (keys.length > 0) {
-      console.log(`🔑 Loaded ${keys.length} Gemini API keys for rotation`);
+      logger.info('LLM', 'Gemini API keys loaded', { keyCount: keys.length });
       return keys;
     }
   }
 
   const singleKey = process.env.GEMINI_API_KEY;
   if (singleKey) {
-    console.log('🔑 Loaded 1 Gemini API key');
+    logger.info('LLM', 'Gemini API keys loaded', { keyCount: 1 });
     return [singleKey];
   }
 
-  throw new Error('No Gemini API keys found. Set GEMINI_API_KEY or GEMINI_API_KEYS env var.');
+  throw new Error('No Gemini API keys found. Set GEMINI_API_KEY or GEMINI_API_KEYS.');
 };
 
 const apiKeys = loadApiKeys();
-
-// Create GoogleGenerativeAI instances for each key
-const clients = apiKeys.map(key => new GoogleGenerativeAI(key));
-
-// Track current key index (round-robin)
+const clients = apiKeys.map((key) => new GoogleGenerativeAI(key));
 let currentKeyIndex = 0;
 
-// Fallback model chain for text generation (Free Tier limits)
-const TEXT_MODELS = [
-  'gemini-2.5-flash',       // 5 RPM
-  'gemini-3-flash',         // 5 RPM
-  'gemini-2.5-flash-lite',  // 10 RPM
-  'gemini-3.1-flash-lite',  // 15 RPM, 500 RPD
-  'gemini-2.0-flash'        // 15 RPM
-];
+const EMBEDDING_MODELS = ['gemini-embedding-001'];
 
-// Embedding models (no fallback chain needed, just rotate keys)
-const EMBEDDING_MODELS = [
-  'gemini-embedding-001',
-];
-
-/**
- * Check if an error is a rate limit error (429)
- */
 const isRateLimitError = (error) => {
-  if (!error) return false;
-  const msg = error.message || '';
-  const status = error.status || error.httpStatusCode || error?.response?.status;
+  const message = String(error?.message || '').toLowerCase();
+  const status = error?.status || error?.httpStatusCode || error?.response?.status || null;
   return (
     status === 429 ||
-    msg.includes('429') ||
-    msg.includes('RESOURCE_EXHAUSTED') ||
-    msg.includes('rate limit') ||
-    msg.includes('quota')
+    message.includes('429') ||
+    message.includes('resource_exhausted') ||
+    message.includes('rate limit') ||
+    message.includes('quota')
   );
 };
 
-/**
- * Get the next API key client (round-robin)
- */
 const getNextClient = () => {
   currentKeyIndex = (currentKeyIndex + 1) % clients.length;
   return clients[currentKeyIndex];
 };
 
-/**
- * Execute a Gemini call with automatic key rotation and model fallback.
- * 
- * @param {Function} callFn - Function that receives (genAI, modelName) and returns a promise
- * @param {Object} options
- * @param {string} options.preferredModel - Preferred model name (default: 'gemini-2.5-flash')
- * @param {string[]} options.fallbackModels - Override fallback model chain
- * @param {string} options.taskLabel - Label for logging (e.g. 'table extraction')
- * @returns {Promise<any>} - Result from the callFn
- */
-export const executeWithFallback = async (callFn, options = {}) => {
-  const {
-    preferredModel = 'gemini-2.5-flash',
-    fallbackModels = TEXT_MODELS,
-    taskLabel = 'Gemini call',
-  } = options;
+const dedupe = (items) => [...new Set(items.filter(Boolean))];
+const normalizeRequestedModel = (modelName) => {
+  if (!modelName) {
+    return DEFAULT_TEXT_MODEL.apiModel;
+  }
 
-  // Build the ordered model list: preferred first, then fallbacks
-  const models = [preferredModel, ...fallbackModels.filter(m => m !== preferredModel)];
+  const resolved = resolveTextModel(modelName);
+  if (resolved?.id === modelName || resolved?.apiModel === modelName) {
+    return resolved.apiModel;
+  }
+
+  return modelName;
+};
+
+export const executeWithFallback = async (callFn, options = {}) => {
+  const taskLabel = options.taskLabel || 'Gemini call';
+  const taskLogger = logger.child({ taskLabel });
+  const preferredModel = normalizeRequestedModel(options.preferredModel || DEFAULT_TEXT_MODEL.id);
+  const fallbackModels =
+    options.fallbackModels && options.fallbackModels.length > 0
+      ? options.fallbackModels.map((model) => normalizeRequestedModel(model))
+      : preferredModel === EMBEDDING_MODELS[0]
+        ? []
+        : getTextFallbackModels(preferredModel);
+
+  const models = dedupe([preferredModel, ...fallbackModels]);
   const totalAttempts = clients.length * models.length;
   let attempt = 0;
   let lastError = null;
 
-  for (const modelName of models) {
-    for (let keyAttempt = 0; keyAttempt < clients.length; keyAttempt++) {
-      attempt++;
+  for (let modelIndex = 0; modelIndex < models.length; modelIndex += 1) {
+    const modelName = models[modelIndex];
+    let shouldAdvanceModel = false;
+    let rateLimitHits = 0;
+    const rateLimitedKeys = [];
+
+    for (let keyAttempt = 0; keyAttempt < clients.length; keyAttempt += 1) {
+      attempt += 1;
       const client = clients[currentKeyIndex];
       const keyLabel = `key-${currentKeyIndex + 1}/${clients.length}`;
 
       try {
         const result = await callFn(client, modelName);
-        return result;
+        taskLogger.info('LLM', 'Model execution succeeded', {
+          modelName,
+          attempt,
+          totalAttempts,
+          keyLabel,
+        });
+        return {
+          result,
+          modelName,
+          attempt,
+          totalAttempts,
+          requestedModel: preferredModel,
+          fallbackModels: models.filter((candidate) => candidate !== modelName),
+        };
       } catch (error) {
         lastError = error;
 
         if (isRateLimitError(error)) {
-          console.warn(
-            `⚠️ [${taskLabel}] Rate limited on ${modelName} (${keyLabel}). ` +
-            `Attempt ${attempt}/${totalAttempts}`
-          );
-          // Try next key
+          rateLimitHits += 1;
+          rateLimitedKeys.push(keyLabel);
           getNextClient();
-        } else {
-          // Non-rate-limit error — don't retry
-          throw error;
+          continue;
         }
+
+        if (isUnsupportedModelError(error)) {
+          taskLogger.warn('LLM', 'Unsupported or unavailable model, moving to fallback', {
+            modelName,
+            attempt,
+            totalAttempts,
+          });
+          shouldAdvanceModel = true;
+          break;
+        }
+
+        throw error;
       }
     }
-    // All keys exhausted for this model, move to next model
-    const nextModel = models[models.indexOf(modelName) + 1];
-    if (nextModel) {
-      console.log(`\n======================================================`);
-      console.log(`🔄 MODEL SWITCH: Exhausted limits for ${modelName}.`);
-      console.log(`🚀 Switching to fallback model: ${nextModel}`);
-      console.log(`======================================================\n`);
+
+    if (rateLimitHits > 0) {
+      taskLogger.warn('LLM', 'Rate limit hit for model', {
+        modelName,
+        rateLimitHits,
+        attemptedKeys: rateLimitedKeys,
+        attempt,
+        totalAttempts,
+      });
+    }
+
+    if (shouldAdvanceModel || modelIndex < models.length - 1) {
+      const nextModel = models[modelIndex + 1];
+      if (nextModel) {
+        taskLogger.info('LLM', 'Switching to fallback model', {
+          fromModel: modelName,
+          toModel: nextModel,
+        });
+      }
     }
   }
 
-  // All keys and all models exhausted
-  console.error(`❌ [${taskLabel}] All ${totalAttempts} attempts failed.`);
-  throw lastError || new Error(`All Gemini API keys and models exhausted for: ${taskLabel}`);
+  throw lastError || new Error(`All Gemini API keys and fallback models failed for ${taskLabel}`);
 };
 
-/**
- * Get a generative model instance (for simple/direct usage).
- * Uses the current active key.
- */
-export const getGenAI = () => {
-  return clients[currentKeyIndex];
-};
+export const getGenAI = () => clients[currentKeyIndex];
 
-/**
- * Get model name constants
- */
 export const MODELS = {
-  TEXT: 'gemini-2.5-flash',
-  EMBEDDING: 'gemini-embedding-001',
-  TEXT_FALLBACKS: TEXT_MODELS,
+  TEXT: DEFAULT_TEXT_MODEL.id,
+  TEXT_API: DEFAULT_TEXT_MODEL.apiModel,
+  TEXT_FALLBACKS: getTextFallbackModels(DEFAULT_TEXT_MODEL.id),
+  TEXT_OPTIONS: getAvailableTextModels(),
+  EMBEDDING: EMBEDDING_MODELS[0],
 };
 
-export default { executeWithFallback, getGenAI, MODELS, isRateLimitError };
+export default {
+  executeWithFallback,
+  getGenAI,
+  MODELS,
+  isRateLimitError,
+};

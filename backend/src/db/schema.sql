@@ -55,10 +55,22 @@ CREATE TABLE IF NOT EXISTS chunks (
     embedding vector(768) NOT NULL,
     chunk_type VARCHAR(20) DEFAULT 'text' CHECK (chunk_type IN ('text', 'table', 'heading', 'paragraph', 'list', 'section')),
     page_number INTEGER,
+    bbox JSONB,
+    page_width INTEGER,
+    page_height INTEGER,
     metadata JSONB,
     search_vector tsvector GENERATED ALWAYS AS (to_tsvector('english', content)) STORED,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE chunks ADD COLUMN IF NOT EXISTS chunk_index INTEGER;
+ALTER TABLE chunks ADD COLUMN IF NOT EXISTS content TEXT;
+ALTER TABLE chunks ADD COLUMN IF NOT EXISTS chunk_type VARCHAR(20) DEFAULT 'text';
+ALTER TABLE chunks ADD COLUMN IF NOT EXISTS page_number INTEGER;
+ALTER TABLE chunks ADD COLUMN IF NOT EXISTS bbox JSONB;
+ALTER TABLE chunks ADD COLUMN IF NOT EXISTS page_width INTEGER;
+ALTER TABLE chunks ADD COLUMN IF NOT EXISTS page_height INTEGER;
+ALTER TABLE chunks ADD COLUMN IF NOT EXISTS metadata JSONB;
 
 -- Vector similarity index (Cosine)
 CREATE INDEX IF NOT EXISTS idx_chunks_embedding

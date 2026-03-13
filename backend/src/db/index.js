@@ -1,5 +1,6 @@
 import pg from 'pg';
 import dotenv from 'dotenv';
+import logger from '../utils/logger.js';
 
 dotenv.config();
 
@@ -23,10 +24,17 @@ export const query = async (text, params) => {
   try {
     const res = await pool.query(text, params);
     const duration = Date.now() - start;
-    console.log('Executed query', { text: text.substring(0, 80), duration, rows: res.rowCount });
+    logger.debug('DB', 'Executed query', {
+      text: text.substring(0, 80),
+      duration,
+      rows: res.rowCount,
+    });
     return res;
   } catch (error) {
-    console.error('Database query error', error);
+    logger.error('DB', 'Database query error', {
+      error: error.message,
+      text: text.substring(0, 80),
+    });
     throw error;
   }
 };

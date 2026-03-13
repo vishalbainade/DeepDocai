@@ -1,749 +1,326 @@
-import dotenv from 'dotenv';
-import { generateEmbedding } from './embedding.service.js';
-import { searchSimilarChunks, getAllDocumentChunks } from './vector_service.js';
-import { hybridSearch } from './retrievalService.js';
 import geminiClient from './gemini-client.js';
+import { retrieveRelevantChunks, isGenericQuery, isTableRequest } from './retrievalService.js';
+import { buildParagraphCitations } from './citationService.js';
+import logger from '../utils/logger.js';
 
-dotenv.config();
+const summarizeChunksForFlow = (chunks = []) =>
+  chunks.map((chunk, index) => ({
+    rank: index + 1,
+    chunkId: chunk.id,
+    page: chunk.pageNumber,
+    type: chunk.chunkType,
+    similarity: Number(chunk.similarity || 0).toFixed(4),
+    preview: String(chunk.content || '').replace(/\s+/g, ' ').trim().slice(0, 90),
+  }));
 
-/**
- * Clean query for vector search by removing formatting instructions
- * This ensures we search for the core content, not formatting keywords
- * @param {string} question - Original user question
- * @returns {string} - Cleaned query for embedding/search
- */
-const cleanQueryForSearch = (question) => {
-  if (!question || typeof question !== 'string') {
-    return question;
-  }
-
-  let cleaned = question.trim();
-
-  // Remove formatting-related phrases (case-insensitive)
-  const formattingPatterns = [
-    /\bin\s+tabular\s+format\b/gi,
-    /\bin\s+a\s+table\b/gi,
-    /\bin\s+table\s+format\b/gi,
-    /\bas\s+a\s+table\b/gi,
-    /\bin\s+table\b/gi,
-    /\btabular\s+format\b/gi,
-    /\btable\s+format\b/gi,
-    /\bin\s+tabular\b/gi,
-    /\bshow\s+in\s+table\b/gi,
-    /\bdisplay\s+in\s+table\b/gi,
-    /\bpresent\s+in\s+table\b/gi,
-    /\bformat\s+as\s+table\b/gi,
-    /\bin\s+points\b/gi,
-    /\bas\s+points\b/gi,
-    /\bin\s+bullet\s+points\b/gi,
-    /\bas\s+bullet\s+points\b/gi,
-    /\bin\s+list\s+format\b/gi,
-    /\bas\s+a\s+list\b/gi,
-    /\bin\s+markdown\b/gi,
-    /\bmarkdown\s+format\b/gi,
-    /\bstructured\s+format\b/gi,
-    /\bstructure\s+it\b/gi,
-    /\bstructure\s+as\b/gi,
-    /\bformat\s+it\b/gi,
-    /\bformat\s+as\b/gi,
-    /\bpresent\s+it\b/gi,
-    /\bdisplay\s+it\b/gi,
-    /\bshow\s+it\b/gi,
-    /\bgive\s+me\s+points\b/gi,
-    /\bprovide\s+points\b/gi,
-    /\blist\s+the\s+points\b/gi,
-  ];
-
-  // Remove formatting patterns
-  formattingPatterns.forEach(pattern => {
-    cleaned = cleaned.replace(pattern, '');
+const summarizeTableRows = (columns = [], rows = []) =>
+  rows.slice(0, 5).map((row, index) => {
+    const summary = { row: index + 1 };
+    columns.forEach((column, columnIndex) => {
+      summary[column] = row?.[columnIndex] ?? '';
+    });
+    return summary;
   });
 
-  // Remove extra whitespace and trim
-  cleaned = cleaned.replace(/\s+/g, ' ').trim();
-
-  // If cleaned query is too short or empty, return original (fallback)
-  if (cleaned.length < 3) {
-    console.warn(`⚠️ Cleaned query too short (${cleaned.length} chars), using original query`);
-    return question.trim();
-  }
-
-  return cleaned;
-};
-
-/**
- * Check if question requests tabular format
- * IMPROVED: More comprehensive detection
- */
-const isTableRequest = (question) => {
-  const lowerQuestion = question.toLowerCase();
-  const tableKeywords = [
-    'tabular format',
-    'table format',
-    'in table',
-    'as table',
-    'tabular',
-    'timeline',
-    'events timeline',
-    'facts table',
-    'summary table',
-    'document summary table',
-    'in tabular',
-    'show in table',
-    'display in table',
-    'create a table',
-    'make a table',
-    'generate a table',
-    'output as table',
-    'present as table',
-    'format as table',
-    'table of',
-    'list in table',
-  ];
-  return tableKeywords.some(keyword => lowerQuestion.includes(keyword));
-};
-
-/**
- * Check if question is a generic/summary query that requires broad retrieval
- */
-const isGenericQuery = (question) => {
-  const lowerQuestion = question.toLowerCase();
-  const genericKeywords = [
-    'summarize',
-    'summary',
-    'summarise',
-    'overview',
-    'key points',
-    'important points',
-    'main points',
-    'highlights',
-    'give me',
-    'what is',
-    'what are',
-    'tell me about',
-    'explain',
-    'describe',
-    'general',
-    'overall',
-    'entire',
-    'whole document',
-    'document',
-  ];
-  
-  const isShort = question.trim().split(/\s+/).length <= 5;
-  const hasGenericKeyword = genericKeywords.some(keyword => lowerQuestion.includes(keyword));
-  const isFormatOnly = (lowerQuestion.includes('tabular') || lowerQuestion.includes('table') || lowerQuestion.includes('format')) 
-    && !lowerQuestion.match(/\b(who|what|when|where|why|how|which|name|list|find|search|locate)\b/);
-  
-  return hasGenericKeyword || (isShort && isFormatOnly);
-};
-
-/**
- * Hash a row for deduplication
- */
-const hashRow = (row) => {
-  if (!Array.isArray(row)) return '';
-  return row.map(cell => String(cell || '').trim().toLowerCase()).join('|');
-};
-
-/**
- * Deduplicate rows based on content hash
- */
 const deduplicateRows = (rows) => {
   const seen = new Set();
   const unique = [];
-  
-  for (const row of rows) {
-    const hash = hashRow(row);
-    if (hash && !seen.has(hash)) {
-      seen.add(hash);
+
+  rows.forEach((row) => {
+    const normalized = Array.isArray(row)
+      ? row.map((cell) => String(cell || '').trim().toLowerCase()).join('|')
+      : '';
+
+    if (normalized && !seen.has(normalized)) {
+      seen.add(normalized);
       unique.push(row);
     }
-  }
-  
+  });
+
   return unique;
 };
 
-/**
- * IMPROVED: Build table answer with better extraction
- * This is the core function that extracts structured data from document chunks
- */
-const buildTableAnswer = async (question, documentId, documentChunks) => {
-  console.log(`\n📊 ========== IMPROVED TABLE BUILDER ==========`);
-  console.log(`Question: ${question}`);
-  console.log(`Total chunks: ${documentChunks.length}`);
-  
-  if (documentChunks.length === 0) {
-    console.log('❌ No chunks available for table extraction');
-    return {
-      answer_type: 'table',
-      table: {
-        title: 'No Data Found',
-        columns: [],
-        rows: [],
-      },
-      sources: [],
-    };
-  }
-
-  // Build complete context from all chunks
-  const context = documentChunks
-    .map((chunk, idx) => {
-      const chunkType = chunk.metadata?.chunkType || 'text';
-      const pageNum = chunk.metadata?.pageNumber;
-      const header = pageNum 
-        ? `[Section ${idx + 1} - Page ${pageNum} - Type: ${chunkType}]`
-        : `[Section ${idx + 1} - Type: ${chunkType}]`;
-      return `${header}\n${chunk.text || ''}`;
+const buildTextContext = (chunks) =>
+  chunks
+    .map((chunk, index) => {
+      const similarity = Number((chunk.similarity || 0) * 100).toFixed(1);
+      return `[Chunk ${index + 1} | Page ${chunk.pageNumber} | Relevance ${similarity}%]\n${chunk.content}`;
     })
     .join('\n\n---\n\n');
 
-  console.log(`📝 Context length: ${context.length} characters`);
+const buildTableContext = (chunks) =>
+  chunks
+    .map((chunk, index) => `[Chunk ${index + 1} | Page ${chunk.pageNumber} | Type ${chunk.chunkType}]\n${chunk.content}`)
+    .join('\n\n---\n\n');
 
-  // Determine appropriate table structure based on question
-  const lowerQuestion = question.toLowerCase();
-  let tableType = 'general';
-  let suggestedColumns = ['Key Point', 'Description'];
-  let extractionHint = 'Extract key points and important information';
-
-  if (lowerQuestion.includes('timeline') || lowerQuestion.includes('events')) {
-    tableType = 'timeline';
-    suggestedColumns = ['Date', 'Event', 'Description'];
-    extractionHint = 'Extract chronological events with dates';
-  } else if (lowerQuestion.includes('facts')) {
-    tableType = 'facts';
-    suggestedColumns = ['Fact', 'Source/Reference'];
-    extractionHint = 'Extract factual statements and their sources';
-  } else if (lowerQuestion.includes('summary') || lowerQuestion.includes('overview')) {
-    tableType = 'summary';
-    suggestedColumns = ['Topic', 'Summary'];
-    extractionHint = 'Summarize main topics and themes';
-  } else if (lowerQuestion.includes('important') || lowerQuestion.includes('key point')) {
-    tableType = 'keypoints';
-    suggestedColumns = ['Key Point', 'Details'];
-    extractionHint = 'Extract the most important points and their details';
-  } else if (lowerQuestion.includes('compare') || lowerQuestion.includes('comparison')) {
-    tableType = 'comparison';
-    suggestedColumns = ['Aspect', 'Item 1', 'Item 2'];
-    extractionHint = 'Compare different items or concepts';
+const parseJsonResponse = (rawText) => {
+  const trimmed = String(rawText || '')
+    .trim()
+    .replace(/^```(?:json)?\s*/gm, '')
+    .replace(/```\s*$/gm, '')
+    .trim();
+  const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error('No JSON object found in model response');
   }
+  return JSON.parse(jsonMatch[0]);
+};
 
-  console.log(`📋 Table type detected: ${tableType}`);
-  console.log(`📋 Suggested columns: ${suggestedColumns.join(', ')}`);
+const buildTableAnswer = async (question, chunks, preferredModel) => {
+  const prompt = `You are extracting structured data from a document for a production RAG system.
 
-  // IMPROVED PROMPT: More explicit instructions for table extraction
-  const prompt = `You are extracting structured information from a document to create a table.
+QUESTION:
+${question}
 
-USER REQUEST: ${question}
+DOCUMENT CHUNKS:
+${buildTableContext(chunks)}
 
-EXTRACTION GOAL: ${extractionHint}
-
-DOCUMENT CONTENT:
-${context}
-
-CRITICAL INSTRUCTIONS:
-1. You MUST return ONLY valid JSON - no markdown, no explanations, no code blocks.
-2. ANALYZE THE ENTIRE DOCUMENT CONTENT and extract relevant structured information.
-3. Create meaningful rows - each row should represent a distinct piece of information.
-4. For "${tableType}" type tables, use columns like: ${JSON.stringify(suggestedColumns)}
-5. If the document contains any information at all, you MUST extract at least some data.
-6. Be thorough - extract ALL relevant points, not just a few.
-7. Keep cell content concise but informative.
-
-REQUIREMENTS FOR DIFFERENT REQUEST TYPES:
-- "summary" / "overview" → Extract main topics, themes, key sections. Create at least 5-10 rows.
-- "important points" / "key points" → Extract critical information, main claims, key facts. Create at least 5-10 rows.
-- "timeline" / "events" → Extract dates and events chronologically.
-- "facts" → Extract factual statements with their references.
-- Generic requests → Provide a comprehensive overview of the document content.
-
-REQUIRED JSON FORMAT:
+Return ONLY valid JSON using this exact shape:
 {
   "answer_type": "table",
   "table": {
-    "title": "Descriptive title based on the user's question",
-    "columns": ${JSON.stringify(suggestedColumns)},
-    "rows": [
-      ["Value for column 1", "Value for column 2"],
-      ["Another value", "Another description"],
-      ...more rows...
-    ]
-  }
+    "title": "Short title",
+    "columns": ["Column 1", "Column 2"],
+    "rows": [["Value 1", "Value 2"]]
+  },
+  "answer": "Optional short summary"
 }
 
-IMPORTANT:
-- The rows array must contain actual data extracted from the document
-- Each row must have the same number of elements as there are columns
-- If you truly cannot find any relevant information, return empty rows
-- But if there is ANY content in the document, extract something meaningful
+Rules:
+- Use information only from the document chunks.
+- Keep columns consistent across all rows.
+- If data is sparse, still return a useful small table instead of empty prose.`;
 
-Return ONLY the JSON object, nothing else:`;
-
-  try {
-    const result = await geminiClient.executeWithFallback(
-      async (genAI, modelName) => {
-        const model = genAI.getGenerativeModel({ 
-          model: modelName,
-          generationConfig: {
-            temperature: 0.3,
-            topP: 0.95,
-            topK: 40,
-            responseMimeType: 'application/json',
-          },
-        });
-        return await model.generateContent(prompt);
-      },
-      { taskLabel: 'Table Extraction', preferredModel: geminiClient.MODELS.TEXT }
-    );
-
-    const response = await result.response;
-    const rawText = response.text();
-    
-    console.log(`📤 Raw response length: ${rawText.length} characters`);
-    console.log(`📤 Raw response preview: ${rawText.substring(0, 200)}...`);
-
-    // Parse JSON response
-    let cleanedText = rawText.trim();
-    cleanedText = cleanedText.replace(/^```(?:json)?\s*/gm, '').replace(/```\s*$/gm, '').trim();
-    
-    const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      
-      if (parsed.answer_type === 'table' && parsed.table) {
-        const table = parsed.table;
-        
-        // Validate and normalize the table
-        const columns = Array.isArray(table.columns) ? table.columns : suggestedColumns;
-        let rows = Array.isArray(table.rows) ? table.rows : [];
-        
-        // Normalize rows to match column count
-        const columnCount = columns.length;
-        rows = rows.map(row => {
-          if (!Array.isArray(row)) return Array(columnCount).fill('');
-          const normalized = [...row];
-          while (normalized.length < columnCount) {
-            normalized.push('');
-          }
-          return normalized.slice(0, columnCount);
-        });
-
-        // Deduplicate rows
-        rows = deduplicateRows(rows);
-
-        console.log(`✅ Table extracted: ${columns.length} columns, ${rows.length} rows`);
-
-        // If we got an empty table but have content, try fallback extraction
-        if (rows.length === 0 && context.length > 100) {
-          console.log('⚠️ Empty table from context with content - attempting fallback extraction');
-          const fallbackTable = await fallbackTableExtraction(question, context, suggestedColumns);
-          if (fallbackTable.rows.length > 0) {
-            return {
-              answer_type: 'table',
-              table: fallbackTable,
-              sources: documentChunks.map((chunk) => ({
-                chunkIndex: chunk.metadata?.chunkIndex || 0,
-                documentId: chunk.metadata?.documentId || documentId,
-                similarity: chunk.similarity || 0.5,
-              })),
-            };
-          }
-        }
-
-        return {
-          answer_type: 'table',
-          table: {
-            title: table.title || 'Document Summary',
-            columns: columns,
-            rows: rows,
-          },
-          sources: documentChunks.map((chunk) => ({
-            chunkIndex: chunk.metadata?.chunkIndex || 0,
-            documentId: chunk.metadata?.documentId || documentId,
-            similarity: chunk.similarity || 0.5,
-          })),
-        };
-      }
-    }
-
-    throw new Error('Failed to parse table response');
-  } catch (error) {
-    console.error('❌ Table extraction error:', error.message);
-    
-    // Fallback: try simpler extraction
-    try {
-      console.log('🔄 Attempting fallback table extraction...');
-      const fallbackTable = await fallbackTableExtraction(question, context, suggestedColumns);
-      
-      return {
-        answer_type: 'table',
-        table: fallbackTable,
-        sources: documentChunks.map((chunk) => ({
-          chunkIndex: chunk.metadata?.chunkIndex || 0,
-          documentId: chunk.metadata?.documentId || documentId,
-          similarity: chunk.similarity || 0.5,
-        })),
-      };
-    } catch (fallbackError) {
-      console.error('❌ Fallback extraction also failed:', fallbackError.message);
-      
-      return {
-        answer_type: 'table',
-        table: {
-          title: 'Extraction Failed',
-          columns: ['Status', 'Details'],
-          rows: [
-            ['Error', 'Failed to extract structured data from the document'],
-            ['Suggestion', 'Try asking a more specific question or request text format instead'],
-          ],
-        },
-        sources: [],
-      };
-    }
-  }
-};
-
-/**
- * Fallback table extraction with simpler prompt
- */
-const fallbackTableExtraction = async (question, context, suggestedColumns) => {
-  const simplePrompt = `Extract key information from this text as JSON.
-
-TEXT:
-${context.substring(0, 10000)}
-
-TASK: Create a simple table with columns ${JSON.stringify(suggestedColumns)}.
-Extract at least 5-10 distinct points from the text.
-
-Return JSON ONLY:
-{
-  "title": "Summary",
-  "columns": ${JSON.stringify(suggestedColumns)},
-  "rows": [["point 1", "description 1"], ["point 2", "description 2"], ...]
-}`;
-
-  const result = await geminiClient.executeWithFallback(
+  const execution = await geminiClient.executeWithFallback(
     async (genAI, modelName) => {
-      const model = genAI.getGenerativeModel({ 
+      const model = genAI.getGenerativeModel({
         model: modelName,
         generationConfig: {
-          temperature: 0.5,
-          topP: 0.95,
+          temperature: 0.2,
+          topP: 0.9,
           responseMimeType: 'application/json',
         },
       });
-      return await model.generateContent(simplePrompt);
+      return model.generateContent(prompt);
     },
-    { taskLabel: 'Fallback Table Extraction', preferredModel: geminiClient.MODELS.TEXT }
+    { taskLabel: 'Table Extraction', preferredModel: preferredModel || geminiClient.MODELS.TEXT }
   );
-  const response = await result.response;
-  const rawText = response.text();
-  
-  let cleanedText = rawText.trim();
-  cleanedText = cleanedText.replace(/^```(?:json)?\s*/gm, '').replace(/```\s*$/gm, '').trim();
-  
-  const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
-  if (jsonMatch) {
-    const parsed = JSON.parse(jsonMatch[0]);
-    return {
-      title: parsed.title || 'Document Summary',
-      columns: Array.isArray(parsed.columns) ? parsed.columns : suggestedColumns,
-      rows: Array.isArray(parsed.rows) ? deduplicateRows(parsed.rows) : [],
-    };
-  }
-  
-  throw new Error('Failed to parse fallback response');
+  const parsed = parseJsonResponse((await execution.result.response).text());
+  const table = parsed.table || {};
+  const columns = Array.isArray(table.columns) && table.columns.length ? table.columns : ['Key', 'Value'];
+  const rows = Array.isArray(table.rows) ? deduplicateRows(table.rows) : [];
+  logger.info('LLM', 'Table answer generated', {
+    modelUsed: execution.modelName,
+    requestedModel: execution.requestedModel,
+    columnCount: columns.length,
+    rowCount: rows.length,
+  });
+  logger.table('INFO', 'TABLE FLOW', 'Structured table preview', summarizeTableRows(columns, rows), {
+    modelUsed: execution.modelName,
+    title: table.title || 'Structured Answer',
+  });
+
+  return {
+    answer_type: 'table',
+    answer: parsed.answer || '',
+    table: {
+      title: table.title || 'Structured Answer',
+      columns,
+      rows,
+    },
+    modelUsed: execution.modelName,
+  };
 };
 
-/**
- * Generate answer using RAG
- * @param {string} question - User's question
- * @param {string} documentId - Document ID
- * @param {string} intent - Optional intent override ('table', 'summary', or null for auto-detect)
- * @returns {Promise<Object>} Answer object with type, content, and sources
- */
-export const generateAnswer = async (question, documentId, intent = null) => {
+const generateTextAnswerInternal = async (question, chunks, preferredModel) => {
+  const prompt = `You are DeepDocAI, a production document assistant.
+
+Answer the user's question using ONLY the supplied context.
+Write in clear paragraphs.
+Do not invent facts that are not present in the context.
+
+CONTEXT:
+${buildTextContext(chunks)}
+
+QUESTION:
+${question}
+
+ANSWER:`;
+
+  const execution = await geminiClient.executeWithFallback(
+    async (genAI, modelName) => {
+      const model = genAI.getGenerativeModel({
+        model: modelName,
+        generationConfig: {
+          temperature: 0.4,
+          topP: 0.95,
+        },
+      });
+      return model.generateContent(prompt);
+    },
+    { taskLabel: 'Standard Q&A', preferredModel: preferredModel || geminiClient.MODELS.TEXT }
+  );
+  logger.info('LLM', 'Text answer generated', {
+    modelUsed: execution.modelName,
+    requestedModel: execution.requestedModel,
+    chunkCount: chunks.length,
+  });
+
+  return {
+    answer: (await execution.result.response).text().trim(),
+    modelUsed: execution.modelName,
+  };
+};
+
+export const generateAnswer = async (question, documentId, intent = null, preferredModel = null) => {
   try {
-    console.log(`\n=== RAG Generation Started ===`);
-    console.log(`Question: ${question}`);
-    console.log(`Document ID: ${documentId}`);
-    console.log(`Intent: ${intent || 'auto-detected'}`);
+    const retrieval = await retrieveRelevantChunks({ question, documentId, intent });
+    logger.table('INFO', 'DATA FLOW', 'RAG chunk context', summarizeChunksForFlow(retrieval.chunks), {
+      documentId,
+      flow: 'non-stream',
+    });
 
-    // Step 1: Detect query intent
-    const isTable = intent === 'table' || (intent === null && isTableRequest(question));
-    const isGeneric = intent === 'summary' || (intent === null && isGenericQuery(question));
-    
-    console.log(`📋 Query Analysis:`);
-    console.log(`   - Table query: ${isTable ? 'YES' : 'NO'}`);
-    console.log(`   - Generic/Summary query: ${isGeneric ? 'YES' : 'NO'}`);
-    
-    // Step 2: Clean query for search
-    const searchQuery = cleanQueryForSearch(question);
-    console.log(`🔍 Cleaned query: "${searchQuery}"`);
-    
-    // Step 3: Generate embedding
-    const questionEmbedding = await generateEmbedding(searchQuery);
-    console.log(`✅ Embedding generated (dim: ${questionEmbedding.length})`);
-
-    // Step 4: Retrieve chunks - for table queries, get ALL chunks
-    let documentChunks;
-    if (isTable) {
-      console.log('📊 Table query: Retrieving ALL document chunks');
-      documentChunks = await getAllDocumentChunks(documentId, true);
-    } else {
-      documentChunks = await hybridSearch(searchQuery, questionEmbedding, documentId, isGeneric, false);
-    }
-
-    if (documentChunks.length === 0) {
+    if (!retrieval.chunks.length) {
       return {
         answer_type: 'text',
         answer: 'I could not find relevant information in the document. Please try rephrasing your question.',
         sources: [],
+        paragraphCitations: [],
       };
     }
 
-    console.log(`✅ Retrieved ${documentChunks.length} chunks`);
-
-    // Step 5: For table queries, use table builder
-    if (isTable) {
-      const tableResult = await buildTableAnswer(question, documentId, documentChunks);
-      return tableResult;
+    if (retrieval.isTable) {
+      const tableResult = await buildTableAnswer(question, retrieval.chunks, preferredModel);
+      return {
+        ...tableResult,
+        sources: retrieval.chunks,
+        modelUsed: tableResult.modelUsed,
+      };
     }
 
-    // Step 6: For text queries, generate text response
-    const context = documentChunks
-      .map((chunk, index) => {
-        const similarityPercent = (chunk.similarity * 100).toFixed(1);
-        return `[Section ${index + 1} - Relevance: ${similarityPercent}%]\n${chunk.text || ''}`;
-      })
-      .join('\n\n---\n\n');
-
-    const prompt = `You are a helpful document assistant. Answer the question based on the provided context.
-
-CONTEXT:
-${context}
-
-QUESTION: ${question}
-
-INSTRUCTIONS:
-1. Answer based ONLY on the provided context
-2. Be clear and comprehensive
-3. If the information is not in the context, say so
-4. Use a professional but friendly tone
-
-Answer:`;
-
-    const result = await geminiClient.executeWithFallback(
-      async (genAI, modelName) => {
-        const model = genAI.getGenerativeModel({ 
-          model: modelName,
-          generationConfig: {
-            temperature: 0.7,
-            topP: 0.95,
-          },
-        });
-        return await model.generateContent(prompt);
-      },
-      { taskLabel: 'Standard Q&A', preferredModel: preferredModel || geminiClient.MODELS.TEXT }
-    );
-
-    const response = await result.response;
-    const answer = response.text();
-
+    const textResult = await generateTextAnswerInternal(question, retrieval.chunks, preferredModel);
     return {
       answer_type: 'text',
-      answer: answer.trim(),
-      sources: documentChunks.map((chunk) => ({
-        chunkIndex: chunk.metadata?.chunkIndex || 0,
-        documentId: chunk.metadata?.documentId || documentId,
-        similarity: chunk.similarity || 0.5,
-      })),
+      answer: textResult.answer,
+      sources: retrieval.chunks,
+      paragraphCitations: buildParagraphCitations(textResult.answer, retrieval.chunks),
+      modelUsed: textResult.modelUsed,
     };
   } catch (error) {
-    console.error('Error in RAG generation:', error);
+    logger.error('ERROR', 'RAG generation failed', {
+      area: 'RAG',
+      documentId,
+      error: error.message,
+    });
     throw new Error(`Failed to generate answer: ${error.message}`);
   }
 };
 
-/**
- * Generate answer with streaming support
- * For table requests, returns complete structured data
- * For text requests, yields chunks as they arrive
- */
-export const generateAnswerStream = async function* (question, documentId, intent = null) {
-  try {
-    console.log(`\n=== RAG Streaming Started ===`);
-    console.log(`Question: ${question}`);
-    console.log(`Intent: ${intent || 'auto-detected'}`);
+export const generateAnswerStream = async function* (question, documentId, intent = null, preferredModel = null) {
+  const retrieval = await retrieveRelevantChunks({ question, documentId, intent });
+  logger.table('INFO', 'DATA FLOW', 'Streaming chunk context', summarizeChunksForFlow(retrieval.chunks), {
+    documentId,
+    flow: 'stream',
+  });
 
-    // Detect query intent
-    const isTable = intent === 'table' || (intent === null && isTableRequest(question));
-    const isGeneric = intent === 'summary' || (intent === null && isGenericQuery(question));
-    
-    console.log(`📋 Query type: ${isTable ? 'Table' : isGeneric ? 'Generic' : 'Specific'}`);
+  if (!retrieval.chunks.length) {
+    yield 'I could not find relevant information in the document.';
+    return {
+      answer_type: 'text',
+      answer: 'I could not find relevant information in the document.',
+      sources: [],
+      paragraphCitations: [],
+    };
+  }
 
-    // Clean and embed query
-    const searchQuery = cleanQueryForSearch(question);
-    const questionEmbedding = await generateEmbedding(searchQuery);
+  if (retrieval.isTable) {
+    const tableResult = await buildTableAnswer(question, retrieval.chunks, preferredModel);
+    return {
+      ...tableResult,
+      sources: retrieval.chunks,
+      paragraphCitations: [],
+      modelUsed: tableResult.modelUsed,
+    };
+  }
 
-    // Retrieve chunks
-    let documentChunks;
-    if (isTable) {
-      documentChunks = await getAllDocumentChunks(documentId, true);
-    } else {
-      documentChunks = await hybridSearch(searchQuery, questionEmbedding, documentId, isGeneric, false);
-    }
+  const prompt = `You are DeepDocAI, a production document assistant.
 
-    if (documentChunks.length === 0) {
-      yield 'I could not find relevant information in the document.';
-      return {
-        sources: [],
-        answer_type: 'text',
-      };
-    }
-
-    // For table queries, build table and return (no streaming)
-    if (isTable) {
-      console.log('📊 Building table response...');
-      const tableResult = await buildTableAnswer(question, documentId, documentChunks);
-      
-      // Return the complete table result
-      return {
-        ...tableResult,
-        sources: tableResult.sources || [],
-      };
-    }
-
-    // For text queries, stream the response
-    const context = documentChunks
-      .map((chunk, index) => {
-        const similarityPercent = (chunk.similarity * 100).toFixed(1);
-        return `[Section ${index + 1} - Relevance: ${similarityPercent}%]\n${chunk.text || ''}`;
-      })
-      .join('\n\n---\n\n');
-
-    const prompt = `You are a helpful document assistant. Answer based on the context.
+Use only the supplied context. Answer in well-formed paragraphs.
 
 CONTEXT:
-${context}
+${buildTextContext(retrieval.chunks)}
 
-QUESTION: ${question}
+QUESTION:
+${question}
 
-Answer clearly and comprehensively:`;
+ANSWER:`;
 
-    const result = await geminiClient.executeWithFallback(
-      async (genAI, modelName) => {
-        const model = genAI.getGenerativeModel({ 
-          model: modelName,
-          generationConfig: {
-            temperature: 0.7,
-            topP: 0.95,
-          },
-        });
-        return await model.generateContentStream(prompt);
-      },
-      { taskLabel: 'Streaming Q&A', preferredModel: preferredModel || geminiClient.MODELS.TEXT }
-    );
-    
-    let fullText = '';
-    for await (const chunk of result.stream) {
-      const chunkText = chunk.text();
-      if (chunkText) {
-        fullText += chunkText;
-        yield chunkText;
-      }
+  const execution = await geminiClient.executeWithFallback(
+    async (genAI, modelName) => {
+      const model = genAI.getGenerativeModel({
+        model: modelName,
+        generationConfig: {
+          temperature: 0.4,
+          topP: 0.95,
+        },
+      });
+      return model.generateContentStream(prompt);
+    },
+    { taskLabel: 'Streaming Q&A', preferredModel: preferredModel || geminiClient.MODELS.TEXT }
+  );
+  logger.info('LLM', 'Streaming model selected', {
+    modelUsed: execution.modelName,
+    requestedModel: execution.requestedModel,
+    chunkCount: retrieval.chunks.length,
+  });
+
+  let answer = '';
+  for await (const chunk of execution.result.stream) {
+    const token = chunk.text();
+    if (token) {
+      answer += token;
+      yield token;
     }
-
-    return {
-      sources: documentChunks.map((chunk) => ({
-        chunkIndex: chunk.metadata?.chunkIndex || 0,
-        documentId: chunk.metadata?.documentId || documentId,
-        similarity: chunk.similarity || 0.5,
-      })),
-      answer_type: 'text',
-      answer: fullText.trim(),
-    };
-  } catch (error) {
-    console.error('Error in RAG streaming:', error);
-    throw error;
   }
+
+  return {
+    answer_type: 'text',
+    answer: answer.trim(),
+    sources: retrieval.chunks,
+    paragraphCitations: buildParagraphCitations(answer, retrieval.chunks),
+    modelUsed: execution.modelName,
+  };
 };
 
-/**
- * Diagnose table format issues for a question and document
- * Returns detailed information about each step in the RAG pipeline
- */
 export const diagnoseTableFormat = async (question, documentId) => {
   try {
-    const diagnostics = {
+    const retrieval = await retrieveRelevantChunks({ question, documentId, intent: null });
+
+    return {
       question,
       documentId,
-      steps: {},
       timestamp: new Date().toISOString(),
+      steps: {
+        intentDetection: {
+          success: true,
+          isTableRequest: isTableRequest(question),
+          isGenericQuery: isGenericQuery(question),
+        },
+        retrieval: {
+          success: true,
+          chunksRetrieved: retrieval.chunks.length,
+          chunkIds: retrieval.chunks.map((chunk) => chunk.id),
+        },
+      },
     };
-
-    // Step 1: Check if question is detected as table request
-    const isTable = isTableRequest(question);
-    diagnostics.steps.intentDetection = {
-      success: true,
-      isTableRequest: isTable,
-      isGenericQuery: isGenericQuery(question),
-    };
-
-    // Step 2: Generate embedding for question
-    try {
-      const questionEmbedding = await generateEmbedding(question);
-      diagnostics.steps.embedding = {
-        success: true,
-        dimension: questionEmbedding.length,
-      };
-    } catch (error) {
-      diagnostics.steps.embedding = {
-        success: false,
-        error: error.message,
-      };
-    }
-
-    // Step 3: Retrieve chunks
-    try {
-      const documentChunks = await hybridSearch(
-        question,
-        await generateEmbedding(question),
-        documentId,
-        isGenericQuery(question),
-        isTable
-      );
-      diagnostics.steps.retrieval = {
-        success: true,
-        chunksRetrieved: documentChunks.length,
-        tableChunks: documentChunks.filter(c => c.metadata?.chunkType === 'table').length,
-        textChunks: documentChunks.filter(c => c.metadata?.chunkType === 'text').length,
-      };
-    } catch (error) {
-      diagnostics.steps.retrieval = {
-        success: false,
-        error: error.message,
-      };
-    }
-
-    // Step 4: If table request, check buildTableAnswer path
-    if (isTable) {
-      diagnostics.steps.tablePipeline = {
-        note: 'Table queries use buildTableAnswer() map-reduce pipeline',
-        path: 'buildTableAnswer() → batchChunks() → extractTableRowsFromBatch() → formatTableResponse()',
-      };
-    }
-
-    return diagnostics;
   } catch (error) {
     return {
       question,
       documentId,
-      error: error.message,
-      stack: error.stack,
       timestamp: new Date().toISOString(),
+      error: error.message,
     };
   }
 };
 
-export { isTableRequest, isGenericQuery, cleanQueryForSearch };
+export { isTableRequest, isGenericQuery };

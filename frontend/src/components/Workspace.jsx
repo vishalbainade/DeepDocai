@@ -1,11 +1,40 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Navbar from './Navbar';
 import ChatHistoryDrawer from './ChatHistoryDrawer';
 import UploadZone from './UploadZone';
-import PDFViewer from './PDFViewer';
+import PDFViewer from '/PDFViewer';
 import ChatPanel from './ChatPanel';
-import { uploadDocument, askQuestion, askQuestionStream, getChatMessages, getDocumentPreview } from '../services/api';
+import ChatStream from './ChatStream';
+import { getAvailableModels, getChatMessages, getDocumentPreview, uploadDocument } from '../services/api';
 import { detectQueryIntent } from '../utils/intentDetection';
+
+const FALLBACK_MODELS = [
+  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+  { id: 'gemini-3-flash', label: 'Gemini 3 Flash' },
+  { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite' },
+  { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
+  { id: 'gemma-3-1b', label: 'Gemma 3 1B' },
+  { id: 'gemma-3-4b', label: 'Gemma 3 4B' },
+  { id: 'gemma-3-12b', label: 'Gemma 3 12B' },
+  { id: 'gemma-3-27b', label: 'Gemma 3 27B' },
+];
+
+const flattenParagraphCitations = (paragraphCitations = []) => {
+  const seen = new Set();
+  const flattened = [];
+
+  paragraphCitations.forEach((paragraph) => {
+    (paragraph?.citations || []).forEach((citation) => {
+      const key = `${citation.chunkId || 'chunk'}-${citation.page}-${JSON.stringify(citation.bbox || null)}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        flattened.push(citation);
+      }
+    });
+  });
+
+  return flattened;
+};
 
 const Workspace = () => {
   const [currentDocumentId, setCurrentDocumentId] = useState(null);
@@ -18,45 +47,86 @@ const Workspace = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [currentFileName, setCurrentFileName] = useState(null);
   const [chatListRefreshTrigger, setChatListRefreshTrigger] = useState(0);
-  const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
+  const [availableModels, setAvailableModels] = useState(FALLBACK_MODELS);
+  const [selectedModel, setSelectedModel] = useState(FALLBACK_MODELS[0].id);
+  const [activeHighlight, setActiveHighlight] = useState(null);
+  const [activeStream, setActiveStream] = useState(null);
+  const activeStreamIdRef = useRef(null);
+  const submissionLockRef = useRef(false);
+
+  useEffect(() => {
+    const loadModels = async () => {
+      try {
+        const result = await getAvailableModels();
+        if (Array.isArray(result?.models) && result.models.length > 0) {
+          setAvailableModels(result.models);
+          setSelectedModel((current) =>
+            result.models.some((model) => model.id === current) ? current : result.models[0].id
+          );
+        }
+      } catch (error) {
+        console.error('Failed to load available models', error);
+      }
+    };
+
+    loadModels();
+  }, []);
+
+  useEffect(() => {
+    activeStreamIdRef.current = activeStream?.id || null;
+  }, [activeStream]);
+
+  useEffect(() => {
+    if (!isThinking && !activeStream) {
+      submissionLockRef.current = false;
+    }
+  }, [activeStream, isThinking]);
+
+  const patchMessage = (messageId, updater) => {
+    setChatHistory((previous) =>
+      previous.map((message) => {
+        if (message.id !== messageId) {
+          return message;
+        }
+
+        return typeof updater === 'function' ? updater(message) : { ...message, ...updater };
+      })
+    );
+  };
+
+  const handleCitationClick = (citation) => {
+    setActiveHighlight(citation);
+  };
 
   const handleUpload = async (file) => {
     setIsUploading(true);
     try {
-      // Upload document (gets signed URL, uploads to GCS, processes with Tesseract)
       const result = await uploadDocument(file);
       setCurrentDocumentId(result.documentId);
       setCurrentFileName(result.fileName);
-      
-      // Get preview URL from GCS
+      setCurrentChatId(null);
+      setChatHistory([]);
+      setActiveHighlight(null);
+
       try {
         const previewData = await getDocumentPreview(result.documentId);
         setPdfUrl(previewData.previewUrl);
-      } catch (previewError) {
-        console.error('Error getting preview URL:', previewError);
-        // Fallback: use object URL temporarily
-        const url = URL.createObjectURL(file);
-        setPdfUrl(url);
+      } catch (error) {
+        console.error('Error loading preview URL', error);
+        setPdfUrl(URL.createObjectURL(file));
       }
-      
+
       setShowUploadZone(false);
-      
-      // Clear previous chat history and current chat
-      setChatHistory([]);
-      setCurrentChatId(null);
-      
-      console.log('Document uploaded and processed:', result);
     } catch (error) {
-      console.error('Upload error:', error);
-      alert('Failed to upload document: ' + (error.response?.data?.message || error.message));
+      console.error('Upload error', error);
+      alert(`Failed to upload document: ${error.response?.data?.message || error.message}`);
     } finally {
       setIsUploading(false);
     }
   };
 
-  const handleSelectChat = async (chat) => {
+  const loadChatMessages = async (chat) => {
     if (!chat) {
-      // New chat - clear history
       setCurrentChatId(null);
       setChatHistory([]);
       return;
@@ -65,314 +135,82 @@ const Workspace = () => {
     setCurrentChatId(chat.id);
     setCurrentDocumentId(chat.documentId);
     setShowUploadZone(false);
+    setActiveHighlight(null);
 
-    // Load chat messages
     try {
       const result = await getChatMessages(chat.id);
-      // Ensure all messages have stable IDs for proper React key handling
-      // Add safety checks to prevent crashes if data is malformed
-      const formattedMessages = (result?.messages || []).map((msg, index) => {
-        // Normalize role to lowercase to ensure consistent matching
-        const normalizedRole = (msg?.role || 'user').toLowerCase();
-        return {
-          id: msg?.id || `${normalizedRole}-${index}-${msg?.createdAt || Date.now()}`, // Use DB id or generate stable id
-          role: normalizedRole, // Ensure role is lowercase: 'user' or 'ai'
-          content: msg?.content || '',
-          createdAt: msg?.createdAt || new Date().toISOString(),
-        };
-      });
+      const formattedMessages = (result?.messages || []).map((message, index) => ({
+        id: message?.id || `${message?.role || 'msg'}-${index}`,
+        role: (message?.role || 'user').toLowerCase(),
+        content: message?.content || '',
+        createdAt: message?.createdAt || new Date().toISOString(),
+        answer_type: message?.answer_type || 'text',
+        table: message?.table || null,
+      }));
       setChatHistory(formattedMessages);
-
-      // Load document preview
-      try {
-        const previewData = await getDocumentPreview(chat.documentId);
-        setPdfUrl(previewData.previewUrl);
-        setCurrentFileName(previewData.fileName);
-      } catch (previewError) {
-        console.error('Error loading document preview:', previewError);
-      }
     } catch (error) {
-      console.error('Error loading chat messages:', error);
-      alert('Failed to load chat. Please try again.');
+      console.error('Error loading chat history', error);
+      alert('Failed to load chat history.');
+    }
+
+    try {
+      const previewData = await getDocumentPreview(chat.documentId);
+      setPdfUrl(previewData.previewUrl);
+      setCurrentFileName(previewData.fileName);
+    } catch (error) {
+      console.error('Error loading document preview', error);
     }
   };
 
-  const handleSendMessage = async (message) => {
-    if (!currentDocumentId) return;
+  const handleSendMessage = (question) => {
+    if (!currentDocumentId || isThinking || submissionLockRef.current) {
+      return false;
+    }
 
-    // Add user message to chat immediately (optimistic UI)
-    // Give user message a stable ID to prevent it from disappearing during updates
-    const userMessageId = `user-${Date.now()}-${Math.random()}`;
-    const userMessage = { 
-      id: userMessageId,
-      role: 'user', // Ensure role is exactly 'user' (lowercase)
-      content: message || '', // Ensure content is never undefined
-      createdAt: new Date().toISOString() 
+    submissionLockRef.current = true;
+
+    const userMessage = {
+      id: `user-${Date.now()}-${Math.random()}`,
+      role: 'user',
+      content: question,
+      createdAt: new Date().toISOString(),
     };
-    // Append user message - preserve all existing messages
-    setChatHistory((prev) => [...prev, userMessage]);
-    
-    // Create empty AI message bubble for streaming
-    const aiMessageId = Date.now(); // Use timestamp as unique ID
-    const initialAiMessage = {
+
+    const aiMessageId = `ai-${Date.now()}-${Math.random()}`;
+    const aiMessage = {
       id: aiMessageId,
       role: 'ai',
       content: '',
+      citations: [],
+      paragraphCitations: [],
       isStreaming: true,
-      sources: null,
       createdAt: new Date().toISOString(),
     };
-    setChatHistory((prev) => [...prev, initialAiMessage]);
+
+    setChatHistory((previous) => [...previous, userMessage, aiMessage]);
     setIsThinking(true);
+    setActiveHighlight(null);
 
-    // Store chatId from response for future messages
-    let responseChatId = currentChatId;
+    const intent = detectQueryIntent(question);
+    setActiveStream({
+      id: `stream-${Date.now()}`,
+      messageId: aiMessageId,
+      documentId: currentDocumentId,
+      question,
+      chatId: currentChatId,
+      intent,
+      model: selectedModel,
+    });
 
-    // Detect query intent for table-aware retrieval
-    const intent = detectQueryIntent(message);
-    console.log(`Query intent detected: ${intent || 'auto-detect'}`);
-
-    try {
-      let accumulatedContent = '';
-      let finalSources = null;
-      let streamingFailed = false;
-
-      // Use streaming API with fallback to non-streaming
-      try {
-        await askQuestionStream(
-          currentDocumentId,
-          message,
-          currentChatId, // Pass chatId to maintain conversation
-          // onChunk: Append each chunk to the message
-          // CRITICAL: Skip text accumulation for table queries (tables return complete, not streamed)
-          (chunk) => {
-            // Only accumulate text for non-table responses
-            // Table responses are handled in onComplete callback
-            accumulatedContent += chunk;
-            // Update ONLY the AI message with accumulated content
-            // Preserve all other messages (including user messages) by using map correctly
-            setChatHistory((prev) =>
-              prev.map((msg) => {
-                // Only update the specific AI message being streamed
-                // Skip if message already has table data (table queries don't stream text)
-                if (msg.id === aiMessageId && !(msg.answer_type === 'table' && msg.table)) {
-                  return { ...msg, content: accumulatedContent, isStreaming: true };
-                }
-                // Return all other messages unchanged (including user messages)
-                return msg;
-              })
-            );
-          },
-          // onSources: Store sources when received
-          (sources) => {
-            finalSources = sources;
-            // Update ONLY the AI message with sources but keep streaming flag
-            // Preserve all other messages unchanged
-            setChatHistory((prev) =>
-              prev.map((msg) => {
-                if (msg.id === aiMessageId) {
-                  return { ...msg, sources: sources, isStreaming: true };
-                }
-                return msg; // Preserve all other messages
-              })
-            );
-          },
-          // onChatId: Update current chat ID if we don't have one
-          (chatId) => {
-            if (!responseChatId && chatId) {
-              responseChatId = chatId;
-              setCurrentChatId(chatId);
-            }
-          },
-          // onError: Handle streaming errors - show error message (don't fallback to avoid double API calls)
-          async (error) => {
-            console.error('Streaming error:', error);
-            streamingFailed = true;
-            
-            // Extract error message from error object
-            let errorMessage = 'Sorry, I encountered an error while processing your question. Please try again.';
-            if (error.message) {
-              // Check if it's a network/API error that won't be fixed by retry
-              if (error.message.includes('embedding') || error.message.includes('fetch failed') || error.message.includes('network')) {
-                errorMessage = 'Unable to connect to the AI service. Please check your internet connection and API configuration, then try again.';
-              } else {
-                errorMessage = error.message;
-              }
-            }
-            
-            // Update ONLY the AI message with error
-            // Preserve all other messages (including user messages)
-            setChatHistory((prev) =>
-              prev.map((msg) => {
-                if (msg.id === aiMessageId) {
-                  return {
-                    ...msg,
-                    content: errorMessage,
-                    isStreaming: false,
-                  };
-                }
-                return msg; // Preserve all other messages
-              })
-            );
-            setIsThinking(false);
-          },
-          // onComplete: Handle complete response (for both table and text data)
-          (completeData) => {
-            if (completeData) {
-              setChatHistory((prev) =>
-                prev.map((msg) => {
-                  if (msg.id === aiMessageId) {
-                    // Handle table responses
-                    if (completeData.answer_type === 'table' && completeData.table) {
-                      return {
-                        ...msg,
-                        answer_type: 'table',
-                        table: completeData.table,
-                        answer: completeData.answer || '',
-                        isStreaming: false,
-                      };
-                    }
-                    // Handle text responses - use answer from complete event or accumulated content
-                    else if (completeData.answer_type === 'text') {
-                      // Use answer from complete event (backend sends full text), or fallback to accumulated
-                      const finalContent = completeData.answer || accumulatedContent || '';
-                      return {
-                        ...msg,
-                        content: finalContent,
-                        answer_type: 'text',
-                        isStreaming: false,
-                      };
-                    }
-                    // Fallback: use accumulated content or answer field
-                    return {
-                      ...msg,
-                      content: completeData.answer || accumulatedContent || '',
-                      isStreaming: false,
-                    };
-                  }
-                  return msg;
-                })
-              );
-            }
-          },
-          intent, // Pass intent for table-aware retrieval
-          selectedModel // Pass preferred model
-        );
-
-        // Streaming completed successfully: mark message as no longer streaming
-        // CRITICAL: Preserve data if it was already set by onComplete callback
-        // Only update isStreaming and sources if not already finalized
-        if (!streamingFailed) {
-          setChatHistory((prev) =>
-            prev.map((msg) => {
-              if (msg.id === aiMessageId) {
-                // If message already has table data, preserve it
-                if (msg.answer_type === 'table' && msg.table) {
-                  return {
-                    ...msg,
-                    isStreaming: false,
-                    sources: finalSources || msg.sources,
-                  };
-                }
-                // If message already has content (set by onComplete or chunks), preserve it
-                // Only use accumulatedContent if msg.content is empty
-                const finalContent = msg.content || accumulatedContent || '';
-                return {
-                  ...msg,
-                  content: finalContent,
-                  isStreaming: false,
-                  sources: finalSources || msg.sources,
-                };
-              }
-              return msg; // Preserve all other messages
-            })
-          );
-          // Trigger chat list refresh to update timestamps
-          setChatListRefreshTrigger(prev => prev + 1);
-        }
-      } catch (streamError) {
-        // If streaming setup fails, try non-streaming
-        console.error('Streaming setup failed, using non-streaming:', streamError);
-        try {
-          const result = await askQuestion(currentDocumentId, message, currentChatId, intent, selectedModel);
-          if (result.chatId && !responseChatId) {
-            responseChatId = result.chatId;
-            setCurrentChatId(result.chatId);
-          }
-          
-          // Update ONLY the AI message with complete response
-          // CRITICAL: Handle table responses vs text responses differently
-          // Preserve all other messages (including user messages)
-          setChatHistory((prev) =>
-            prev.map((msg) => {
-              if (msg.id === aiMessageId) {
-                // If result is a table response, store table data with empty content
-                if (result.answer_type === 'table' && result.table) {
-                  return {
-                    ...msg,
-                    answer_type: 'table',
-                    table: result.table,
-                    answer: result.answer || '',
-                    content: '', // Empty content so ChatPanel shows table
-                    sources: result.sources,
-                    isStreaming: false,
-                  };
-                }
-                // Otherwise, store as text response
-                return {
-                  ...msg,
-                  content: result.answer || '',
-                  sources: result.sources,
-                  isStreaming: false,
-                };
-              }
-              return msg; // Preserve all other messages
-            })
-          );
-          // Trigger chat list refresh to update timestamps
-          setChatListRefreshTrigger(prev => prev + 1);
-        } catch (fallbackError) {
-          console.error('Fallback error:', fallbackError);
-          // Update ONLY the AI message with error
-          // Preserve all other messages (including user messages)
-          setChatHistory((prev) =>
-            prev.map((msg) => {
-              if (msg.id === aiMessageId) {
-                return {
-                  ...msg,
-                  content: 'Sorry, I encountered an error while processing your question. Please try again.',
-                  isStreaming: false,
-                };
-              }
-              return msg; // Preserve all other messages
-            })
-          );
-        }
-      }
-    } catch (error) {
-      console.error('Ask error:', error);
-      // Update ONLY the AI message with error
-      // Preserve all other messages (including user messages)
-      setChatHistory((prev) =>
-        prev.map((msg) => {
-          if (msg.id === aiMessageId) {
-            return {
-              ...msg,
-              content: 'Sorry, I encountered an error while processing your question. Please try again.',
-              isStreaming: false,
-            };
-          }
-          return msg; // Preserve all other messages
-        })
-      );
-    } finally {
-      setIsThinking(false);
-    }
+    return true;
   };
 
-  const handleSummarize = async () => {
-    if (!currentDocumentId) return;
-    handleSendMessage('Please provide a comprehensive summary of this document.');
+  const handleSummarize = () => {
+    if (!currentDocumentId) {
+      return false;
+    }
+
+    return handleSendMessage('Please provide a comprehensive summary of this document.');
   };
 
   const handleUploadNew = () => {
@@ -381,40 +219,115 @@ const Workspace = () => {
     setCurrentChatId(null);
     setPdfUrl(null);
     setChatHistory([]);
-    if (pdfUrl) {
-      URL.revokeObjectURL(pdfUrl);
-    }
+    setActiveHighlight(null);
+    setActiveStream(null);
   };
 
+  const isCurrentStream = (streamId) => activeStreamIdRef.current === streamId;
+
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
-      <Navbar 
-        onUploadClick={handleUploadNew} 
-        onMenuClick={() => setDrawerOpen(!drawerOpen)}
-      />
-      
-      {/* Chat History Drawer */}
+    <div className="flex h-screen flex-col bg-slate-50">
+      {activeStream ? (
+        <ChatStream
+          key={activeStream.id}
+          request={activeStream}
+          onToken={(token) => {
+            if (!isCurrentStream(activeStream.id)) {
+              return;
+            }
+            patchMessage(activeStream.messageId, (message) => ({
+              ...message,
+              content: `${message.content || ''}${token}`,
+              isStreaming: true,
+            }));
+          }}
+          onChatId={(chatId) => {
+            if (!isCurrentStream(activeStream.id)) {
+              return;
+            }
+            if (!currentChatId && chatId) {
+              setCurrentChatId(chatId);
+            }
+          }}
+          onCitations={(payload) => {
+            if (!isCurrentStream(activeStream.id)) {
+              return;
+            }
+            patchMessage(activeStream.messageId, {
+              citations: payload.citations || [],
+              paragraphCitations: payload.paragraphCitations || [],
+              isStreaming: true,
+            });
+          }}
+          onComplete={(payload) => {
+            if (!isCurrentStream(activeStream.id)) {
+              return;
+            }
+            patchMessage(activeStream.messageId, (message) => ({
+              ...message,
+              isStreaming: false,
+              content: payload.answer_type === 'table' ? '' : payload.answer || message.content || '',
+              answer: payload.answer || '',
+              answer_type: payload.answer_type || 'text',
+              table: payload.table || null,
+              citations:
+                Array.isArray(payload.citations) && payload.citations.length > 0
+                  ? payload.citations
+                  : Array.isArray(message.citations) && message.citations.length > 0
+                    ? message.citations
+                    : flattenParagraphCitations(payload.paragraphCitations || []),
+              paragraphCitations: payload.paragraphCitations || message.paragraphCitations || [],
+            }));
+            setIsThinking(false);
+            setChatListRefreshTrigger((value) => value + 1);
+          }}
+          onDone={() => {
+            if (!isCurrentStream(activeStream.id)) {
+              return;
+            }
+            submissionLockRef.current = false;
+            setIsThinking(false);
+            setActiveStream(null);
+          }}
+          onError={(error) => {
+            if (!isCurrentStream(activeStream.id)) {
+              return;
+            }
+            patchMessage(activeStream.messageId, (message) => ({
+              ...message,
+              isStreaming: false,
+              content:
+                message.content && message.content.trim().length > 0
+                  ? message.content
+                  : error.message || 'Sorry, I encountered an error while processing your question. Please try again.',
+            }));
+            submissionLockRef.current = false;
+            setIsThinking(false);
+            setActiveStream(null);
+          }}
+        />
+      ) : null}
+
+      <Navbar onUploadClick={handleUploadNew} onMenuClick={() => setDrawerOpen((value) => !value)} />
+
       <ChatHistoryDrawer
         isOpen={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         currentChatId={currentChatId}
         currentDocumentId={currentDocumentId}
-        onSelectChat={handleSelectChat}
+        onSelectChat={loadChatMessages}
         refreshTrigger={chatListRefreshTrigger}
       />
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Panel - PDF Viewer / Upload Zone */}
-        <div className="w-1/2 border-r border-gray-200 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden">
+        <div className="w-1/2 overflow-hidden border-r border-slate-200">
           {showUploadZone || !pdfUrl ? (
             <UploadZone onUpload={handleUpload} isUploading={isUploading} />
           ) : (
-            <PDFViewer fileUrl={pdfUrl} />
+            <PDFViewer fileUrl={pdfUrl} activeHighlight={activeHighlight} />
           )}
         </div>
 
-        {/* Right Panel - Chat Interface */}
         <div className="w-1/2 overflow-hidden">
           <ChatPanel
             chatHistory={chatHistory}
@@ -423,7 +336,10 @@ const Workspace = () => {
             isThinking={isThinking}
             currentDocumentId={currentDocumentId}
             selectedModel={selectedModel}
+            availableModels={availableModels}
             onModelChange={setSelectedModel}
+            onCitationClick={handleCitationClick}
+            currentFileName={currentFileName}
           />
         </div>
       </div>
@@ -432,4 +348,3 @@ const Workspace = () => {
 };
 
 export default Workspace;
-
