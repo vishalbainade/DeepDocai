@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import geminiClient from './gemini-client.js';
+import logger from '../utils/logger.js';
 
 dotenv.config();
 
@@ -12,21 +13,26 @@ export const generateEmbedding = async (text) => {
       throw new Error('Text input is empty or invalid');
     }
 
-    const result = await geminiClient.executeWithFallback(
+    const execution = await geminiClient.executeWithFallback(
       async (genAI, modelName) => {
         const model = genAI.getGenerativeModel({ model: modelName });
         return await model.embedContent({
-          content: { parts: [{ text: text }] },
-          outputDimensionality: 768
+          content: { parts: [{ text }] },
+          outputDimensionality: 768,
         });
       },
       { taskLabel: 'Embedding Generation', preferredModel: geminiClient.MODELS.EMBEDDING, fallbackModels: [] }
     );
-    
-    // Handle different possible response structures
+
+    const result = execution.result;
+    logger.info('EMBEDDING', 'Embedding generated', {
+      modelUsed: execution.modelName,
+      requestedModel: execution.requestedModel,
+      inputLength: text.length,
+    });
+
     let embedding;
     if (result.embedding) {
-      // Check if it's an object with values property
       if (result.embedding.values && Array.isArray(result.embedding.values)) {
         embedding = result.embedding.values;
       } else if (Array.isArray(result.embedding)) {
@@ -37,7 +43,10 @@ export const generateEmbedding = async (text) => {
     } else if (Array.isArray(result)) {
       embedding = result;
     } else {
-      console.error('Unexpected embedding response structure:', JSON.stringify(result, null, 2));
+      logger.error('EMBEDDING', 'Unexpected embedding response structure', {
+        modelUsed: execution.modelName,
+        inputLength: text.length,
+      });
       throw new Error('Invalid embedding response structure from Gemini');
     }
 
@@ -45,18 +54,22 @@ export const generateEmbedding = async (text) => {
       throw new Error('Invalid embedding response: empty or not an array');
     }
 
-    // Validate embedding dimensions (gemini-embedding-001 produces 768-dimensional vectors)
     if (embedding.length !== 768) {
-      console.error(`❌ ERROR: Embedding dimension is ${embedding.length}, expected 768`);
-      console.error(`   - Input text length: ${text.length} characters`);
-      console.error(`   - This will cause vector search to fail!`);
+      logger.error('EMBEDDING', 'Invalid embedding dimension detected', {
+        dimension: embedding.length,
+        expectedDimension: 768,
+        inputLength: text.length,
+        modelUsed: execution.modelName,
+      });
       throw new Error(`Invalid embedding dimension: ${embedding.length} (expected 768)`);
     }
 
     return embedding;
   } catch (error) {
-    console.error('Error generating embedding:', error);
-    console.error('Input text length:', text?.length || 0);
+    logger.error('EMBEDDING', 'Error generating embedding', {
+      error: error.message,
+      inputLength: text?.length || 0,
+    });
     throw new Error(`Failed to generate embedding: ${error.message}`);
   }
 };
@@ -67,31 +80,38 @@ export const generateEmbedding = async (text) => {
 export const generateEmbeddings = async (texts) => {
   try {
     const embeddings = [];
-    
-    console.log(`\n🔮 Generating embeddings for ${texts.length} chunks...`);
-    
-    // Process embeddings sequentially to avoid rate limits
-    for (let i = 0; i < texts.length; i++) {
+
+    logger.info('EMBEDDING', 'Batch embedding generation started', {
+      chunkCount: texts.length,
+    });
+
+    for (let i = 0; i < texts.length; i += 1) {
       const text = texts[i];
       const embedding = await generateEmbedding(text);
-      
-      // Validate dimension
+
       if (embedding.length !== 768) {
         throw new Error(`Chunk ${i}: Invalid embedding dimension ${embedding.length}, expected 768`);
       }
-      
+
       embeddings.push(embedding);
-      
-      // Log progress for every chunk
-      console.log(`   ⚙️ [Chunk ${i + 1}/${texts.length}] Embedding generated (dimension: ${embedding.length}, input length: ${text.length} chars)`);
+      logger.debug('EMBEDDING', 'Batch embedding progress', {
+        chunkIndex: i + 1,
+        chunkCount: texts.length,
+        dimension: embedding.length,
+        inputLength: text.length,
+      });
     }
-    
-    console.log(`✅ Generated ${embeddings.length} embeddings, all with dimension 768`);
+
+    logger.info('EMBEDDING', 'Batch embedding generation complete', {
+      chunkCount: embeddings.length,
+      dimension: 768,
+    });
 
     return embeddings;
   } catch (error) {
-    console.error('Error generating embeddings batch:', error);
+    logger.error('EMBEDDING', 'Error generating embeddings batch', {
+      error: error.message,
+    });
     throw error;
   }
 };
-

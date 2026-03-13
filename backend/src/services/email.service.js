@@ -13,6 +13,12 @@ const transporter = nodemailer.createTransport({
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
+  pool: true,
+  maxConnections: 5,
+  maxMessages: 100,
+  connectionTimeout: 5000,
+  greetingTimeout: 5000,
+  socketTimeout: 10000
 });
 
 export const sendOTPEmail = async (email, otp, type = 'registration') => {
@@ -73,29 +79,37 @@ export const sendOTPEmail = async (email, otp, type = 'registration') => {
   }
 
   try {
-    console.log(`📧 Attempting to send ${type} OTP email to ${email}...`);
+    const startTime = performance.now();
+    console.log(`\n[EMAIL WORKER] Sending OTP email...`);
+    console.log(`[SMTP CONNECT] Establishing connection for ${email}`);
+    
     const info = await transporter.sendMail({
       from: process.env.SMTP_FROM || `"DeepDoc AI" <${process.env.SMTP_USER}>`,
       to: email,
       subject: subject,
       html: html,
     });
-    console.log(`✅ OTP email sent successfully (${type}):`, info.messageId);
-    console.log(`   To: ${email}`);
-    console.log(`   Subject: ${subject}`);
+    
+    const duration = (performance.now() - startTime).toFixed(2);
+    console.log(`[SMTP SEND] Email accepted by SMTP server for ${email}`);
+    console.log(`[EMAIL COMPLETE] Delivery initiated successfully (Time: ${duration}ms, ID: ${info.messageId})`);
+    
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error(`❌ Error sending OTP email (${type}):`, error.message);
-    console.error('   Full error:', error);
+    console.error(`\n[ERROR][OTP EMAIL]`);
+    console.error(`Email sending failed`);
+    console.error(`User: ${email}`);
+    console.error(`Error: ${error.message}`);
     
-    // Provide more specific error messages
     if (error.code === 'EAUTH') {
-      console.error('   Authentication failed. Check GMAIL_USER and GMAIL_APP_PASSWORD.');
+      console.error(`Status: SMTP Authentication failed`);
     } else if (error.code === 'ECONNECTION') {
-      console.error('   Connection failed. Check internet connection and Gmail SMTP settings.');
+      console.error(`Status: SMTP Connection failed`);
+    } else if (error.code === 'ETIMEDOUT') {
+      console.error(`Status: SMTP Connection timeout`);
     }
-    
-    throw new Error(`Failed to send OTP email: ${error.message}`);
+
+    throw error;
   }
 };
 

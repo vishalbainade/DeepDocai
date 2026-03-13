@@ -4,6 +4,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import uploadRoutes from './routes/upload.routes.js';
+import askRoutes from './routes/ask.routes.js';
 import chatRoutes from './routes/chat.routes.js';
 import historyRoutes from './routes/history.routes.js';
 import diagnosticsRoutes from './routes/diagnostics.routes.js';
@@ -42,7 +43,8 @@ app.use('/api/auth', authRoutes);
 
 // Protected routes (require authentication)
 app.use('/api/upload', uploadRoutes);
-app.use('/api/ask', chatRoutes);
+app.use('/api/ask', askRoutes);
+app.use('/api/chat', chatRoutes);
 app.use('/api/history', historyRoutes);
 app.use('/api/diagnostics', diagnosticsRoutes);
 app.use('/api/chats', chatsRoutes);
@@ -101,8 +103,8 @@ const initializeDatabase = async () => {
 const startServer = async () => {
   try {
     // Validate required environment variables
-    if (!process.env.GEMINI_API_KEY) {
-      throw new Error('GEMINI_API_KEY environment variable is required');
+    if (!process.env.GEMINI_API_KEY && !process.env.GEMINI_API_KEYS) {
+      throw new Error('GEMINI_API_KEY or GEMINI_API_KEYS environment variable is required');
     }
 
     // Initialize database

@@ -1,9 +1,17 @@
-import { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, Loader2, Copy, Check, User, Bot, MessageSquare, ChevronDown } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
-import SourceCard from './SourceCard';
-import ChatTable from './ChatTable';
-import { extractTableFromContent } from '../utils/tableParser';
+import { useEffect, useRef, useState } from 'react';
+import { Bot, ChevronDown, Loader2, MessageSquare, Send, Sparkles, User } from 'lucide-react';
+import AnswerCard from './AnswerCard';
+
+const DEFAULT_MODEL_OPTIONS = [
+  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+  { id: 'gemini-3-flash', label: 'Gemini 3 Flash' },
+  { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite' },
+  { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
+  { id: 'gemma-3-1b', label: 'Gemma 3 1B' },
+  { id: 'gemma-3-4b', label: 'Gemma 3 4B' },
+  { id: 'gemma-3-12b', label: 'Gemma 3 12B' },
+  { id: 'gemma-3-27b', label: 'Gemma 3 27B' },
+];
 
 const ChatPanel = ({
   chatHistory,
@@ -12,74 +20,71 @@ const ChatPanel = ({
   isThinking,
   currentDocumentId,
   selectedModel,
-  onModelChange
+  availableModels = [],
+  onModelChange,
+  onCitationClick,
 }) => {
   const [input, setInput] = useState('');
-  const messagesEndRef = useRef(null);
-  const chatContainerRef = useRef(null);
-  const [isUserAtBottom, setIsUserAtBottom] = useState(true);
-  const [copiedMessageId, setCopiedMessageId] = useState(null);
   const [isImproving, setIsImproving] = useState(false);
+  const scrollerRef = useRef(null);
+  const endRef = useRef(null);
+  const submitLockRef = useRef(false);
+  const modelOptions = Array.isArray(availableModels) && availableModels.length > 0 ? availableModels : DEFAULT_MODEL_OPTIONS;
+  const activeModel = modelOptions.some((model) => model.id === selectedModel) ? selectedModel : modelOptions[0]?.id || 'gemini-2.5-flash';
 
-  // Check if user is at bottom of chat
-  const checkIfAtBottom = () => {
-    if (!chatContainerRef.current) return;
-    const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
-    const threshold = 100; // Consider "at bottom" if within 100px
-    setIsUserAtBottom(scrollHeight - scrollTop - clientHeight < threshold);
-  };
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatHistory]);
 
-  // Auto-scroll only if user is at bottom
-  const scrollToBottom = () => {
-    if (isUserAtBottom) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  useEffect(() => {
+    if (!isThinking) {
+      submitLockRef.current = false;
+    }
+  }, [isThinking]);
+
+  const runSingleSubmit = (submitter) => {
+    if (submitLockRef.current) {
+      return;
+    }
+
+    submitLockRef.current = true;
+    const accepted = submitter();
+
+    if (accepted === false) {
+      submitLockRef.current = false;
     }
   };
 
-  // Update scroll position on chat history changes
-  useEffect(() => {
-    scrollToBottom();
-  }, [chatHistory, isUserAtBottom]);
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    runSingleSubmit(() => {
+      if (!input.trim() || !currentDocumentId || isThinking) {
+        return false;
+      }
 
-  // Monitor scroll position
-  useEffect(() => {
-    const container = chatContainerRef.current;
-    if (!container) return;
+      const accepted = onSendMessage?.(input.trim());
+      if (accepted === false) {
+        return false;
+      }
 
-    container.addEventListener('scroll', checkIfAtBottom);
-    checkIfAtBottom(); // Initial check
-
-    return () => {
-      container.removeEventListener('scroll', checkIfAtBottom);
-    };
-  }, []);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (input.trim() && !isThinking && currentDocumentId) {
-      onSendMessage(input.trim());
       setInput('');
-    }
-  };
-
-  const handleSummarize = () => {
-    if (!isThinking && currentDocumentId) {
-      onSummarize();
-    }
+      return true;
+    });
   };
 
   const handleImproveText = async () => {
-    if (!input.trim() || isImproving || isThinking) return;
+    if (!input.trim() || isImproving || isThinking) {
+      return;
+    }
 
     setIsImproving(true);
     try {
-      // Call API to improve the text using Gemini
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      const response = await fetch(`${API_BASE_URL}/api/ask/improve-text`, {
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const response = await fetch(`${apiBaseUrl}/api/ask/improve-text`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
         },
         body: JSON.stringify({ text: input }),
       });
@@ -93,494 +98,146 @@ const ChatPanel = ({
         setInput(data.improvedText);
       }
     } catch (error) {
-      console.error('Error improving text:', error);
-      // Fallback: Simple text improvement
-      const improved = improveTextLocally(input);
-      setInput(improved);
+      console.error('Failed to improve text', error);
     } finally {
       setIsImproving(false);
     }
   };
 
-  // Local fallback text improvement function
-  const improveTextLocally = (text) => {
-    if (!text.trim()) return text;
-
-    // Capitalize first letter
-    let improved = text.trim();
-    improved = improved.charAt(0).toUpperCase() + improved.slice(1);
-
-    // Ensure it ends with proper punctuation if it's a question
-    if (improved.toLowerCase().includes('what') ||
-      improved.toLowerCase().includes('how') ||
-      improved.toLowerCase().includes('why') ||
-      improved.toLowerCase().includes('when') ||
-      improved.toLowerCase().includes('where') ||
-      improved.toLowerCase().includes('who') ||
-      improved.toLowerCase().includes('can you') ||
-      improved.toLowerCase().includes('could you')) {
-      if (!improved.endsWith('?') && !improved.endsWith('.')) {
-        improved += '?';
-      }
-    } else if (!improved.endsWith('.') && !improved.endsWith('?') && !improved.endsWith('!')) {
-      improved += '.';
-    }
-
-    return improved;
-  };
-
-  const handleCopyMessage = async (message, messageId) => {
-    try {
-      let textToCopy = '';
-
-      // If message has table data, format it as a markdown table
-      if (message.answer_type === 'table' && message.table) {
-        const table = message.table;
-        const title = table.title || 'Table';
-        const columns = table.columns || [];
-        const rows = table.rows || [];
-
-        // Build markdown table
-        textToCopy = `${title}\n\n`;
-
-        if (columns.length > 0 && rows.length > 0) {
-          // Add header row
-          textToCopy += '| ' + columns.join(' | ') + ' |\n';
-          // Add separator row
-          textToCopy += '| ' + columns.map(() => '---').join(' | ') + ' |\n';
-          // Add data rows
-          rows.forEach(row => {
-            textToCopy += '| ' + row.join(' | ') + ' |\n';
-          });
-        }
-
-        // Add any additional text content
-        if (message.content && message.content.trim()) {
-          textToCopy += '\n' + message.content;
-        }
-      } else {
-        // Regular text content
-        textToCopy = message.content || '';
-      }
-
-      if (!textToCopy.trim()) {
-        return; // Nothing to copy
-      }
-
-      // Copy to clipboard
-      await navigator.clipboard.writeText(textToCopy);
-
-      // Show feedback
-      setCopiedMessageId(messageId);
-      setTimeout(() => {
-        setCopiedMessageId(null);
-      }, 2000);
-    } catch (error) {
-      console.error('Failed to copy message:', error);
-      // Fallback for older browsers
-      let textToCopy = '';
-      if (message.answer_type === 'table' && message.table) {
-        const table = message.table;
-        const title = table.title || 'Table';
-        const columns = table.columns || [];
-        const rows = table.rows || [];
-        textToCopy = `${title}\n\n`;
-        if (columns.length > 0 && rows.length > 0) {
-          textToCopy += '| ' + columns.join(' | ') + ' |\n';
-          textToCopy += '| ' + columns.map(() => '---').join(' | ') + ' |\n';
-          rows.forEach(row => {
-            textToCopy += '| ' + row.join(' | ') + ' |\n';
-          });
-        }
-        if (message.content && message.content.trim()) {
-          textToCopy += '\n' + message.content;
-        }
-      } else {
-        textToCopy = message.content || '';
-      }
-
-      const textArea = document.createElement('textarea');
-      textArea.value = textToCopy;
-      document.body.appendChild(textArea);
-      textArea.select();
-      try {
-        document.execCommand('copy');
-        setCopiedMessageId(messageId);
-        setTimeout(() => {
-          setCopiedMessageId(null);
-        }, 2000);
-      } catch (err) {
-        console.error('Fallback copy failed:', err);
-      }
-      document.body.removeChild(textArea);
-    }
-  };
-
   return (
-    <div className="h-full flex flex-col bg-gradient-to-b from-slate-50 to-white relative">
-      {/* Top Left Model Selector Overlay */}
-      <div className="absolute top-4 left-6 z-10">
-        <div className="relative inline-block">
+    <div className="flex h-full flex-col bg-[linear-gradient(180deg,_#fffdf7_0%,_#f8fafc_55%,_#eef2ff_100%)]">
+      <div className="flex items-center justify-between border-b border-slate-200/80 bg-white/80 px-6 py-4 backdrop-blur">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-amber-700">DeepDocAI Chat</p>
+          <p className="text-sm text-slate-500">Streaming answers with citations and PDF sync</p>
+        </div>
+
+        <div className="relative">
           <select
-            value={selectedModel}
-            onChange={(e) => onModelChange(e.target.value)}
+            value={activeModel}
+            onChange={(event) => onModelChange?.(event.target.value)}
             disabled={isThinking}
-            className="appearance-none bg-white border border-slate-200 rounded-lg px-3 py-1.5 pr-8 text-sm font-medium text-slate-600 hover:border-slate-300 hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors shadow-sm"
+            className="min-w-[220px] appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2 pr-9 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-            <option value="gemini-3-flash">Gemini 3 Flash</option>
-            <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
-            <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite</option>
-            <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+            {modelOptions.map((model) => (
+              <option key={model.id} value={model.id}>
+                {model.label}
+              </option>
+            ))}
           </select>
-          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-            <ChevronDown size={14} />
-          </div>
+          <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
         </div>
       </div>
 
-      {/* Chat Messages */}
-      <div
-        ref={chatContainerRef}
-        className="flex-1 overflow-y-auto px-4 pt-16 pb-6 space-y-6 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent"
-      >
-        {chatHistory.length === 0 ? (
-          <div className="h-full flex items-center justify-center">
-            <div className="text-center max-w-md">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-indigo-100 mb-4">
-                <MessageSquare className="w-8 h-8 text-[#8E84B8]" />
+      <div ref={scrollerRef} className="flex-1 overflow-y-auto px-5 py-6">
+        {!chatHistory.length ? (
+          <div className="flex h-full items-center justify-center">
+            <div className="max-w-sm rounded-3xl border border-white/70 bg-white/70 px-8 py-10 text-center shadow-xl shadow-slate-200/70 backdrop-blur">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                <MessageSquare size={24} />
               </div>
-              <h3 className="text-xl font-semibold text-slate-800 mb-2">Welcome to DeepDoc AI</h3>
-              <p className="text-slate-500 text-sm leading-relaxed">
-                Upload a document to start asking questions and get intelligent insights
+              <h3 className="text-lg font-semibold text-slate-800">Ask about your document</h3>
+              <p className="mt-2 text-sm leading-relaxed text-slate-500">
+                Stream answers live, inspect cited paragraphs, and jump straight to the source in the PDF.
               </p>
             </div>
           </div>
         ) : (
-          chatHistory.map((message, index) => {
-            // Use message.id if available, otherwise fall back to index
-            // Add safety checks to prevent crashes
-            if (!message) return null;
-            const messageKey = message.id !== undefined ? message.id : `msg-${index}`;
-            const isStreaming = message.isStreaming === true;
-            const hasContent = message.content && message.content.trim().length > 0;
-            const hasTable = message.answer_type === 'table' && message.table;
-            const hasAnyContent = hasContent || hasTable;
-            const showAnalyzing = isStreaming && !hasAnyContent;
+          <div className="space-y-5">
+            {chatHistory.map((message, index) => {
+              if (!message) {
+                return null;
+              }
 
-            // Determine message role (case-insensitive check)
-            const messageRole = message.role?.toLowerCase() || 'user';
-            const isUserMessage = messageRole === 'user';
-            const isAiMessage = messageRole === 'ai';
+              const isUser = (message.role || '').toLowerCase() === 'user';
 
-            const isCopied = copiedMessageId === (message.id || messageKey);
+              return (
+                <div key={message.id || index} className={`flex items-start gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
+                  <div className={`mt-1 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-2xl ${isUser ? 'bg-slate-900 text-white' : 'bg-amber-100 text-amber-900'}`}>
+                    {isUser ? <User size={17} /> : <Bot size={17} />}
+                  </div>
 
-            return (
-              <div
-                key={messageKey}
-                className={`flex items-start gap-3 ${isUserMessage ? 'flex-row-reverse' : 'flex-row'}`}
-              >
-                {/* Avatar */}
-                <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${isUserMessage
-                    ? 'bg-[#8E84B8] text-white shadow-md'
-                    : 'bg-[#8E84B8] text-white shadow-md'
-                  }`}>
-                  {isUserMessage ? (
-                    <User size={16} />
-                  ) : (
-                    <Bot size={16} />
-                  )}
-                </div>
-
-                {/* Message Bubble */}
-                <div className={`relative max-w-[75%] rounded-2xl px-5 py-3.5 transition-all duration-200 group shadow-sm ${isUserMessage
-                    ? 'bg-[#8E84B8] text-white rounded-tr-sm'
-                    : 'bg-white text-slate-800 border border-slate-200 rounded-tl-sm'
-                  }`}>
-                  {/* Copy button for AI messages */}
-                  {isAiMessage && hasAnyContent && !isStreaming && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleCopyMessage(message, messageKey);
-                      }}
-                      className="absolute -top-1 -right-1 p-1.5 rounded-full bg-white shadow-md hover:bg-slate-50 transition-all text-slate-500 hover:text-[#8E84B8] opacity-0 group-hover:opacity-100"
-                      title={isCopied ? 'Copied!' : 'Copy message'}
-                      aria-label="Copy message"
-                    >
-                      {isCopied ? (
-                        <Check size={14} className="text-green-600" />
-                      ) : (
-                        <Copy size={14} />
-                      )}
-                    </button>
-                  )}
-                  {isAiMessage ? (
-                    // AI message rendering
-                    <div className="prose prose-sm max-w-none prose-slate">
-                      {showAnalyzing ? (
-                        // Show "Analyzing..." until first chunk arrives
-                        <div className="flex items-center gap-2.5 text-slate-600">
-                          <Loader2 className="w-4 h-4 animate-spin text-[#8E84B8]" />
-                          <span className="text-sm font-medium">Analyzing document...</span>
-                        </div>
-                      ) : !hasAnyContent && !isStreaming ? (
-                        // Empty response fallback
-                        <div className="text-slate-500 italic text-sm flex items-center gap-2">
-                          <span>⚠️</span>
-                          <span>AI returned an empty response. Please try asking your question again.</span>
-                        </div>
-                      ) : (
-                        // Check if response is a table
-                        message.answer_type === 'table' && message.table ? (
-                          <>
-                            <ChatTable
-                              title={message.table.title}
-                              columns={message.table.columns}
-                              rows={message.table.rows}
-                            />
-                            {/* Fallback text if provided */}
-                            {message.answer && (
-                              <div className="mt-4">
-                                <ReactMarkdown
-                                  components={{
-                                    p: ({ children }) => (
-                                      <p className="mb-2 last:mb-0">{children}</p>
-                                    ),
-                                  }}
-                                >
-                                  {message.answer}
-                                </ReactMarkdown>
-                              </div>
-                            )}
-                            {/* Blinking cursor while streaming */}
-                            {isStreaming && hasContent && (
-                              <span className="inline-block w-0.5 h-4 bg-slate-600 ml-1 animate-blink align-middle">
-                                |
-                              </span>
-                            )}
-                          </>
+                  <div className={`max-w-[82%] rounded-3xl px-5 py-4 shadow-sm ${isUser ? 'rounded-tr-md bg-slate-900 text-white' : 'rounded-tl-md border border-white/60 bg-white/85 text-slate-800 shadow-xl shadow-slate-200/50 backdrop-blur'}`}>
+                    {isUser ? (
+                      <p className="whitespace-pre-wrap text-sm leading-relaxed text-white">{message.content}</p>
+                    ) : (
+                      <div className="text-sm">
+                        {!message.content && !message.table && message.isStreaming ? (
+                          <div className="flex items-center gap-2 text-slate-500">
+                            <Loader2 size={16} className="animate-spin" />
+                            <span>Generating answer...</span>
+                          </div>
                         ) : (
-                          (() => {
-                            // Try to extract markdown table from content
-                            const content = message.content || '';
-                            const { table: extractedTable, remainingContent } = extractTableFromContent(content);
+                          <AnswerCard message={message} onCitationClick={onCitationClick} />
+                        )}
 
-                            if (extractedTable) {
-                              return (
-                                <>
-                                  {/* Render extracted table */}
-                                  <ChatTable
-                                    columns={extractedTable.columns}
-                                    rows={extractedTable.rows}
-                                  />
-                                  {/* Render remaining content (text before/after table) */}
-                                  {remainingContent && (
-                                    <div className="mt-4">
-                                      <ReactMarkdown
-                                        components={{
-                                          p: ({ children }) => (
-                                            <p className="mb-2 last:mb-0">{children}</p>
-                                          ),
-                                          strong: ({ children }) => (
-                                            <strong className="font-semibold">{children}</strong>
-                                          ),
-                                          ul: ({ children }) => (
-                                            <ul className="list-disc list-inside mb-2 space-y-1">
-                                              {children}
-                                            </ul>
-                                          ),
-                                          ol: ({ children }) => (
-                                            <ol className="list-decimal list-inside mb-2 space-y-1">
-                                              {children}
-                                            </ol>
-                                          ),
-                                        }}
-                                      >
-                                        {remainingContent}
-                                      </ReactMarkdown>
-                                    </div>
-                                  )}
-                                  {/* Blinking cursor while streaming */}
-                                  {isStreaming && hasContent && (
-                                    <span className="inline-block w-0.5 h-4 bg-slate-600 ml-1 animate-blink align-middle">
-                                      |
-                                    </span>
-                                  )}
-                                </>
-                              );
-                            }
-
-                            // Default: Show content with markdown rendering
-                            const displayContent = content;//|| 'No response generated.';
-                            return (
-                              <>
-                                {displayContent && (
-                                  <ReactMarkdown
-                                    components={{
-                                      p: ({ children }) => (
-                                        <p className="mb-3 last:mb-0 text-slate-700 leading-relaxed">{children}</p>
-                                      ),
-                                      strong: ({ children }) => (
-                                        <strong className="font-semibold text-slate-900">{children}</strong>
-                                      ),
-                                      ul: ({ children }) => (
-                                        <ul className="list-disc list-outside mb-3 space-y-1.5 ml-4 text-slate-700">
-                                          {children}
-                                        </ul>
-                                      ),
-                                      ol: ({ children }) => (
-                                        <ol className="list-decimal list-outside mb-3 space-y-1.5 ml-4 text-slate-700">
-                                          {children}
-                                        </ol>
-                                      ),
-                                      table: ({ children }) => (
-                                        <div className="overflow-x-auto my-4 rounded-lg border border-slate-200 shadow-sm">
-                                          <table className="min-w-full divide-y divide-slate-200">
-                                            {children}
-                                          </table>
-                                        </div>
-                                      ),
-                                      th: ({ children }) => (
-                                        <th className="px-4 py-3 bg-slate-50 font-semibold text-left text-slate-900 text-sm">
-                                          {children}
-                                        </th>
-                                      ),
-                                      td: ({ children }) => (
-                                        <td className="px-4 py-3 text-slate-700 text-sm border-t border-slate-100">
-                                          {children}
-                                        </td>
-                                      ),
-                                      code: ({ children }) => (
-                                        <code className="px-1.5 py-0.5 bg-slate-100 text-slate-800 rounded text-sm font-mono">
-                                          {children}
-                                        </code>
-                                      ),
-                                      pre: ({ children }) => (
-                                        <pre className="p-4 bg-slate-900 text-slate-100 rounded-lg overflow-x-auto my-3 text-sm font-mono">
-                                          {children}
-                                        </pre>
-                                      ),
-                                      blockquote: ({ children }) => (
-                                        <blockquote className="border-l-4 border-indigo-500 pl-4 italic text-slate-600 my-3">
-                                          {children}
-                                        </blockquote>
-                                      ),
-                                    }}
-                                  >
-                                    {displayContent}
-                                  </ReactMarkdown>
-                                )}
-                                {/* Blinking cursor while streaming */}
-                                {isStreaming && hasContent && (
-                                  <span className="inline-block w-0.5 h-4 bg-slate-600 ml-1 animate-blink align-middle">
-                                    |
-                                  </span>
-                                )}
-                              </>
-                            );
-                          })()
-                        )
-                      )}
-                      {/* Sources/chunks hidden per user request */}
-                      {/* {message.sources && (
-                        <SourceCard sources={message.sources} />
-                      )} */}
-                    </div>
-                  ) : (
-                    // User message or any other non-AI message - always display content
-                    <p className="whitespace-pre-wrap text-white leading-relaxed">
-                      {message.content || ''}
-                    </p>
-                  )}
+                        {message.isStreaming ? (
+                          <span className="ml-1 inline-block h-4 w-0.5 animate-pulse bg-amber-500 align-middle" />
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })
+              );
+            })}
+          </div>
         )}
-
-        <div ref={messagesEndRef} />
+        <div ref={endRef} />
       </div>
 
-      {/* Input Bar */}
-      <div className="border-t border-slate-200 bg-white/80 backdrop-blur-sm shadow-lg">
-        <div className="p-4">
-          <form onSubmit={handleSubmit} className="flex gap-3 items-end">
-            <div className="flex-1 relative">
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder={
-                  currentDocumentId
-                    ? 'Ask a question about the document...'
-                    : 'Upload a document first...'
-                }
-                disabled={!currentDocumentId || isThinking}
-                className="w-full px-4 py-3 pr-20 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400 transition-all shadow-sm"
-              />
-              {/* Multicolor Star Icon for improving text */}
-              {input.trim() && !isThinking && (
-                <button
-                  type="button"
-                  onClick={handleImproveText}
-                  disabled={isImproving}
-                  className="absolute right-12 top-1/2 -translate-y-1/2 p-1.5 rounded-lg hover:bg-slate-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
-                  title="Improve your question"
-                >
-                  {isImproving ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-[#8E84B8]" />
-                  ) : (
-                    <div className="relative">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="star-blink">
-                        <defs>
-                          <linearGradient id="starGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" stopColor="#fbbf24" />
-                            <stop offset="50%" stopColor="#ec4899" />
-                            <stop offset="100%" stopColor="#9333ea" />
-                          </linearGradient>
-                        </defs>
-                        <path
-                          d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"
-                          fill="none"
-                          stroke="url(#starGradient)"
-                          strokeWidth="2"
-                        />
-                      </svg>
-                    </div>
-                  )}
-                </button>
-              )}
-              {isThinking && (
-                <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                  <Loader2 className="w-4 h-4 animate-spin text-[#8E84B8]" />
-                </div>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={handleSummarize}
+      <div className="border-t border-slate-200 bg-white/85 px-4 py-4 backdrop-blur">
+        <form onSubmit={handleSubmit} className="flex items-end gap-3">
+          <div className="relative flex-1">
+            <input
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
               disabled={!currentDocumentId || isThinking}
-              className="px-4 py-3 bg-[#8E84B8]/10 text-[#8E84B8] rounded-xl hover:bg-[#8E84B8]/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm border border-[#8E84B8]/20"
-              title="Summarize document"
-            >
-              <Sparkles size={18} />
-              <span className="hidden sm:inline text-sm font-medium">Summarize</span>
-            </button>
-            <button
-              type="submit"
-              disabled={!input.trim() || !currentDocumentId || isThinking}
-              className="px-6 py-3 bg-[#8E84B8] text-white rounded-xl hover:bg-[#7A70A8] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-md hover:shadow-lg font-medium"
-            >
-              <Send size={18} />
-              <span className="hidden sm:inline">Send</span>
-            </button>
-          </form>
-        </div>
+              placeholder={currentDocumentId ? 'Ask a question about this document...' : 'Upload a document first...'}
+              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 pr-24 text-sm text-slate-800 shadow-sm transition focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+            />
+
+            {input.trim() ? (
+              <button
+                type="button"
+                onClick={handleImproveText}
+                disabled={isImproving || isThinking}
+                className="absolute right-12 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-amber-600 transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
+                title="Improve question"
+              >
+                {isImproving ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+              </button>
+            ) : null}
+          </div>
+
+          <button
+            type="button"
+            onClick={() =>
+              runSingleSubmit(() => {
+                if (!currentDocumentId || isThinking) {
+                  return false;
+                }
+
+                return onSummarize?.();
+              })
+            }
+            disabled={!currentDocumentId || isThinking}
+            className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Summarize
+          </button>
+
+          <button
+            type="submit"
+            disabled={!currentDocumentId || !input.trim() || isThinking}
+            className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Send size={16} />
+            Send
+          </button>
+        </form>
       </div>
     </div>
   );
 };
 
 export default ChatPanel;
-

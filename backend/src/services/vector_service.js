@@ -1,313 +1,278 @@
 import { query, getClient } from '../db/index.js';
+import logger from '../utils/logger.js';
 
-/**
- * Store embeddings in PostgreSQL with pgvector
- * CRITICAL: Now supports chunk metadata (type, page_number) for table-aware retrieval
- */
+const parseJson = (value, fallback = null) => {
+  if (value == null) {
+    return fallback;
+  }
+
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return fallback;
+    }
+  }
+
+  return value;
+};
+
+const mapChunkRow = (row, fallbackSimilarity = 0.5) => {
+  const metadata = parseJson(row.metadata, {}) || {};
+  const bbox = parseJson(row.bbox, metadata.bbox || null);
+  const pageWidth = row.page_width || metadata.pageWidth || null;
+  const pageHeight = row.page_height || metadata.pageHeight || null;
+
+  return {
+    id: row.id,
+    documentId: row.document_id,
+    chunkIndex: row.chunk_index,
+    content: row.content || row.chunk_text || '',
+    text: row.content || row.chunk_text || '',
+    chunkType: row.chunk_type || metadata.chunkType || 'paragraph',
+    pageNumber: row.page_number || metadata.pageNumber || 1,
+    bbox,
+    pageWidth,
+    pageHeight,
+    metadata: {
+      ...metadata,
+      documentId: row.document_id,
+      chunkIndex: row.chunk_index,
+      chunkType: row.chunk_type || metadata.chunkType || 'paragraph',
+      pageNumber: row.page_number || metadata.pageNumber || 1,
+      bbox,
+      pageWidth,
+      pageHeight,
+    },
+    distance: Number(row.distance ?? 0),
+    similarity: Number(row.similarity ?? fallbackSimilarity),
+  };
+};
+
 export const storeEmbeddings = async (embeddings, chunks, documentId) => {
   const client = await getClient();
-  
+
   try {
     if (embeddings.length !== chunks.length) {
       throw new Error('Mismatch between embeddings and chunks count');
     }
 
-    console.log(`\n💾 Storing ${embeddings.length} embeddings for document ${documentId}...`);
+    logger.info('INGESTION', 'Storing chunk embeddings', {
+      documentId,
+      chunkCount: chunks.length,
+    });
 
     await client.query('BEGIN');
 
-    try {
-      let successCount = 0;
-      let tableCount = 0;
-      let textCount = 0;
-      
-      for (let i = 0; i < embeddings.length; i++) {
-        const embedding = embeddings[i];
-        const chunk = chunks[i];
+    for (let index = 0; index < embeddings.length; index += 1) {
+      const embedding = embeddings[index];
+      const chunk = chunks[index];
+      const chunkText = typeof chunk === 'string' ? chunk : chunk.content || chunk.text || '';
 
-        if (embedding.length !== 768) {
-          console.warn(`⚠️ Chunk ${i}: Embedding dimension is ${embedding.length}, expected 768`);
-        }
-
-        const chunkText = typeof chunk === 'string' ? chunk : (chunk.text || chunk.content || '');
-        const chunkType = typeof chunk === 'object' && chunk.chunk_type ? chunk.chunk_type : 'text';
-        const pageNumber = typeof chunk === 'object' && chunk.page_number ? chunk.page_number : null;
-        const metadata = typeof chunk === 'object' && chunk.metadata ? JSON.stringify(chunk.metadata) : null;
-        
-        if (!chunkText || chunkText.trim().length === 0) {
-          console.warn(`⚠️ Chunk ${i}: Empty chunk text, skipping...`);
-          continue;
-        }
-
-        const vectorString = `[${embedding.join(',')}]`;
-
-        await client.query(
-          `INSERT INTO chunks (document_id, chunk_index, content, embedding, chunk_type, page_number, metadata)
-           VALUES ($1, $2, $3, $4::vector, $5, $6, $7)`,
-          [documentId, i, chunkText, vectorString, chunkType, pageNumber, metadata]
-        );
-        successCount++;
-        
-        if (chunkType === 'table') {
-          tableCount++;
-        } else {
-          textCount++;
-        }
-        
-        if ((i + 1) % 10 === 0) {
-          console.log(`   Progress: ${i + 1}/${embeddings.length} embeddings stored...`);
-        }
+      if (!chunkText.trim()) {
+        logger.warn('INGESTION', 'Skipping empty chunk', { documentId, chunkIndex: index });
+        continue;
       }
 
-      await client.query('COMMIT');
-      console.log(`✅ Successfully stored ${successCount} embeddings for document ${documentId}`);
-      console.log(`   - Text chunks: ${textCount}`);
-      console.log(`   - Table chunks: ${tableCount}`);
-      
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
+      const vectorString = `[${embedding.join(',')}]`;
+      const chunkType = typeof chunk === 'object' ? chunk.chunk_type || 'paragraph' : 'paragraph';
+      const pageNumber = typeof chunk === 'object' ? chunk.page_number || null : null;
+      const bbox = typeof chunk === 'object' && chunk.bbox ? JSON.stringify(chunk.bbox) : null;
+      const pageWidth = typeof chunk === 'object' ? chunk.page_width || null : null;
+      const pageHeight = typeof chunk === 'object' ? chunk.page_height || null : null;
+      const metadata = typeof chunk === 'object' && chunk.metadata ? JSON.stringify(chunk.metadata) : null;
+
+      await client.query(
+        `INSERT INTO chunks (
+          document_id,
+          chunk_index,
+          content,
+          embedding,
+          chunk_type,
+          page_number,
+          bbox,
+          page_width,
+          page_height,
+          metadata
+        )
+         VALUES ($1, $2, $3, $4::vector, $5, $6, $7, $8, $9, $10)`,
+        [documentId, index, chunkText, vectorString, chunkType, pageNumber, bbox, pageWidth, pageHeight, metadata]
+      );
     }
+
+    await client.query('COMMIT');
+    logger.info('INGESTION', 'Chunk embeddings stored', {
+      documentId,
+      chunkCount: chunks.length,
+    });
   } catch (error) {
-    console.error('Error storing embeddings:', error);
+    await client.query('ROLLBACK').catch(() => {});
+    logger.error('ERROR', 'Failed to store embeddings', {
+      area: 'VECTOR STORE',
+      documentId,
+      error: error.message,
+    });
     throw new Error(`Failed to store embeddings: ${error.message}`);
   } finally {
     client.release();
   }
 };
 
-/**
- * Perform similarity search in PostgreSQL using pgvector
- * Returns top K most similar chunks using cosine distance
- */
 export const searchSimilarChunks = async (queryEmbedding, documentId, topK = 4) => {
   try {
-    if (!queryEmbedding || !Array.isArray(queryEmbedding) || queryEmbedding.length === 0) {
+    if (!Array.isArray(queryEmbedding) || queryEmbedding.length === 0) {
       throw new Error('Invalid query embedding');
     }
 
-    if (!documentId) {
-      throw new Error('Document ID is required');
-    }
-
     const vectorString = `[${queryEmbedding.join(',')}]`;
-
-    console.log(`\n🔍 Vector similarity search for document ${documentId}...`);
-    
     const result = await query(
-      `SELECT 
+      `SELECT
         id,
         document_id,
         chunk_index,
-        content as chunk_text,
+        content,
         chunk_type,
         page_number,
+        bbox,
+        page_width,
+        page_height,
         metadata,
-        1 - (embedding <=> $1::vector) as similarity,
-        embedding <=> $1::vector as distance
-       FROM chunks
-       WHERE embedding IS NOT NULL
-         AND document_id = $2
-       ORDER BY embedding <=> $1::vector
-       LIMIT $3`,
+        1 - (embedding <=> $1::vector) AS similarity,
+        embedding <=> $1::vector AS distance
+      FROM chunks
+      WHERE document_id = $2 AND embedding IS NOT NULL
+      ORDER BY embedding <=> $1::vector
+      LIMIT $3`,
       [vectorString, documentId, topK]
     );
 
-    if (!result.rows || result.rows.length === 0) {
-      console.log(`⚠️ No results for document ${documentId}`);
-      return [];
-    }
-
-    console.log(`✅ Found ${result.rows.length} similar chunks`);
-
-    const chunks = result.rows.map((row) => ({
-      text: row.chunk_text || '',
-      metadata: {
-        documentId: row.document_id,
-        chunkIndex: row.chunk_index,
-        chunkType: row.chunk_type || 'text',
-        pageNumber: row.page_number,
-      },
-      distance: parseFloat(row.distance) || 0,
-      similarity: parseFloat(row.similarity) || 0,
-    }));
-
-    return chunks;
+    return result.rows.map((row) => mapChunkRow(row, 0));
   } catch (error) {
-    console.error('Error in similarity search:', error);
+    logger.error('ERROR', 'Vector search failed', {
+      area: 'SIMILARITY SEARCH',
+      documentId,
+      error: error.message,
+    });
     throw new Error(`Failed to search similar chunks: ${error.message}`);
   }
 };
 
-/**
- * Get top chunks by document order (for generic queries)
- */
 export const getTopChunksByOrder = async (documentId, topK = 10) => {
   try {
-    if (!documentId) {
-      throw new Error('Document ID is required');
-    }
-
     const result = await query(
-      `SELECT 
+      `SELECT
         id,
         document_id,
         chunk_index,
-        content as chunk_text,
+        content,
         chunk_type,
         page_number,
+        bbox,
+        page_width,
+        page_height,
         metadata
-       FROM chunks
-       WHERE embedding IS NOT NULL
-         AND document_id = $1
-       ORDER BY chunk_index ASC
-       LIMIT $2`,
+      FROM chunks
+      WHERE document_id = $1 AND embedding IS NOT NULL
+      ORDER BY chunk_index ASC
+      LIMIT $2`,
       [documentId, topK]
     );
 
-    if (!result.rows || result.rows.length === 0) {
-      console.log(`No chunks found for document ${documentId}`);
-      return [];
-    }
-
-    console.log(`Found ${result.rows.length} chunks by order`);
-
-    return result.rows.map((row) => ({
-      text: row.chunk_text || '',
-      metadata: {
-        documentId: row.document_id,
-        chunkIndex: row.chunk_index,
-        chunkType: row.chunk_type || 'text',
-        pageNumber: row.page_number,
-      },
-      distance: 0.5,
-      similarity: 0.5,
-    }));
+    return result.rows.map((row) => mapChunkRow(row, 0.5));
   } catch (error) {
-    console.error('Error getting chunks by order:', error);
+    logger.error('ERROR', 'Ordered chunk retrieval failed', {
+      area: 'ORDERED RETRIEVAL',
+      documentId,
+      error: error.message,
+    });
     throw new Error(`Failed to get chunks by order: ${error.message}`);
   }
 };
 
-/**
- * Get ALL chunks from a document (for table/summary queries)
- * CRITICAL: This retrieves ALL chunks to ensure comprehensive analysis
- * 
- * @param {string} documentId - Document ID
- * @param {boolean} prioritizeTables - If true, return table chunks first
- * @returns {Promise<Array>} Array of all chunks
- */
 export const getAllDocumentChunks = async (documentId, prioritizeTables = false) => {
   try {
-    if (!documentId) {
-      throw new Error('Document ID is required');
-    }
-
-    // Get all chunks, optionally prioritizing tables
-    const orderBy = prioritizeTables 
-      ? 'ORDER BY chunk_type DESC, chunk_index ASC' // 'table' > 'text' alphabetically
-      : 'ORDER BY chunk_index ASC';
-    
+    const orderBy = prioritizeTables ? 'ORDER BY chunk_type DESC, chunk_index ASC' : 'ORDER BY chunk_index ASC';
     const result = await query(
-      `SELECT 
+      `SELECT
         id,
         document_id,
         chunk_index,
-        content as chunk_text,
+        content,
         chunk_type,
         page_number,
+        bbox,
+        page_width,
+        page_height,
         metadata,
-        0.5 as similarity,
-        0.5 as distance
-       FROM chunks
-       WHERE embedding IS NOT NULL
-         AND document_id = $1
-       ${orderBy}`,
+        0.5 AS similarity,
+        0.5 AS distance
+      FROM chunks
+      WHERE document_id = $1 AND embedding IS NOT NULL
+      ${orderBy}`,
       [documentId]
     );
 
-    if (!result.rows || result.rows.length === 0) {
-      console.log(`No chunks found for document ${documentId}`);
-      return [];
-    }
-
-    const tableChunks = result.rows.filter(r => r.chunk_type === 'table').length;
-    const textChunks = result.rows.filter(r => r.chunk_type !== 'table').length;
-    
-    console.log(`📊 Retrieved ALL ${result.rows.length} chunks for document ${documentId}`);
-    console.log(`   - Table chunks: ${tableChunks}`);
-    console.log(`   - Text chunks: ${textChunks}`);
-
-    const chunks = result.rows.map((row) => ({
-      text: row.chunk_text || '',
-      metadata: {
-        documentId: row.document_id,
-        chunkIndex: row.chunk_index,
-        chunkType: row.chunk_type || 'text',
-        pageNumber: row.page_number,
-      },
-      distance: 0.5,
-      similarity: 0.5,
-    }));
-
-    return chunks;
+    return result.rows.map((row) => mapChunkRow(row, 0.5));
   } catch (error) {
-    console.error('Error getting all document chunks:', error);
+    logger.error('ERROR', 'Document chunk retrieval failed', {
+      area: 'ALL CHUNKS',
+      documentId,
+      error: error.message,
+    });
     throw new Error(`Failed to get all document chunks: ${error.message}`);
   }
 };
 
-
-
-/**
- * Delete all embeddings for a document
- */
 export const deleteDocumentEmbeddings = async (documentId) => {
   try {
-    const result = await query(
-      'DELETE FROM chunks WHERE document_id = $1 RETURNING id',
-      [documentId]
-    );
-
-    const deletedCount = result.rowCount || 0;
-    console.log(`Deleted ${deletedCount} embeddings for document ${documentId}`);
-    return deletedCount;
+    const result = await query('DELETE FROM chunks WHERE document_id = $1 RETURNING id', [documentId]);
+    logger.info('INGESTION', 'Document chunks deleted', {
+      documentId,
+      deletedCount: result.rowCount || 0,
+    });
+    return result.rowCount || 0;
   } catch (error) {
-    console.error('Error deleting document embeddings:', error);
+    logger.error('ERROR', 'Failed to delete document embeddings', {
+      area: 'DELETE CHUNKS',
+      documentId,
+      error: error.message,
+    });
     throw new Error(`Failed to delete document embeddings: ${error.message}`);
   }
 };
 
-/**
- * Get document statistics
- */
 export const getDocumentStats = async (documentId) => {
   try {
     const result = await query(
-      `SELECT 
-        COUNT(*) as total_chunks,
-        COUNT(CASE WHEN chunk_type = 'table' THEN 1 END) as table_chunks,
-        COUNT(CASE WHEN chunk_type = 'text' THEN 1 END) as text_chunks,
-        SUM(LENGTH(content)) as total_characters,
-        AVG(LENGTH(content)) as avg_chunk_size
-       FROM chunks
-       WHERE document_id = $1`,
+      `SELECT
+        COUNT(*) AS total_chunks,
+        COUNT(CASE WHEN chunk_type = 'table' THEN 1 END) AS table_chunks,
+        COUNT(CASE WHEN chunk_type = 'paragraph' THEN 1 END) AS paragraph_chunks,
+        SUM(LENGTH(content)) AS total_characters,
+        AVG(LENGTH(content)) AS avg_chunk_size
+      FROM chunks
+      WHERE document_id = $1`,
       [documentId]
     );
 
-    if (result.rows.length === 0) {
+    const row = result.rows[0];
+    if (!row) {
       return null;
     }
 
     return {
-      totalChunks: parseInt(result.rows[0].total_chunks) || 0,
-      tableChunks: parseInt(result.rows[0].table_chunks) || 0,
-      textChunks: parseInt(result.rows[0].text_chunks) || 0,
-      totalCharacters: parseInt(result.rows[0].total_characters) || 0,
-      avgChunkSize: parseInt(result.rows[0].avg_chunk_size) || 0,
+      totalChunks: Number(row.total_chunks || 0),
+      tableChunks: Number(row.table_chunks || 0),
+      paragraphChunks: Number(row.paragraph_chunks || 0),
+      totalCharacters: Number(row.total_characters || 0),
+      avgChunkSize: Number(row.avg_chunk_size || 0),
     };
   } catch (error) {
-    console.error('Error getting document stats:', error);
+    logger.error('ERROR', 'Failed to load document stats', {
+      area: 'DOCUMENT STATS',
+      documentId,
+      error: error.message,
+    });
     return null;
   }
 };
