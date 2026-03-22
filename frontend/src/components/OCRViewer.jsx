@@ -280,30 +280,47 @@ const OCRViewer = ({ documentId, pdfUrl, activeHighlight }) => {
                     }
 
                     const normalize = (t) => t?.toLowerCase().replace(/[^\w\s\-\.]/g, '').replace(/\s+/g, ' ').trim() || '';
+                    const STOP_WORDS = new Set(['the', 'and', 'for', 'was', 'with', 'that', 'from', 'this', 'were', 'have']);
                     const cleanH = normalize(activeHighlight?.text);
                     const cleanB = normalize(block?.text || '');
 
-                    const normalizeWord = (t) => t?.toLowerCase().replace(/[^\w]/g, '') || '';
-                    const hWords = (activeHighlight?.text || '').split(/\s+/).map(normalizeWord).filter(w => w.length > 2);
-                    const bWords = (block?.text || '').split(/\s+/).map(normalizeWord).filter(w => w.length > 2);
+                    const normalizeWords = (t) => (t || '').toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/).filter(w => w.length > 2 && !STOP_WORDS.has(w));
+                    const hWords = normalizeWords(activeHighlight?.text);
+                    const bWords = normalizeWords(block?.text || '');
                     
-                    // Match if there is a significant overlap in key words (at least 2 consecutive or 3 total)
-                    const hasSignificantOverlap = hWords.length > 0 && bWords.length > 0 && (
-                       bWords.some(bw => hWords.includes(bw)) && (cleanB.length > 8 || hWords.length < 5)
-                    );
+                    // Match if at least 40% of the significant words in the citation appear in the block
+                    // OR if the block text is a significant part of the citation text
+                    const matchingWords = hWords.filter(w => bWords.includes(w));
+                    const wordOverlapRatio = hWords.length > 0 ? (matchingWords.length / hWords.length) : 0;
+                    const hasSignificantOverlap = (wordOverlapRatio >= 0.4) || (cleanH.length > 20 && cleanB.length > 20 && (cleanH.includes(cleanB) || cleanB.includes(cleanH)));
 
                     // Improved matching strategy
                     let isHighlighted = false;
                     if (activeHighlight && parseInt(activeHighlight.page) === pageNum) {
                       // 1. Precise Coordinate Matching (Most accurate)
                       if (activeHighlight.bbox && Array.isArray(coords)) {
-                        const [hx1, hy1, hx2, hy2] = activeHighlight.bbox;
-                        const [bx1, by1, bx2, by2] = coords;
+                        // Normalize both to pixel space if they are in 0..1 range
+                        const getAbsCoords = (c, w, h) => {
+                          const [x1, y1, x2, y2] = c;
+                          const isFrac = Math.max(x1, y1, x2, y2) <= 1.05;
+                          return isFrac ? [x1 * w, y1 * h, x2 * w, y2 * h] : [x1, y1, x2, y2];
+                        };
+
+                        const [hx1, hy1, hx2, hy2] = getAbsCoords(activeHighlight.bbox, docW, docH);
+                        const [bx1, by1, bx2, by2] = getAbsCoords(coords, docW, docH);
                         
-                        // Check for significant intersection or proximity
-                        const isCloseX = Math.abs(hx1 - bx1) < 15 && Math.abs(hx2 - bx2) < 15;
-                        const isCloseY = Math.abs(hy1 - by1) < 15 && Math.abs(hy2 - by2) < 15;
-                        if (isCloseX && isCloseY) isHighlighted = true;
+                        const intersectX = Math.max(0, Math.min(hx2, bx2) - Math.max(hx1, bx1));
+                        const intersectY = Math.max(0, Math.min(hy2, by2) - Math.max(hy1, by1));
+                        const intersectionArea = intersectX * intersectY;
+                        
+                        if (intersectionArea > 0) {
+                          const areaH = (hx2 - hx1) * (hy2 - hy1);
+                          const areaB = (bx2 - bx1) * (by2 - by1);
+                          // Allow a bit more fuzziness (15% coverage)
+                          if (intersectionArea / areaH > 0.15 || intersectionArea / areaB > 0.15) {
+                             isHighlighted = true;
+                          }
+                        }
                       }
                       
                       // 2. Fallback to Text Matching
@@ -315,12 +332,15 @@ const OCRViewer = ({ documentId, pdfUrl, activeHighlight }) => {
                     }
 
                     const finalFontSize = (block.block_type === 'header' || block.block_type === 'title' ? 19 : 14) * scale;
+                    // Switch to a more vibrant high-contrast Indigo highlight
+                    const highlightColor = isDark ? 'rgba(99, 102, 241, 0.25)' : 'rgba(99, 102, 241, 0.15)';
+                    const highlightBorder = '#6366f1';
 
                     return (
                       <div
                         key={bIdx}
                         className={`absolute transition-all duration-300 ${isHighlighted 
-                          ? 'bg-amber-100/40 ring-2 ring-amber-400 z-50 shadow-[0_0_30px_rgba(245,158,11,0.6)] scale-[1.02]' 
+                          ? 'z-[999] shadow-[0_0_50px_rgba(99,102,241,0.7)] scale-[1.02] ring-2 ring-indigo-500 ring-offset-2 ring-offset-transparent animate-pulse-subtle' 
                           : 'border-b border-transparent group/block'
                         }`}
                         style={{
@@ -328,13 +348,16 @@ const OCRViewer = ({ documentId, pdfUrl, activeHighlight }) => {
                           top: `${(y1 / docH) * 100}%`,
                           width: `${((x2 - x1) / docW) * 100}%`,
                           height: `${((y2 - y1) / docH) * 100}%`,
+                          backgroundColor: isHighlighted ? highlightColor : 'transparent',
+                          border: isHighlighted ? `2px solid ${highlightBorder}` : 'none',
                           color: dc.textPrimary,
                           fontSize: `${finalFontSize}px`,
                           fontWeight: block.block_type === 'header' || block.block_type === 'title' ? '900' : '500',
                           fontFamily: 'system-ui, sans-serif',
                           lineHeight: '1.4',
-                          zIndex: isHighlighted ? 50 : 1,
-                          overflow: 'visible'
+                          zIndex: isHighlighted ? 999 : 1,
+                          overflow: 'visible',
+                          borderRadius: '8px'
                         }}
                       >
                         <div className="w-full h-full relative pointer-events-none">

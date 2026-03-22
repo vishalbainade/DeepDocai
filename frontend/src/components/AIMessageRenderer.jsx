@@ -28,7 +28,17 @@ function renderWithCitations(text, onCitationClick, dc, citations = []) {
       // Find the corresponding citation in the provided citations array
       // Match by page and occurrence index
       const pageCitations = citations.filter(c => parseInt(c.page) === pageNum);
-      const realCitation = pageCitations[occurrence - 1] || pageCitations[0] || { page: pageNum };
+      
+      // Fallback text context (the text chunk immediately preceding this citation tag)
+      // The split regex (\[Pg\.\s*\d+\]) means tags are even-indexed if text starts with non-tag
+      const textParts = text.split(/(\[Pg\.\s*\d+\])/g);
+      const precedingText = i > 0 ? textParts[i-1] : '';
+      const fallbackText = precedingText.trim().slice(-100); // Last 100 chars for context
+
+      const realCitation = pageCitations[occurrence - 1] || pageCitations[0] || { 
+        page: pageNum, 
+        text: fallbackText 
+      };
 
       return (
         <span
