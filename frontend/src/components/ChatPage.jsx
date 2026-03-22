@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useChat } from '../contexts/ChatContext';
+import { useTheme } from '../contexts/ThemeContext';
 import ChatPanel from './ChatPanel';
 import PDFViewer from './PDFViewer';
 import OCRViewer from './OCRViewer';
@@ -62,7 +63,8 @@ const ChatPage = () => {
   const [leftPanelWidth, setLeftPanelWidth] = useState(50);
   const [isResizing, setIsResizing] = useState(false);
   const [availableModels, setAvailableModels] = useState(FALLBACK_MODELS);
-  const [selectedModel, setSelectedModel] = useState(FALLBACK_MODELS[0].id);
+  const { preferences, updatePreference } = useTheme();
+  const [selectedModel, setSelectedModel] = useState(preferences?.defaultModelId || FALLBACK_MODELS[0].id);
   const dc = useDarkColors();
   const [activeHighlight, setActiveHighlight] = useState(null);
   const [activeStream, setActiveStream] = useState(null);
@@ -102,6 +104,13 @@ const ChatPage = () => {
 
     loadModels();
   }, []);
+
+  // Update effect to adjust selectedModel when preferences load
+  useEffect(() => {
+    if (preferences?.defaultModelId && availableModels.some(m => m.id === preferences.defaultModelId)) {
+      setSelectedModel(preferences.defaultModelId);
+    }
+  }, [preferences?.defaultModelId, availableModels]);
 
   useEffect(() => {
     if (!chatId) {
@@ -393,7 +402,10 @@ const ChatPage = () => {
           currentDocumentId={currentDocumentId}
           selectedModel={selectedModel}
           availableModels={availableModels}
-          onModelChange={setSelectedModel}
+          onModelChange={(newModelId) => {
+            setSelectedModel(newModelId);
+            updatePreference({ defaultModelId: newModelId });
+          }}
           onCitationClick={handleCitationClick}
           currentFileName={currentFileName}
         />

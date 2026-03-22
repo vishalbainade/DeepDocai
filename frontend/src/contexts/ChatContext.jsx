@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { getChats, getChatMessages, createChat } from '../services/api';
 
 const ChatContext = createContext(null);
@@ -48,7 +48,7 @@ export function ChatProvider({ children }) {
   }, [currentDocumentId]);
 
   // Load chats list
-  const loadChats = async () => {
+  const loadChats = useCallback(async () => {
     try {
       setLoading(true);
       const result = await getChats();
@@ -61,10 +61,10 @@ export function ChatProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // Create new chat
-  const createNewChat = async (documentId) => {
+  const createNewChat = useCallback(async (documentId) => {
     try {
       const result = await createChat(documentId);
       if (result?.chat) {
@@ -77,17 +77,16 @@ export function ChatProvider({ children }) {
       console.error('Error creating chat:', error);
       throw error;
     }
-  };
+  }, [loadChats]);
 
   // Load chat messages
-  const loadChatMessages = async (chatId) => {
+  const loadChatMessages = useCallback(async (chatId) => {
     try {
       setLoading(true);
       const result = await getChatMessages(chatId);
       const formattedMessages = (result?.messages || []).map((msg, index) => {
         const normalizedRole = (msg?.role || 'user').toLowerCase();
         
-        // Try to parse content as JSON if it's a table response
         let parsedContent = msg?.content || '';
         let answerType = 'text';
         let tableData = null;
@@ -98,11 +97,9 @@ export function ChatProvider({ children }) {
             if (parsed.answer_type === 'table' && parsed.table) {
               answerType = 'table';
               tableData = parsed.table;
-              parsedContent = parsed.answer || ''; // Use fallback text if available
+              parsedContent = parsed.answer || '';
             }
-          } catch (e) {
-            // Not JSON, treat as regular text
-          }
+          } catch (e) {}
         }
         
         return {
@@ -110,10 +107,11 @@ export function ChatProvider({ children }) {
           role: normalizedRole,
           content: parsedContent,
           createdAt: msg?.createdAt || new Date().toISOString(),
-          // Preserve table data if it exists
           answer_type: answerType,
           table: tableData,
           sources: msg?.sources,
+          citations: msg?.citations || [],
+          paragraphCitations: msg?.paragraphCitations || [],
         };
       });
       setChatHistory(formattedMessages);
@@ -127,55 +125,38 @@ export function ChatProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  };
-
-
-
-
-
-//////////////////////////////////////////////////////
-// Update message in chat history
-const updateMessage = (messageId, updates) => {
-  setChatHistory((prev) =>
-    prev.map((msg) => {
-      if (msg.id === messageId) {
-        // Support both object updates and function updates
-        if (typeof updates === 'function') {
-          return updates(msg);
-        }
-        return { ...msg, ...updates };
-      }
-      return msg;
-    })
-  );
-};
-/////////////////////////////////
-
-
-
+  }, []);
 
   // Add message to current chat history
-  const addMessage = (message) => {
+  const addMessage = useCallback((message) => {
     setChatHistory((prev) => [...prev, message]);
-  };
+  }, []);
 
   // Update message in chat history
-  // const updateMessage = (messageId, updates) => {
-  //   setChatHistory((prev) =>
-  //     prev.map((msg) => (msg.id === messageId ? { ...msg, ...updates } : msg))
-  //   );
-  // };
+  const updateMessage = useCallback((messageId, updates) => {
+    setChatHistory((prev) =>
+      prev.map((msg) => {
+        if (msg.id === messageId) {
+          if (typeof updates === 'function') {
+            return updates(msg);
+          }
+          return { ...msg, ...updates };
+        }
+        return msg;
+      })
+    );
+  }, []);
 
   // Refresh chats list
-  const refreshChats = () => {
+  const refreshChats = useCallback(() => {
     loadChats();
-  };
+  }, [loadChats]);
 
   // Clear current chat
-  const clearChat = () => {
+  const clearChat = useCallback(() => {
     setCurrentChatId(null);
     setChatHistory([]);
-  };
+  }, []);
 
   // Load chats on mount (only if authenticated)
   useEffect(() => {
@@ -183,7 +164,7 @@ const updateMessage = (messageId, updates) => {
     if (token) {
       loadChats();
     }
-  }, []);
+  }, [loadChats]);
 
   const value = {
     chats,
