@@ -1,22 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import Navbar from './Navbar';
 import ChatHistoryDrawer from './ChatHistoryDrawer';
 import UploadZone from './UploadZone';
-import PDFViewer from '/PDFViewer';
+import PDFViewer from './PDFViewer';
+import OCRViewer from './OCRViewer';
 import ChatPanel from './ChatPanel';
 import ChatStream from './ChatStream';
-import { getAvailableModels, getChatMessages, getDocumentPreview, uploadDocument } from '../services/api';
+import { getAvailableModels, getChatMessages, getDocumentPreview, uploadDocument, getUserSelectedModel, saveUserSelectedModel } from '../services/api';
 import { detectQueryIntent } from '../utils/intentDetection';
 
 const FALLBACK_MODELS = [
-  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-  { id: 'gemini-3-flash', label: 'Gemini 3 Flash' },
-  { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite' },
-  { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
-  { id: 'gemma-3-1b', label: 'Gemma 3 1B' },
-  { id: 'gemma-3-4b', label: 'Gemma 3 4B' },
-  { id: 'gemma-3-12b', label: 'Gemma 3 12B' },
-  { id: 'gemma-3-27b', label: 'Gemma 3 27B' },
+  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', displayName: 'Gemini 2.5 Flash', modelName: 'gemini-2.5-flash', provider: { slug: 'google', name: 'Google AI Studio' } },
 ];
 
 const flattenParagraphCitations = (paragraphCitations = []) => {
@@ -47,30 +41,120 @@ const Workspace = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [currentFileName, setCurrentFileName] = useState(null);
   const [chatListRefreshTrigger, setChatListRefreshTrigger] = useState(0);
-  const [availableModels, setAvailableModels] = useState(FALLBACK_MODELS);
-  const [selectedModel, setSelectedModel] = useState(FALLBACK_MODELS[0].id);
+  const [availableModels, setAvailableModels] = useState([]);
+  const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [selectedModelId, setSelectedModelId] = useState(() => {
+    // Instant restore from localStorage on first render (before any API call)
+    return localStorage.getItem('deepdocai_selected_model_id') || null;
+  });
+  const [selectedModelName, setSelectedModelName] = useState(() => {
+    return localStorage.getItem('deepdocai_selected_model_name') || null;
+  });
   const [activeHighlight, setActiveHighlight] = useState(null);
   const [activeStream, setActiveStream] = useState(null);
   const activeStreamIdRef = useRef(null);
   const submissionLockRef = useRef(false);
+  const modelSavePendingRef = useRef(false);
 
+  // ─── Load models from backend + verify persisted selection ──────────────
   useEffect(() => {
-    const loadModels = async () => {
+    const loadModelsAndSelection = async () => {
       try {
-        const result = await getAvailableModels();
-        if (Array.isArray(result?.models) && result.models.length > 0) {
-          setAvailableModels(result.models);
-          setSelectedModel((current) =>
-            result.models.some((model) => model.id === current) ? current : result.models[0].id
-          );
+        // Load models from new multi-provider endpoint
+        const modelsResult = await getAvailableModels();
+        let models = [];
+
+        if (Array.isArray(modelsResult?.models) && modelsResult.models.length > 0) {
+          models = modelsResult.models;
+          setAvailableModels(models);
         }
+
+        if (models.length === 0) return;
+
+        // ── Try 1: Restore from localStorage (already set in useState init) ──
+        const cachedId = localStorage.getItem('deepdocai_selected_model_id');
+        const cachedName = localStorage.getItem('deepdocai_selected_model_name');
+
+        if (cachedId || cachedName) {
+          // Match by UUID first, then by modelName as fallback
+          const matched = models.find((m) => m.id === cachedId)
+            || models.find((m) => m.modelName === cachedName);
+
+          if (matched) {
+            setSelectedModelId(matched.id);
+            setSelectedModelName(matched.modelName);
+            // Update localStorage in case ID changed (re-seed)
+            localStorage.setItem('deepdocai_selected_model_id', matched.id);
+            localStorage.setItem('deepdocai_selected_model_name', matched.modelName);
+            console.log('[DeepDocAI] ✅ Restored model from cache:', matched.displayName);
+            return;
+          }
+        }
+
+        // ── Try 2: Load from backend DB (user_settings table) ──
+        try {
+          const selectionResult = await getUserSelectedModel();
+          if (selectionResult?.selected?.modelId) {
+            const persistedId = selectionResult.selected.modelId;
+            const persistedName = selectionResult.selected.modelName;
+
+            const matched = models.find((m) => m.id === persistedId)
+              || models.find((m) => m.modelName === persistedName);
+
+            if (matched) {
+              setSelectedModelId(matched.id);
+              setSelectedModelName(matched.modelName);
+              localStorage.setItem('deepdocai_selected_model_id', matched.id);
+              localStorage.setItem('deepdocai_selected_model_name', matched.modelName);
+              console.log('[DeepDocAI] ✅ Restored model from backend:', matched.displayName);
+              return;
+            }
+          }
+        } catch (error) {
+          console.warn('[DeepDocAI] Could not load from backend, using default', error);
+        }
+
+        // ── Default: first model in list ──
+        setSelectedModelId(models[0].id);
+        setSelectedModelName(models[0].modelName);
+        console.log('[DeepDocAI] Using default model:', models[0].displayName);
       } catch (error) {
-        console.error('Failed to load available models', error);
+        console.error('[DeepDocAI] Failed to load models', error);
+      } finally {
+        setModelsLoaded(true);
       }
     };
 
-    loadModels();
+    loadModelsAndSelection();
   }, []);
+
+  // ─── Persist model selection to backend AND localStorage ──────────────
+  const handleModelChange = useCallback(async (modelId) => {
+    setSelectedModelId(modelId);
+
+    const model = availableModels.find((m) => m.id === modelId);
+    const modelName = model?.modelName || null;
+    setSelectedModelName(modelName);
+
+    // Save to localStorage IMMEDIATELY (survives refresh instantly)
+    localStorage.setItem('deepdocai_selected_model_id', modelId);
+    if (modelName) {
+      localStorage.setItem('deepdocai_selected_model_name', modelName);
+    }
+
+    // Also persist to backend DB (for cross-device sync)
+    if (modelSavePendingRef.current) return;
+    modelSavePendingRef.current = true;
+
+    try {
+      await saveUserSelectedModel(modelId);
+      console.log('[DeepDocAI] ✅ Model saved to backend:', model?.displayName || modelId);
+    } catch (error) {
+      console.error('[DeepDocAI] Failed to save to backend (localStorage still has it)', error);
+    } finally {
+      modelSavePendingRef.current = false;
+    }
+  }, [availableModels]);
 
   useEffect(() => {
     activeStreamIdRef.current = activeStream?.id || null;
@@ -192,6 +276,8 @@ const Workspace = () => {
     setActiveHighlight(null);
 
     const intent = detectQueryIntent(question);
+
+    // Use the model_name for the backend (it resolves via the router)
     setActiveStream({
       id: `stream-${Date.now()}`,
       messageId: aiMessageId,
@@ -199,7 +285,7 @@ const Workspace = () => {
       question,
       chatId: currentChatId,
       intent,
-      model: selectedModel,
+      model: selectedModelName || selectedModelId,
     });
 
     return true;
@@ -321,10 +407,14 @@ const Workspace = () => {
 
       <div className="flex flex-1 overflow-hidden">
         <div className="w-1/2 overflow-hidden border-r border-slate-200">
-          {showUploadZone || !pdfUrl ? (
+          {showUploadZone || !currentDocumentId ? (
             <UploadZone onUpload={handleUpload} isUploading={isUploading} />
           ) : (
-            <PDFViewer fileUrl={pdfUrl} activeHighlight={activeHighlight} />
+            <OCRViewer 
+              documentId={currentDocumentId} 
+              pdfUrl={pdfUrl} 
+              activeHighlight={activeHighlight} 
+            />
           )}
         </div>
 
@@ -335,9 +425,10 @@ const Workspace = () => {
             onSummarize={handleSummarize}
             isThinking={isThinking}
             currentDocumentId={currentDocumentId}
-            selectedModel={selectedModel}
+            selectedModel={selectedModelId}
             availableModels={availableModels}
-            onModelChange={setSelectedModel}
+            modelsLoaded={modelsLoaded}
+            onModelChange={handleModelChange}
             onCitationClick={handleCitationClick}
             currentFileName={currentFileName}
           />

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useChat } from '../contexts/ChatContext';
 import ChatPanel from './ChatPanel';
 import PDFViewer from './PDFViewer';
+import OCRViewer from './OCRViewer';
 import UploadZone from './UploadZone';
 import ChatStream from './ChatStream';
 import { getAvailableModels, getDocumentPreview, uploadDocument } from '../services/api';
@@ -350,8 +351,12 @@ const ChatPage = () => {
       <div className="flex-shrink-0 overflow-hidden border-r border-gray-200" style={{ width: `${leftPanelWidth}%` }}>
         {showUploadZone ? (
           <UploadZone onUpload={handleUpload} isUploading={isUploading} />
-        ) : pdfUrl ? (
-          <PDFViewer fileUrl={pdfUrl} activeHighlight={activeHighlight} />
+        ) : pdfUrl && currentDocumentId ? (
+          <OCRViewer 
+            documentId={currentDocumentId} 
+            pdfUrl={pdfUrl} 
+            activeHighlight={activeHighlight} 
+          />
         ) : (
           <div className="flex h-full items-center justify-center bg-gray-50">
             <div className="text-center text-slate-500">

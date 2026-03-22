@@ -1,3 +1,15 @@
+/**
+ * Model Registry (Hybrid: Static fallback + Database-backed)
+ *
+ * This module provides backward compatibility with static model definitions
+ * while the new AI routing system loads models from the database.
+ *
+ * The static registry is used:
+ *   - As an immediate fallback if the DB hasn't been seeded yet
+ *   - For the embedding model (which is not user-facing)
+ *   - For legacy code paths that depend on the old API
+ */
+
 const BASE_TEXT_MODELS = [
   {
     id: 'gemini-2.5-flash',
@@ -118,6 +130,29 @@ export const isUnsupportedModelError = (error) => {
     message.includes('is not supported for generatecontent') ||
     message.includes('models/') && message.includes('not found')
   );
+};
+
+/**
+ * Map a DB model record back to the legacy static format.
+ * Used for backward compatibility with gemini-client.js.
+ */
+export const dbModelToLegacy = (dbModel) => {
+  if (!dbModel) return TEXT_MODEL_REGISTRY[0];
+
+  // Check if it's a known static model
+  const byName = TEXT_MODEL_BY_API.get(dbModel.modelName);
+  if (byName) return byName;
+
+  // Create a legacy-compatible object from DB model
+  return {
+    id: dbModel.modelName,
+    label: dbModel.displayName,
+    apiModel: dbModel.modelName,
+    family: dbModel.modelFamily || 'text',
+    order: dbModel.sortOrder || 100,
+    enabled: true,
+    providerSlug: dbModel.providerSlug,
+  };
 };
 
 export const DEFAULT_TEXT_MODEL = TEXT_MODEL_REGISTRY[0];

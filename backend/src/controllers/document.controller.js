@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
-import { downloadFromInputBucket, uploadToInputBucket } from '../services/storage.service.js';
+import { downloadFromInputBucket, uploadToInputBucket, uploadLogToOutputBucket } from '../services/storage.service.js';
 import { extractDocumentWithSarvam } from '../services/sarvam.service.js';
 import { reconstructSearchablePdf } from '../services/documentReconstructionService.js';
 import { extractLayoutChunks } from '../services/layoutChunkingService.js';
@@ -69,6 +69,30 @@ export const processDocument = async (req, res) => {
 
     const ocrStorageUrl = `${process.env.SUPABASE_URL}/storage/v1/object/public/${process.env.SUPABASE_INPUT_BUCKET || 'file-inputs'}/${ocrStorageFileName}`;
     await updateDocumentStatus(documentId, 'ocr_complete', ocrStorageUrl);
+
+    // ─── RENAMED: Persist Layout-rich OCR JSON and text-only JSON ────────────
+    logger.info('INGESTION', 'Uploading OCR and Text JSON', { documentId, stage: 'json_upload' });
+    
+    // 1. Text JSON: Contains only the raw extracted text (useful for chat context)
+    const textJson = {
+      documentId,
+      fileName,
+      extractedAt: new Date().toISOString(),
+      text: extractedText,
+      tables: extractedData.tables || [],
+    };
+    await uploadLogToOutputBucket(textJson, `text-${documentId}.json`);
+
+    // 2. OCR JSON: The primary "digital layout" file for the High-Fidelity Viewer
+    const ocrLayoutJson = {
+      documentId,
+      fileName,
+      extractedAt: new Date().toISOString(),
+      pageCount: ocrMetadataPages.length,
+      pages: ocrMetadataPages,
+    };
+    await uploadLogToOutputBucket(ocrLayoutJson, `ocr-${documentId}.json`);
+    // ──────────────────────────────────────────────────────────────────────────
 
     logger.info('INGESTION', 'Layout chunking started', { documentId, stage: 'chunking' });
     const chunks = extractLayoutChunks(ocrMetadataPages, documentId);

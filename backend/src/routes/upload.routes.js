@@ -108,4 +108,24 @@ router.get('/preview/:documentId', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/upload/metadata/:documentId
+ * Fetch the metadata.json for the OCR viewer
+ */
+router.get('/metadata/:documentId', async (req, res) => {
+  try {
+    const { documentId } = req.params;
+    const { downloadFromOutputBucket } = await import('../services/storage.service.js');
+    
+    // Attempt download of ocr-[documentId].json (which contains the full layout)
+    const buffer = await downloadFromOutputBucket(`ocr-${documentId}.json`);
+    const metadata = JSON.parse(buffer.toString('utf-8'));
+
+    res.json(metadata);
+  } catch (error) {
+    console.warn(`[OCR_FETCH] Failed to find OCR layout for document ${req.params.documentId}:`, error.message);
+    res.status(404).json({ error: 'OCR layout not found', message: error.message });
+  }
+});
+
 export default router;

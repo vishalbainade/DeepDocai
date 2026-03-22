@@ -218,8 +218,37 @@ export const getDocumentPreview = async (documentId) => {
   return response.data;
 };
 
+/**
+ * Get all active AI models with provider info (multi-provider).
+ * Falls back to legacy /api/ask/models if new endpoint fails.
+ */
 export const getAvailableModels = async () => {
-  const response = await api.get('/api/ask/models');
+  try {
+    const response = await api.get('/api/models');
+    return response.data;
+  } catch {
+    // Fallback to legacy endpoint
+    const response = await api.get('/api/ask/models');
+    return response.data;
+  }
+};
+
+/**
+ * Get the user's currently selected model (persisted across sessions).
+ * @returns {Promise<{selected: {modelId, modelName, displayName, providerSlug, providerName} | null}>}
+ */
+export const getUserSelectedModel = async () => {
+  const response = await api.get('/api/user/selected-model');
+  return response.data;
+};
+
+/**
+ * Save the user's model selection.
+ * @param {string} modelId - The UUID of the model to select
+ * @returns {Promise<{success: boolean, selected: object}>}
+ */
+export const saveUserSelectedModel = async (modelId) => {
+  const response = await api.post('/api/user/select-model', { modelId });
   return response.data;
 };
 

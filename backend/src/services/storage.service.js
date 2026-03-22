@@ -141,6 +141,30 @@ export const uploadLogToOutputBucket = async (logData, fileName) => {
 };
 
 /**
+ * Download a file from the output bucket
+ * @param {string} fileName - Name of the file in storage
+ * @returns {Promise<Buffer>} File buffer
+ */
+export const downloadFromOutputBucket = async (fileName) => {
+  try {
+    const { data, error } = await supabase.storage
+      .from(OUTPUT_BUCKET)
+      .download(fileName);
+
+    if (error) {
+       // Silent fail for 404s in some contexts is handled upstream, but we throw here for consistency
+      throw new Error(`Supabase output download error: ${error.message}`);
+    }
+
+    const arrayBuffer = await data.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  } catch (error) {
+    console.error('Error downloading from output bucket:', error);
+    throw new Error(`Failed to download output file: ${error.message}`);
+  }
+};
+
+/**
  * Generate a log filename with timestamp
  * @param {string} documentId - Document ID
  * @returns {string} Filename

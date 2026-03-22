@@ -2,6 +2,7 @@ import geminiClient from './gemini-client.js';
 import { retrieveRelevantChunks, isGenericQuery, isTableRequest } from './retrievalService.js';
 import { buildParagraphCitations } from './citationService.js';
 import logger from '../utils/logger.js';
+import { routeTextRequest, routeStreamRequest } from './providerRouter.js';
 
 const summarizeChunksForFlow = (chunks = []) =>
   chunks.map((chunk, index) => ({
@@ -133,11 +134,28 @@ Rules:
 };
 
 const generateTextAnswerInternal = async (question, chunks, preferredModel) => {
-  const prompt = `You are DeepDocAI, a production document assistant.
+  const prompt = `You are an AI assistant integrated into DeepDocAI.
 
-Answer the user's question using ONLY the supplied context.
-Write in clear paragraphs.
-Do not invent facts that are not present in the context.
+Always format responses in a structured, UI-friendly way using the following rules:
+
+Divide the response into sections:
+📄 Overview
+🔍 Key Details
+⚙️ Technical Points (if applicable)
+✅ Final Summary
+Use bullet points instead of long paragraphs.
+Keep sentences short and clean.
+Add relevant emojis for readability (not excessive).
+Inline citations format:
+Use [Pg. X] inside sentences
+Example: "The system uses Vue 3 [Pg. 1]"
+At the end, include:
+"📚 Sources: Pg. 1, Pg. 2"
+Avoid repeating the same citation multiple times.
+Do NOT output raw paragraphs.
+Output should be structured and easy to scan.
+
+Use ONLY the supplied context. Do not invent facts that are not present.
 
 CONTEXT:
 ${buildTextContext(chunks)}
@@ -147,28 +165,21 @@ ${question}
 
 ANSWER:`;
 
-  const execution = await geminiClient.executeWithFallback(
-    async (genAI, modelName) => {
-      const model = genAI.getGenerativeModel({
-        model: modelName,
-        generationConfig: {
-          temperature: 0.4,
-          topP: 0.95,
-        },
-      });
-      return model.generateContent(prompt);
-    },
-    { taskLabel: 'Standard Q&A', preferredModel: preferredModel || geminiClient.MODELS.TEXT }
-  );
+  const result = await routeTextRequest({
+    modelIdentifier: preferredModel,
+    prompt,
+    config: { temperature: 0.4, top_p: 0.95 },
+  });
+
   logger.info('LLM', 'Text answer generated', {
-    modelUsed: execution.modelName,
-    requestedModel: execution.requestedModel,
+    modelUsed: result.modelName,
+    requestedModel: preferredModel || 'auto-resolved',
     chunkCount: chunks.length,
   });
 
   return {
-    answer: (await execution.result.response).text().trim(),
-    modelUsed: execution.modelName,
+    answer: result.text.trim(),
+    modelUsed: result.modelName,
   };
 };
 
@@ -243,9 +254,28 @@ export const generateAnswerStream = async function* (question, documentId, inten
     };
   }
 
-  const prompt = `You are DeepDocAI, a production document assistant.
+  const prompt = `You are an AI assistant integrated into DeepDocAI.
 
-Use only the supplied context. Answer in well-formed paragraphs.
+Always format responses in a structured, UI-friendly way using the following rules:
+
+Divide the response into sections:
+📄 Overview
+🔍 Key Details
+⚙️ Technical Points (if applicable)
+✅ Final Summary
+Use bullet points instead of long paragraphs.
+Keep sentences short and clean.
+Add relevant emojis for readability (not excessive).
+Inline citations format:
+Use [Pg. X] inside sentences
+Example: "The system uses Vue 3 [Pg. 1]"
+At the end, include:
+"📚 Sources: Pg. 1, Pg. 2"
+Avoid repeating the same citation multiple times.
+Do NOT output raw paragraphs.
+Output should be structured and easy to scan.
+
+Use ONLY the supplied context. Do not invent facts that are not present.
 
 CONTEXT:
 ${buildTextContext(retrieval.chunks)}
@@ -255,40 +285,39 @@ ${question}
 
 ANSWER:`;
 
-  const execution = await geminiClient.executeWithFallback(
-    async (genAI, modelName) => {
-      const model = genAI.getGenerativeModel({
-        model: modelName,
-        generationConfig: {
-          temperature: 0.4,
-          topP: 0.95,
-        },
-      });
-      return model.generateContentStream(prompt);
-    },
-    { taskLabel: 'Streaming Q&A', preferredModel: preferredModel || geminiClient.MODELS.TEXT }
-  );
-  logger.info('LLM', 'Streaming model selected', {
-    modelUsed: execution.modelName,
-    requestedModel: execution.requestedModel,
-    chunkCount: retrieval.chunks.length,
+  const generator = routeStreamRequest({
+    modelIdentifier: preferredModel,
+    prompt,
+    config: { temperature: 0.4, top_p: 0.95 },
   });
 
   let answer = '';
-  for await (const chunk of execution.result.stream) {
-    const token = chunk.text();
-    if (token) {
-      answer += token;
-      yield token;
+  let meta = null;
+
+  while (true) {
+    const { value, done } = await generator.next();
+    if (done) {
+      meta = value;
+      break;
+    }
+    if (value) {
+      answer += value;
+      yield value;
     }
   }
+
+  logger.info('LLM', 'Streaming stream finished', {
+    modelUsed: meta?.modelName || 'unknown',
+    requestedModel: preferredModel || 'auto-resolved',
+    chunkCount: retrieval.chunks.length,
+  });
 
   return {
     answer_type: 'text',
     answer: answer.trim(),
     sources: retrieval.chunks,
     paragraphCitations: buildParagraphCitations(answer, retrieval.chunks),
-    modelUsed: execution.modelName,
+    modelUsed: meta?.modelName || 'unknown',
   };
 };
 

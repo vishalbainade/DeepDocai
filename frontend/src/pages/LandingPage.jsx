@@ -1,5 +1,389 @@
+// // import { Link } from 'react-router-dom';
+// // import { FileText, Search, Shield, Zap, ArrowRight, Mail, Phone, MapPin, Facebook, Twitter, Linkedin, Instagram, Github, Youtube } from 'lucide-react';
+// // import DeepDocAILogo from '../components/DeepDocAILogo';
+// // import { isAuthenticated } from '../services/api';
+
+// // const LandingPage = () => {
+// //   const loggedIn = isAuthenticated();
+
+// //   return (
+// //     <div className="min-h-screen bg-[#F4F6FB]">
+// //       {/* Navigation */}
+// //       <nav className="bg-white/50 backdrop-blur-md border-2 border-white-700 sticky top-0 z-50">
+// //         <div className="max-w-5xl mx-auto px-4 py-1 flex items-center justify-between">
+// //           <Link to="/" className="flex items-center gap-2">
+// //             <DeepDocAILogo size="large" useOriginalLogo={true} />
+// //           </Link>
+// //           <div className="flex items-center gap-4">
+// //             <Link
+// //               to={loggedIn ? '/chat' : '/login'}
+// //               className="px-4 py-2 text-slate-700 hover:text-purple-600 transition-colors font-medium"
+// //             >
+// //               Login
+// //             </Link>
+// //             <Link
+// //               to={loggedIn ? '/chat' : '/register'}
+// //               className="px-6 py-2 bg-[#8E84B8] text-white rounded-lg hover:bg-[#7A70A8] transition-all shadow-lg hover:shadow-xl font-medium"
+// //             >
+// //               Get Started
+// //             </Link>
+// //           </div>
+// //         </div>
+// //       </nav>
+
+// //       {/* Hero Section */}
+// //       <section className="max-w-7xl mx-auto px-6 py-20 text-center">
+// //         <div className="animate-fade-in">
+// //           <h1 className="text-5xl md:text-6xl font-bold text-slate-900 mb-6 leading-tight">
+// //             AI-Powered DeepDocAI
+// //             <br />
+// //             <span className="bg-gradient-to-r from-[#8E84B8] to-[#6B5FA0] bg-clip-text text-transparent">
+// //               Document Assistant
+// //             </span>
+// //           </h1>
+// //           <p className="text-xl text-slate-600 mb-8 max-w-2xl mx-auto">
+// //             Upload DeepDocAI documents, ask questions, and get instant AI-powered answers. 
+// //             Powered by advanced RAG technology for accurate, context-aware responses.
+// //           </p>
+// //           <div className="flex items-center justify-center gap-4 flex-wrap">
+// //             <Link
+// //               to={loggedIn ? '/chat' : '/register'}
+// //               className="px-8 py-4 bg-[#8E84B8] text-white rounded-lg hover:bg-[#7A70A8] transition-all shadow-lg hover:shadow-xl font-semibold text-lg flex items-center gap-2 group"
+// //             >
+// //               Get Started Free
+// //               <ArrowRight className="group-hover:translate-x-1 transition-transform" size={20} />
+// //             </Link>
+// //             <Link
+// //               to={loggedIn ? '/chat' : '/login'}
+// //               className="px-8 py-4 bg-white text-[#8E84B8] rounded-lg hover:bg-[#F4F6FB] transition-all border-2 border-[#8E84B8]/20 font-semibold text-lg"
+// //             >
+// //               Sign In
+// //             </Link>
+// //           </div>
+// //         </div>
+// //       </section>
+
+// //       {/* How It Works */}
+// //       <section className="max-w-7xl mx-auto px-6 py-20">
+// //         <h2 className="text-3xl font-bold text-center text-slate-900 mb-12">
+// //           How It Works
+// //         </h2>
+// //         <div className="grid md:grid-cols-3 gap-8">
+// //           <div className="bg-white p-8 rounded-xl shadow-lg hover:shadow-xl transition-shadow border border-gray-100">
+// //             <div className="w-16 h-16 bg-[#8E84B8]/10 rounded-lg flex items-center justify-center mb-6">
+// //               <FileText className="text-[#8E84B8]" size={32} />
+// //             </div>
+// //             <h3 className="text-xl font-bold text-slate-900 mb-3">1. Upload Document</h3>
+// //             <p className="text-slate-600">
+// //               Upload your DeepDocAI documents in PDF format. Our system uses OCR to extract text and prepare it for analysis.
+// //             </p>
+// //           </div>
+// //           <div className="bg-white p-8 rounded-xl shadow-lg hover:shadow-xl transition-shadow border border-gray-100">
+// //             <div className="w-16 h-16 bg-[#8E84B8]/10 rounded-lg flex items-center justify-center mb-6">
+// //               <Search className="text-[#8E84B8]" size={32} />
+// //             </div>
+// //             <h3 className="text-xl font-bold text-slate-900 mb-3">2. Ask Questions</h3>
+// //             <p className="text-slate-600">
+// //               Ask any question about your document. Our AI uses RAG (Retrieval-Augmented Generation) to find relevant information.
+// //             </p>
+// //           </div>
+// //           <div className="bg-white p-8 rounded-xl shadow-lg hover:shadow-xl transition-shadow border border-gray-100">
+// //             <div className="w-16 h-16 bg-green-100 rounded-lg flex items-center justify-center mb-6">
+// //               <Zap className="text-green-600" size={32} />
+// //             </div>
+// //             <h3 className="text-xl font-bold text-slate-900 mb-3">3. Get Answers</h3>
+// //             <p className="text-slate-600">
+// //               Receive instant, accurate answers with source citations. All responses are based on your uploaded documents.
+// //             </p>
+// //           </div>
+// //         </div>
+// //       </section>
+
+// //       {/* Features */}
+// //       <section className="bg-white py-20">
+// //         <div className="max-w-7xl mx-auto px-6">
+// //           <h2 className="text-3xl font-bold text-center text-slate-900 mb-12">
+// //             Powerful Features
+// //           </h2>
+// //           <div className="grid md:grid-cols-2 gap-8">
+// //             <div className="flex gap-4">
+// //               <div className="flex-shrink-0">
+// //                 <div className="w-12 h-12 bg-[#8E84B8]/10 rounded-lg flex items-center justify-center">
+// //                   <Search className="text-[#8E84B8]" size={24} />
+// //                 </div>
+// //               </div>
+// //               <div>
+// //                 <h3 className="text-xl font-bold text-slate-900 mb-2">AI DeepDocAI Search</h3>
+// //                 <p className="text-slate-600">
+// //                   Advanced semantic search powered by vector embeddings to find the most relevant information in your documents.
+// //                 </p>
+// //               </div>
+// //             </div>
+// //             <div className="flex gap-4">
+// //               <div className="flex-shrink-0">
+// //                 <div className="w-12 h-12 bg-[#8E84B8]/10 rounded-lg flex items-center justify-center">
+// //                   <Shield className="text-[#8E84B8]" size={24} />
+// //                 </div>
+// //               </div>
+// //               <div>
+// //                 <h3 className="text-xl font-bold text-slate-900 mb-2">Secure Documents</h3>
+// //                 <p className="text-slate-600">
+// //                   Your documents are encrypted and stored securely. We never share your data with third parties.
+// //                 </p>
+// //               </div>
+// //             </div>
+// //             <div className="flex gap-4">
+// //               <div className="flex-shrink-0">
+// //                 <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+// //                   <FileText className="text-green-600" size={24} />
+// //                 </div>
+// //               </div>
+// //               <div>
+// //                 <h3 className="text-xl font-bold text-slate-900 mb-2">OCR Technology</h3>
+// //                 <p className="text-slate-600">
+// //                   Extract text from scanned PDFs and images using advanced OCR technology powered by Tesseract.
+// //                 </p>
+// //               </div>
+// //             </div>
+// //             <div className="flex gap-4">
+// //               <div className="flex-shrink-0">
+// //                 <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+// //                   <Zap className="text-blue-600" size={24} />
+// //                 </div>
+// //               </div>
+// //               <div>
+// //                 <h3 className="text-xl font-bold text-slate-900 mb-2">RAG Technology</h3>
+// //                 <p className="text-slate-600">
+// //                   Retrieval-Augmented Generation ensures accurate, context-aware responses based on your specific documents.
+// //                 </p>
+// //               </div>
+// //             </div>
+// //           </div>
+// //         </div>
+// //       </section>
+
+// //       {/* CTA Section */}
+// //       <section className="max-w-7xl mx-auto px-6 py-20">
+// //         <div className="bg-[#8E84B8] rounded-2xl p-12 text-center text-white">
+// //           <h2 className="text-4xl font-bold mb-4">Ready to Get Started?</h2>
+// //           <p className="text-xl mb-8 text-white/80">
+// //             Join thousands of DeepDocAI professionals using DeepDoc AI to streamline their document analysis.
+// //           </p>
+// //           <Link
+// //             to={loggedIn ? '/chat' : '/register'}
+// //             className="inline-flex items-center gap-2 px-8 py-4 bg-white text-[#8E84B8] rounded-lg hover:bg-[#F4F6FB] transition-all shadow-lg hover:shadow-xl font-semibold text-lg"
+// //           >
+// //             Create Free Account
+// //             <ArrowRight size={20} />
+// //           </Link>
+// //         </div>
+// //       </section>
+
+// //       {/* Footer */}
+// //       <footer className="bg-white border-t border-[#EAF0F6]">
+// //         <div className="max-w-7xl mx-auto px-6 py-16">
+// //           {/* Main Footer Content */}
+// //           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
+// //             {/* Company Info */}
+// //             <div>
+// //               <div className="mb-6">
+// //                 <DeepDocAILogo size="default" showText={true} />
+// //               </div>
+// //               <p className="text-slate-500 mb-6 leading-relaxed">
+// //                 AI-powered DeepDocAI document assistant revolutionizing how DeepDocAI professionals analyze, search, and understand complex DeepDocAI documents.
+// //               </p>
+// //               <div className="flex gap-4">
+// //                 <a href="#" className="w-10 h-10 bg-[#F4F6FB] rounded-lg flex items-center justify-center hover:bg-[#8E84B8] hover:text-white text-slate-500 transition-colors">
+// //                   <Facebook size={18} />
+// //                 </a>
+// //                 <a href="#" className="w-10 h-10 bg-[#F4F6FB] rounded-lg flex items-center justify-center hover:bg-[#8E84B8] hover:text-white text-slate-500 transition-colors">
+// //                   <Twitter size={18} />
+// //                 </a>
+// //                 <a href="#" className="w-10 h-10 bg-[#F4F6FB] rounded-lg flex items-center justify-center hover:bg-[#8E84B8] hover:text-white text-slate-500 transition-colors">
+// //                   <Linkedin size={18} />
+// //                 </a>
+// //                 <a href="#" className="w-10 h-10 bg-[#F4F6FB] rounded-lg flex items-center justify-center hover:bg-[#8E84B8] hover:text-white text-slate-500 transition-colors">
+// //                   <Instagram size={18} />
+// //                 </a>
+// //                 <a href="#" className="w-10 h-10 bg-[#F4F6FB] rounded-lg flex items-center justify-center hover:bg-[#8E84B8] hover:text-white text-slate-500 transition-colors">
+// //                   <Github size={18} />
+// //                 </a>
+// //               </div>
+// //             </div>
+
+// //             {/* Quick Links */}
+// //             <div>
+// //               <h3 className="text-lg font-semibold mb-6 text-[#1E293B]">Quick Links</h3>
+// //               <ul className="space-y-3">
+// //                 <li>
+// //                   <Link to="/" className="text-slate-500 hover:text-[#8E84B8] transition-colors">
+// //                     Home
+// //                   </Link>
+// //                 </li>
+// //                 <li>
+// //                   <Link to="/register" className="text-slate-500 hover:text-[#8E84B8] transition-colors">
+// //                     Get Started
+// //                   </Link>
+// //                 </li>
+// //                 <li>
+// //                   <Link to="/login" className="text-slate-500 hover:text-[#8E84B8] transition-colors">
+// //                     Sign In
+// //                   </Link>
+// //                 </li>
+// //                 <li>
+// //                   <a href="#" className="text-slate-500 hover:text-[#8E84B8] transition-colors">
+// //                     Features
+// //                   </a>
+// //                 </li>
+// //                 <li>
+// //                   <a href="#" className="text-slate-500 hover:text-[#8E84B8] transition-colors">
+// //                     Pricing
+// //                   </a>
+// //                 </li>
+// //                 <li>
+// //                   <a href="#" className="text-slate-500 hover:text-[#8E84B8] transition-colors">
+// //                     About Us
+// //                   </a>
+// //                 </li>
+// //               </ul>
+// //             </div>
+
+// //             {/* Resources */}
+// //             <div>
+// //               <h3 className="text-lg font-semibold mb-6 text-[#1E293B]">Resources</h3>
+// //               <ul className="space-y-3">
+// //                 <li>
+// //                   <a href="#" className="text-slate-500 hover:text-[#8E84B8] transition-colors">
+// //                     Documentation
+// //                   </a>
+// //                 </li>
+// //                 <li>
+// //                   <a href="#" className="text-slate-500 hover:text-[#8E84B8] transition-colors">
+// //                     API Reference
+// //                   </a>
+// //                 </li>
+// //                 <li>
+// //                   <a href="#" className="text-slate-500 hover:text-[#8E84B8] transition-colors">
+// //                     Help Center
+// //                   </a>
+// //                 </li>
+// //                 <li>
+// //                   <a href="#" className="text-slate-500 hover:text-[#8E84B8] transition-colors">
+// //                     Blog
+// //                   </a>
+// //                 </li>
+// //                 <li>
+// //                   <a href="#" className="text-slate-500 hover:text-[#8E84B8] transition-colors">
+// //                     Case Studies
+// //                   </a>
+// //                 </li>
+// //                 <li>
+// //                   <a href="#" className="text-slate-500 hover:text-[#8E84B8] transition-colors">
+// //                     Webinars
+// //                   </a>
+// //                 </li>
+// //               </ul>
+// //             </div>
+
+// //             {/* Contact & DeepDocAI */}
+// //             <div>
+// //               <h3 className="text-lg font-semibold mb-6 text-[#1E293B]">Contact & DeepDocAI</h3>
+// //               <ul className="space-y-4 mb-6">
+// //                 <li className="flex items-start gap-3">
+// //                   <MapPin className="text-[#8E84B8] mt-1 flex-shrink-0" size={18} />
+// //                   <span className="text-slate-500 text-sm">
+// //                     123 DeepDocAI Tech Avenue<br />
+// //                     San Francisco, CA 94105<br />
+// //                     United States
+// //                   </span>
+// //                 </li>
+// //                 <li className="flex items-center gap-3">
+// //                   <Mail className="text-[#8E84B8] flex-shrink-0" size={18} />
+// //                   <a href="mailto:support@DeepDoc AI.com" className="text-slate-500 hover:text-[#8E84B8] transition-colors text-sm">
+// //                     support@DeepDoc AI.com
+// //                   </a>
+// //                 </li>
+// //                 <li className="flex items-center gap-3">
+// //                   <Phone className="text-[#8E84B8] flex-shrink-0" size={18} />
+// //                   <a href="tel:+1-555-123-4567" className="text-slate-500 hover:text-[#8E84B8] transition-colors text-sm">
+// //                     +1 (555) 123-4567
+// //                   </a>
+// //                 </li>
+// //               </ul>
+// //               <div className="pt-4 border-t border-[#EAF0F6]">
+// //                 <ul className="space-y-2">
+// //                   <li>
+// //                     <a href="#" className="text-slate-500 hover:text-[#8E84B8] transition-colors text-sm">
+// //                       Privacy Policy
+// //                     </a>
+// //                   </li>
+// //                   <li>
+// //                     <a href="#" className="text-slate-500 hover:text-[#8E84B8] transition-colors text-sm">
+// //                       Terms of Service
+// //                     </a>
+// //                   </li>
+// //                   <li>
+// //                     <a href="#" className="text-slate-500 hover:text-[#8E84B8] transition-colors text-sm">
+// //                       Cookie Policy
+// //                     </a>
+// //                   </li>
+// //                 </ul>
+// //               </div>
+// //             </div>
+// //           </div>
+
+// //           {/* Newsletter Section */}
+// //           <div className="border-t border-[#EAF0F6] pt-12 mb-12">
+// //             <div className="max-w-2xl mx-auto text-center">
+// //               <h3 className="text-2xl font-semibold mb-3 text-[#1E293B]">Stay Updated</h3>
+// //               <p className="text-slate-500 mb-6">
+// //                 Subscribe to our newsletter for the latest updates, features, and DeepDocAI tech insights.
+// //               </p>
+// //               <div className="flex gap-3 max-w-md mx-auto">
+// //                 <input
+// //                   type="email"
+// //                   placeholder="Enter your email"
+// //                   className="flex-1 px-4 py-3 bg-[#F4F6FB] border border-[#EAF0F6] rounded-lg text-[#1E293B] placeholder-slate-400 focus:outline-none focus:border-[#8E84B8] transition-colors"
+// //                 />
+// //                 <button className="px-6 py-3 bg-[#8E84B8] hover:bg-[#7A70A8] text-white rounded-lg font-semibold transition-colors whitespace-nowrap">
+// //                   Subscribe
+// //                 </button>
+// //               </div>
+// //             </div>
+// //           </div>
+
+// //           {/* Bottom Bar */}
+// //           <div className="border-t border-[#EAF0F6] pt-8">
+// //             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+// //               <p className="text-slate-500 text-sm">
+// //                 © {new Date().getFullYear()} DeepDoc AI. All rights reserved.
+// //               </p>
+// //               <div className="flex items-center gap-6 text-sm">
+// //                 <a href="#" className="text-slate-500 hover:text-[#8E84B8] transition-colors">
+// //                   Security
+// //                 </a>
+// //                 <a href="#" className="text-slate-500 hover:text-[#8E84B8] transition-colors">
+// //                   Compliance
+// //                 </a>
+// //                 <a href="#" className="text-slate-500 hover:text-[#8E84B8] transition-colors">
+// //                   Status
+// //                 </a>
+// //                 <a href="#" className="text-slate-500 hover:text-[#8E84B8] transition-colors">
+// //                   Sitemap
+// //                 </a>
+// //               </div>
+// //             </div>
+// //           </div>
+// //         </div>
+// //       </footer>
+// //     </div>
+// //   );
+// // };
+
+// // export default LandingPage;
+
 // import { Link } from 'react-router-dom';
-// import { FileText, Search, Shield, Zap, ArrowRight, Mail, Phone, MapPin, Facebook, Twitter, Linkedin, Instagram, Github, Youtube } from 'lucide-react';
+// import { FileText, Search, Shield, Zap, ArrowRight, Mail, Phone, MapPin, Facebook, Twitter, Linkedin, Instagram, Github } from 'lucide-react';
 // import DeepDocAILogo from '../components/DeepDocAILogo';
 // import { isAuthenticated } from '../services/api';
 
@@ -7,381 +391,760 @@
 //   const loggedIn = isAuthenticated();
 
 //   return (
-//     <div className="min-h-screen bg-[#F4F6FB]">
-//       {/* Navigation */}
-//       <nav className="bg-white/50 backdrop-blur-md border-2 border-white-700 sticky top-0 z-50">
-//         <div className="max-w-5xl mx-auto px-4 py-1 flex items-center justify-between">
-//           <Link to="/" className="flex items-center gap-2">
-//             <DeepDocAILogo size="large" useOriginalLogo={true} />
-//           </Link>
-//           <div className="flex items-center gap-4">
-//             <Link
-//               to={loggedIn ? '/chat' : '/login'}
-//               className="px-4 py-2 text-slate-700 hover:text-purple-600 transition-colors font-medium"
-//             >
-//               Login
-//             </Link>
-//             <Link
-//               to={loggedIn ? '/chat' : '/register'}
-//               className="px-6 py-2 bg-[#8E84B8] text-white rounded-lg hover:bg-[#7A70A8] transition-all shadow-lg hover:shadow-xl font-medium"
-//             >
-//               Get Started
-//             </Link>
-//           </div>
-//         </div>
-//       </nav>
+//     <div style={{ fontFamily: "'Georgia', 'Times New Roman', serif", background: '#0A0A0F', minHeight: '100vh', overflowX: 'hidden' }}>
+//       <style>{`
+//         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Sans:wght@300;400;500;600&display=swap');
 
-//       {/* Hero Section */}
-//       <section className="max-w-7xl mx-auto px-6 py-20 text-center">
-//         <div className="animate-fade-in">
-//           <h1 className="text-5xl md:text-6xl font-bold text-slate-900 mb-6 leading-tight">
-//             AI-Powered Legal
-//             <br />
-//             <span className="bg-gradient-to-r from-[#8E84B8] to-[#6B5FA0] bg-clip-text text-transparent">
-//               Document Assistant
-//             </span>
-//           </h1>
-//           <p className="text-xl text-slate-600 mb-8 max-w-2xl mx-auto">
-//             Upload legal documents, ask questions, and get instant AI-powered answers. 
-//             Powered by advanced RAG technology for accurate, context-aware responses.
-//           </p>
-//           <div className="flex items-center justify-center gap-4 flex-wrap">
-//             <Link
-//               to={loggedIn ? '/chat' : '/register'}
-//               className="px-8 py-4 bg-[#8E84B8] text-white rounded-lg hover:bg-[#7A70A8] transition-all shadow-lg hover:shadow-xl font-semibold text-lg flex items-center gap-2 group"
-//             >
-//               Get Started Free
-//               <ArrowRight className="group-hover:translate-x-1 transition-transform" size={20} />
-//             </Link>
-//             <Link
-//               to={loggedIn ? '/chat' : '/login'}
-//               className="px-8 py-4 bg-white text-[#8E84B8] rounded-lg hover:bg-[#F4F6FB] transition-all border-2 border-[#8E84B8]/20 font-semibold text-lg"
-//             >
-//               Sign In
-//             </Link>
-//           </div>
-//         </div>
-//       </section>
+//         * { box-sizing: border-box; margin: 0; padding: 0; }
 
-//       {/* How It Works */}
-//       <section className="max-w-7xl mx-auto px-6 py-20">
-//         <h2 className="text-3xl font-bold text-center text-slate-900 mb-12">
-//           How It Works
-//         </h2>
-//         <div className="grid md:grid-cols-3 gap-8">
-//           <div className="bg-white p-8 rounded-xl shadow-lg hover:shadow-xl transition-shadow border border-gray-100">
-//             <div className="w-16 h-16 bg-[#8E84B8]/10 rounded-lg flex items-center justify-center mb-6">
-//               <FileText className="text-[#8E84B8]" size={32} />
+//         .landing-root {
+//           font-family: 'DM Sans', sans-serif;
+//           background: #07070E;
+//           color: #F0EDE8;
+//         }
+
+//         /* NAV */
+//         .nav {
+//           position: sticky; top: 0; z-index: 100;
+//           backdrop-filter: blur(20px);
+//           background: rgba(7,7,14,0.85);
+//           border-bottom: 1px solid rgba(180,155,255,0.12);
+//           padding: 0 2rem;
+//         }
+//         .nav-inner {
+//           max-width: 1200px; margin: 0 auto;
+//           display: flex; align-items: center; justify-content: space-between;
+//           height: 68px;
+//         }
+//         .nav-links { display: flex; align-items: center; gap: 12px; }
+//         .btn-ghost {
+//           padding: 8px 20px;
+//           background: transparent;
+//           border: 1px solid rgba(180,155,255,0.25);
+//           border-radius: 8px;
+//           color: #C4B9F0;
+//           font-family: 'DM Sans', sans-serif;
+//           font-size: 14px; font-weight: 500;
+//           cursor: pointer; text-decoration: none;
+//           transition: all 0.2s ease;
+//           letter-spacing: 0.3px;
+//         }
+//         .btn-ghost:hover { background: rgba(180,155,255,0.1); border-color: rgba(180,155,255,0.5); color: #fff; }
+
+//         .btn-primary {
+//           padding: 9px 22px;
+//           background: linear-gradient(135deg, #7C5CE0 0%, #9B59F5 100%);
+//           border: none; border-radius: 8px;
+//           color: #fff;
+//           font-family: 'DM Sans', sans-serif;
+//           font-size: 14px; font-weight: 600;
+//           cursor: pointer; text-decoration: none;
+//           transition: all 0.25s ease;
+//           box-shadow: 0 4px 20px rgba(124,92,224,0.4);
+//           letter-spacing: 0.3px;
+//         }
+//         .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 28px rgba(124,92,224,0.55); }
+
+//         /* HERO */
+//         .hero {
+//           position: relative;
+//           min-height: 92vh;
+//           display: flex; align-items: center; justify-content: center;
+//           text-align: center;
+//           overflow: hidden;
+//           padding: 80px 2rem;
+//         }
+//         .hero-bg {
+//           position: absolute; inset: 0; z-index: 0;
+//           background:
+//             radial-gradient(ellipse 80% 60% at 50% -10%, rgba(124,92,224,0.35) 0%, transparent 60%),
+//             radial-gradient(ellipse 50% 50% at 85% 60%, rgba(88,44,200,0.2) 0%, transparent 55%),
+//             radial-gradient(ellipse 40% 40% at 15% 70%, rgba(155,89,245,0.15) 0%, transparent 50%);
+//         }
+//         .hero-grid {
+//           position: absolute; inset: 0; z-index: 0;
+//           background-image: linear-gradient(rgba(180,155,255,0.04) 1px, transparent 1px),
+//                             linear-gradient(90deg, rgba(180,155,255,0.04) 1px, transparent 1px);
+//           background-size: 60px 60px;
+//         }
+//         .hero-content { position: relative; z-index: 1; max-width: 820px; }
+
+//         .hero-badge {
+//           display: inline-flex; align-items: center; gap: 8px;
+//           background: rgba(124,92,224,0.15);
+//           border: 1px solid rgba(124,92,224,0.4);
+//           border-radius: 100px;
+//           padding: 6px 16px;
+//           font-size: 12px; font-weight: 600;
+//           letter-spacing: 1.5px; text-transform: uppercase;
+//           color: #B89EFF;
+//           margin-bottom: 28px;
+//         }
+//         .badge-dot {
+//           width: 6px; height: 6px; border-radius: 50%;
+//           background: #9B59F5;
+//           box-shadow: 0 0 8px #9B59F5;
+//           animation: pulse 2s infinite;
+//         }
+//         @keyframes pulse {
+//           0%,100% { opacity: 1; transform: scale(1); }
+//           50% { opacity: 0.5; transform: scale(1.4); }
+//         }
+
+//         .hero-title {
+//           font-family: 'Playfair Display', serif;
+//           font-size: clamp(48px, 7vw, 88px);
+//           font-weight: 900;
+//           line-height: 1.08;
+//           color: #F8F5FF;
+//           margin-bottom: 24px;
+//           letter-spacing: -1px;
+//         }
+//         .hero-title .accent {
+//           background: linear-gradient(135deg, #A78BFA 0%, #C084FC 40%, #E879F9 100%);
+//           -webkit-background-clip: text; background-clip: text;
+//           -webkit-text-fill-color: transparent;
+//           display: block;
+//         }
+
+//         .hero-sub {
+//           font-size: 18px; line-height: 1.7;
+//           color: rgba(240,237,232,0.6);
+//           max-width: 560px; margin: 0 auto 44px;
+//           font-weight: 300;
+//         }
+
+//         .hero-cta {
+//           display: flex; align-items: center; justify-content: center;
+//           gap: 16px; flex-wrap: wrap;
+//         }
+//         .btn-hero-primary {
+//           display: inline-flex; align-items: center; gap: 10px;
+//           padding: 16px 36px;
+//           background: linear-gradient(135deg, #7C5CE0, #9B59F5);
+//           color: #fff; border: none; border-radius: 12px;
+//           font-family: 'DM Sans', sans-serif;
+//           font-size: 16px; font-weight: 600;
+//           text-decoration: none; cursor: pointer;
+//           transition: all 0.3s ease;
+//           box-shadow: 0 8px 32px rgba(124,92,224,0.45);
+//           letter-spacing: 0.2px;
+//         }
+//         .btn-hero-primary:hover {
+//           transform: translateY(-2px);
+//           box-shadow: 0 14px 44px rgba(124,92,224,0.6);
+//         }
+//         .btn-hero-primary svg { transition: transform 0.2s; }
+//         .btn-hero-primary:hover svg { transform: translateX(4px); }
+
+//         .btn-hero-secondary {
+//           display: inline-flex; align-items: center; gap: 10px;
+//           padding: 16px 36px;
+//           background: rgba(255,255,255,0.05);
+//           color: rgba(240,237,232,0.85);
+//           border: 1px solid rgba(255,255,255,0.12);
+//           border-radius: 12px;
+//           font-family: 'DM Sans', sans-serif;
+//           font-size: 16px; font-weight: 500;
+//           text-decoration: none; cursor: pointer;
+//           transition: all 0.25s ease;
+//           backdrop-filter: blur(8px);
+//         }
+//         .btn-hero-secondary:hover {
+//           background: rgba(255,255,255,0.09);
+//           border-color: rgba(255,255,255,0.22);
+//           color: #fff;
+//         }
+
+//         /* STATS */
+//         .stats-strip {
+//           border-top: 1px solid rgba(180,155,255,0.1);
+//           border-bottom: 1px solid rgba(180,155,255,0.1);
+//           background: rgba(180,155,255,0.03);
+//         }
+//         .stats-inner {
+//           max-width: 1200px; margin: 0 auto;
+//           display: grid; grid-template-columns: repeat(3, 1fr);
+//           padding: 40px 2rem;
+//         }
+//         .stat-item {
+//           text-align: center;
+//           padding: 0 24px;
+//         }
+//         .stat-item + .stat-item {
+//           border-left: 1px solid rgba(180,155,255,0.1);
+//         }
+//         .stat-num {
+//           font-family: 'Playfair Display', serif;
+//           font-size: 48px; font-weight: 900;
+//           background: linear-gradient(135deg, #A78BFA, #C084FC);
+//           -webkit-background-clip: text; background-clip: text;
+//           -webkit-text-fill-color: transparent;
+//           line-height: 1;
+//         }
+//         .stat-label {
+//           font-size: 13px; color: rgba(240,237,232,0.45);
+//           margin-top: 8px; letter-spacing: 0.5px;
+//           text-transform: uppercase;
+//         }
+
+//         /* HOW IT WORKS */
+//         .section {
+//           max-width: 1200px; margin: 0 auto;
+//           padding: 100px 2rem;
+//         }
+//         .section-eyebrow {
+//           text-align: center;
+//           font-size: 11px; font-weight: 700;
+//           letter-spacing: 3px; text-transform: uppercase;
+//           color: #9B59F5;
+//           margin-bottom: 16px;
+//         }
+//         .section-title {
+//           font-family: 'Playfair Display', serif;
+//           font-size: clamp(32px, 4vw, 52px);
+//           font-weight: 700; text-align: center;
+//           color: #F8F5FF;
+//           margin-bottom: 16px;
+//           line-height: 1.2;
+//         }
+//         .section-sub {
+//           text-align: center;
+//           color: rgba(240,237,232,0.45);
+//           font-size: 16px;
+//           max-width: 500px; margin: 0 auto 64px;
+//           line-height: 1.7;
+//         }
+
+//         .steps-grid {
+//           display: grid;
+//           grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+//           gap: 2px;
+//           background: rgba(180,155,255,0.08);
+//           border: 1px solid rgba(180,155,255,0.08);
+//           border-radius: 20px;
+//           overflow: hidden;
+//         }
+//         .step-card {
+//           background: #0D0D1A;
+//           padding: 48px 40px;
+//           transition: background 0.3s;
+//           position: relative;
+//           overflow: hidden;
+//         }
+//         .step-card::before {
+//           content: '';
+//           position: absolute;
+//           top: 0; left: 0; right: 0;
+//           height: 1px;
+//           background: linear-gradient(90deg, transparent, rgba(155,89,245,0.5), transparent);
+//         }
+//         .step-card:hover { background: #0F0F1F; }
+//         .step-number {
+//           font-family: 'Playfair Display', serif;
+//           font-size: 72px; font-weight: 900;
+//           color: rgba(124,92,224,0.12);
+//           line-height: 1;
+//           position: absolute; top: 24px; right: 32px;
+//           letter-spacing: -3px;
+//         }
+//         .step-icon {
+//           width: 52px; height: 52px;
+//           border-radius: 14px;
+//           background: linear-gradient(135deg, rgba(124,92,224,0.2), rgba(155,89,245,0.1));
+//           border: 1px solid rgba(124,92,224,0.3);
+//           display: flex; align-items: center; justify-content: center;
+//           margin-bottom: 28px;
+//           color: #A78BFA;
+//         }
+//         .step-title {
+//           font-family: 'Playfair Display', serif;
+//           font-size: 22px; font-weight: 700;
+//           color: #F8F5FF; margin-bottom: 14px;
+//         }
+//         .step-desc {
+//           color: rgba(240,237,232,0.5);
+//           font-size: 15px; line-height: 1.75;
+//         }
+
+//         /* FEATURES */
+//         .features-section {
+//           background: linear-gradient(180deg, rgba(124,92,224,0.04) 0%, transparent 100%);
+//           border-top: 1px solid rgba(180,155,255,0.07);
+//           border-bottom: 1px solid rgba(180,155,255,0.07);
+//           padding: 100px 0;
+//         }
+//         .features-grid {
+//           display: grid;
+//           grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+//           gap: 24px;
+//         }
+//         .feature-card {
+//           background: rgba(255,255,255,0.03);
+//           border: 1px solid rgba(180,155,255,0.1);
+//           border-radius: 16px;
+//           padding: 36px 32px;
+//           transition: all 0.3s ease;
+//           position: relative; overflow: hidden;
+//         }
+//         .feature-card::after {
+//           content: '';
+//           position: absolute;
+//           inset: 0; border-radius: 16px;
+//           background: radial-gradient(ellipse at top left, rgba(124,92,224,0.08), transparent 60%);
+//           opacity: 0; transition: opacity 0.3s;
+//         }
+//         .feature-card:hover { border-color: rgba(124,92,224,0.35); transform: translateY(-3px); }
+//         .feature-card:hover::after { opacity: 1; }
+
+//         .feature-icon-wrap {
+//           width: 48px; height: 48px;
+//           border-radius: 12px;
+//           display: flex; align-items: center; justify-content: center;
+//           margin-bottom: 20px;
+//           position: relative; z-index: 1;
+//         }
+//         .fi-purple { background: rgba(124,92,224,0.15); border: 1px solid rgba(124,92,224,0.3); color: #A78BFA; }
+//         .fi-green  { background: rgba(34,197,94,0.12);  border: 1px solid rgba(34,197,94,0.3);  color: #4ADE80; }
+//         .fi-blue   { background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.3); color: #60A5FA; }
+//         .fi-rose   { background: rgba(244,63,94,0.12);  border: 1px solid rgba(244,63,94,0.3);  color: #FB7185; }
+
+//         .feature-title {
+//           font-family: 'Playfair Display', serif;
+//           font-size: 18px; font-weight: 700;
+//           color: #F8F5FF; margin-bottom: 10px;
+//           position: relative; z-index: 1;
+//         }
+//         .feature-desc {
+//           color: rgba(240,237,232,0.48);
+//           font-size: 14px; line-height: 1.75;
+//           position: relative; z-index: 1;
+//         }
+
+//         /* CTA BAND */
+//         .cta-band {
+//           position: relative; overflow: hidden;
+//           padding: 100px 2rem;
+//         }
+//         .cta-band-inner {
+//           max-width: 1200px; margin: 0 auto;
+//         }
+//         .cta-card {
+//           position: relative; overflow: hidden;
+//           background: linear-gradient(135deg, #1A0E3A 0%, #0F0820 50%, #1A103A 100%);
+//           border: 1px solid rgba(124,92,224,0.3);
+//           border-radius: 28px;
+//           padding: 80px 60px;
+//           text-align: center;
+//         }
+//         .cta-card::before {
+//           content: '';
+//           position: absolute;
+//           top: -60%; left: 50%; transform: translateX(-50%);
+//           width: 700px; height: 400px;
+//           background: radial-gradient(ellipse, rgba(124,92,224,0.35) 0%, transparent 70%);
+//           pointer-events: none;
+//         }
+//         .cta-orb {
+//           position: absolute;
+//           width: 300px; height: 300px; border-radius: 50%;
+//           background: radial-gradient(circle, rgba(155,89,245,0.15), transparent 70%);
+//           pointer-events: none;
+//         }
+//         .cta-orb-1 { bottom: -80px; left: -80px; }
+//         .cta-orb-2 { top: -80px; right: -80px; }
+//         .cta-title {
+//           font-family: 'Playfair Display', serif;
+//           font-size: clamp(36px, 5vw, 60px);
+//           font-weight: 900; color: #F8F5FF;
+//           margin-bottom: 16px; position: relative; z-index: 1;
+//           line-height: 1.1;
+//         }
+//         .cta-sub {
+//           color: rgba(240,237,232,0.55);
+//           font-size: 18px; margin-bottom: 44px;
+//           position: relative; z-index: 1;
+//           max-width: 480px; margin-left: auto; margin-right: auto;
+//           line-height: 1.65;
+//         }
+//         .cta-sub { margin-bottom: 44px; }
+//         .btn-cta {
+//           position: relative; z-index: 1;
+//           display: inline-flex; align-items: center; gap: 12px;
+//           padding: 18px 44px;
+//           background: #fff;
+//           color: #6B3FDB;
+//           border: none; border-radius: 12px;
+//           font-family: 'DM Sans', sans-serif;
+//           font-size: 16px; font-weight: 700;
+//           text-decoration: none; cursor: pointer;
+//           transition: all 0.3s;
+//           box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+//           letter-spacing: 0.2px;
+//         }
+//         .btn-cta:hover { transform: translateY(-2px); box-shadow: 0 14px 44px rgba(0,0,0,0.4); }
+
+//         /* FOOTER */
+//         .footer {
+//           background: #070710;
+//           border-top: 1px solid rgba(180,155,255,0.08);
+//           padding: 80px 2rem 0;
+//         }
+//         .footer-grid {
+//           max-width: 1200px; margin: 0 auto;
+//           display: grid;
+//           grid-template-columns: 2fr 1fr 1fr 1.4fr;
+//           gap: 48px;
+//           padding-bottom: 64px;
+//         }
+//         .footer-brand-desc {
+//           color: rgba(240,237,232,0.38);
+//           font-size: 14px; line-height: 1.8;
+//           margin: 20px 0 28px;
+//         }
+//         .socials { display: flex; gap: 10px; }
+//         .social-btn {
+//           width: 36px; height: 36px; border-radius: 8px;
+//           background: rgba(180,155,255,0.06);
+//           border: 1px solid rgba(180,155,255,0.1);
+//           display: flex; align-items: center; justify-content: center;
+//           color: rgba(240,237,232,0.4);
+//           text-decoration: none;
+//           transition: all 0.2s;
+//         }
+//         .social-btn:hover {
+//           background: rgba(124,92,224,0.2);
+//           border-color: rgba(124,92,224,0.5);
+//           color: #A78BFA;
+//         }
+//         .footer-col-title {
+//           font-size: 12px; font-weight: 700;
+//           letter-spacing: 2px; text-transform: uppercase;
+//           color: rgba(240,237,232,0.6);
+//           margin-bottom: 24px;
+//         }
+//         .footer-links { list-style: none; }
+//         .footer-links li { margin-bottom: 12px; }
+//         .footer-links a {
+//           color: rgba(240,237,232,0.38);
+//           text-decoration: none; font-size: 14px;
+//           transition: color 0.2s;
+//         }
+//         .footer-links a:hover { color: #C084FC; }
+
+//         .contact-item {
+//           display: flex; gap: 12px;
+//           margin-bottom: 14px;
+//           align-items: flex-start;
+//           color: rgba(240,237,232,0.38);
+//           font-size: 13px; line-height: 1.6;
+//         }
+//         .contact-item svg { color: #9B59F5; flex-shrink: 0; margin-top: 1px; }
+
+//         .newsletter-strip {
+//           max-width: 1200px; margin: 0 auto;
+//           border-top: 1px solid rgba(180,155,255,0.08);
+//           padding: 48px 0;
+//           display: flex; align-items: center; justify-content: space-between;
+//           gap: 32px; flex-wrap: wrap;
+//         }
+//         .newsletter-text h4 {
+//           font-family: 'Playfair Display', serif;
+//           font-size: 22px; color: #F8F5FF; margin-bottom: 6px;
+//         }
+//         .newsletter-text p { color: rgba(240,237,232,0.4); font-size: 14px; }
+//         .newsletter-form {
+//           display: flex; gap: 10px;
+//           background: rgba(255,255,255,0.04);
+//           border: 1px solid rgba(180,155,255,0.12);
+//           border-radius: 12px; padding: 6px 6px 6px 18px;
+//           min-width: 340px;
+//         }
+//         .newsletter-form input {
+//           flex: 1; background: transparent; border: none; outline: none;
+//           color: #F8F5FF; font-family: 'DM Sans', sans-serif; font-size: 14px;
+//         }
+//         .newsletter-form input::placeholder { color: rgba(240,237,232,0.25); }
+//         .newsletter-form button {
+//           padding: 10px 22px;
+//           background: linear-gradient(135deg, #7C5CE0, #9B59F5);
+//           color: #fff; border: none; border-radius: 8px;
+//           font-family: 'DM Sans', sans-serif;
+//           font-size: 13px; font-weight: 600;
+//           cursor: pointer; transition: opacity 0.2s;
+//           white-space: nowrap;
+//         }
+//         .newsletter-form button:hover { opacity: 0.9; }
+
+//         .footer-bottom {
+//           max-width: 1200px; margin: 0 auto;
+//           border-top: 1px solid rgba(180,155,255,0.06);
+//           padding: 24px 0 32px;
+//           display: flex; align-items: center; justify-content: space-between;
+//           flex-wrap: wrap; gap: 16px;
+//         }
+//         .footer-bottom-copy {
+//           font-size: 13px; color: rgba(240,237,232,0.25);
+//         }
+//         .footer-bottom-links { display: flex; gap: 24px; }
+//         .footer-bottom-links a {
+//           font-size: 12px; color: rgba(240,237,232,0.25);
+//           text-decoration: none; transition: color 0.2s;
+//         }
+//         .footer-bottom-links a:hover { color: #C084FC; }
+
+//         @media (max-width: 900px) {
+//           .footer-grid { grid-template-columns: 1fr 1fr; }
+//           .stats-inner { grid-template-columns: 1fr; gap: 24px; }
+//           .stat-item + .stat-item { border-left: none; border-top: 1px solid rgba(180,155,255,0.1); padding-top: 24px; }
+//         }
+//         @media (max-width: 600px) {
+//           .footer-grid { grid-template-columns: 1fr; }
+//           .newsletter-strip { flex-direction: column; align-items: flex-start; }
+//           .newsletter-form { min-width: unset; width: 100%; }
+//           .cta-card { padding: 48px 28px; }
+//         }
+//       `}</style>
+
+//       <div className="landing-root">
+//         {/* ── NAV ── */}
+//         <nav className="nav">
+//           <div className="nav-inner">
+//             <Link to="/" style={{ textDecoration: 'none' }}>
+//               <DeepDocAILogo size="large" useOriginalLogo={true} />
+//             </Link>
+//             <div className="nav-links">
+//               <Link to={loggedIn ? '/chat' : '/login'} className="btn-ghost">
+//                 Sign In
+//               </Link>
+//               <Link to={loggedIn ? '/chat' : '/register'} className="btn-primary">
+//                 Get Started
+//               </Link>
 //             </div>
-//             <h3 className="text-xl font-bold text-slate-900 mb-3">1. Upload Document</h3>
-//             <p className="text-slate-600">
-//               Upload your legal documents in PDF format. Our system uses OCR to extract text and prepare it for analysis.
+//           </div>
+//         </nav>
+
+//         {/* ── HERO ── */}
+//         <section className="hero">
+//           <div className="hero-bg" />
+//           <div className="hero-grid" />
+//           <div className="hero-content">
+//             <div className="hero-badge">
+//               <span className="badge-dot" />
+//               Powered by RAG &amp; Vector Search
+//             </div>
+//             <h1 className="hero-title">
+//               Your DeepDocAI Documents,
+//               <span className="accent">Finally Understood</span>
+//             </h1>
+//             <p className="hero-sub">
+//               Upload contracts, briefs, and case files — then simply ask. Our AI digs through every clause, every footnote, and gives you precise answers instantly.
 //             </p>
-//           </div>
-//           <div className="bg-white p-8 rounded-xl shadow-lg hover:shadow-xl transition-shadow border border-gray-100">
-//             <div className="w-16 h-16 bg-[#8E84B8]/10 rounded-lg flex items-center justify-center mb-6">
-//               <Search className="text-[#8E84B8]" size={32} />
+//             <div className="hero-cta">
+//               <Link to={loggedIn ? '/chat' : '/register'} className="btn-hero-primary">
+//                 Start for Free <ArrowRight size={18} />
+//               </Link>
+//               <Link to={loggedIn ? '/chat' : '/login'} className="btn-hero-secondary">
+//                 Sign In
+//               </Link>
 //             </div>
-//             <h3 className="text-xl font-bold text-slate-900 mb-3">2. Ask Questions</h3>
-//             <p className="text-slate-600">
-//               Ask any question about your document. Our AI uses RAG (Retrieval-Augmented Generation) to find relevant information.
-//             </p>
 //           </div>
-//           <div className="bg-white p-8 rounded-xl shadow-lg hover:shadow-xl transition-shadow border border-gray-100">
-//             <div className="w-16 h-16 bg-green-100 rounded-lg flex items-center justify-center mb-6">
-//               <Zap className="text-green-600" size={32} />
-//             </div>
-//             <h3 className="text-xl font-bold text-slate-900 mb-3">3. Get Answers</h3>
-//             <p className="text-slate-600">
-//               Receive instant, accurate answers with source citations. All responses are based on your uploaded documents.
-//             </p>
-//           </div>
-//         </div>
-//       </section>
+//         </section>
 
-//       {/* Features */}
-//       <section className="bg-white py-20">
-//         <div className="max-w-7xl mx-auto px-6">
-//           <h2 className="text-3xl font-bold text-center text-slate-900 mb-12">
-//             Powerful Features
-//           </h2>
-//           <div className="grid md:grid-cols-2 gap-8">
-//             <div className="flex gap-4">
-//               <div className="flex-shrink-0">
-//                 <div className="w-12 h-12 bg-[#8E84B8]/10 rounded-lg flex items-center justify-center">
-//                   <Search className="text-[#8E84B8]" size={24} />
-//                 </div>
-//               </div>
-//               <div>
-//                 <h3 className="text-xl font-bold text-slate-900 mb-2">AI Legal Search</h3>
-//                 <p className="text-slate-600">
-//                   Advanced semantic search powered by vector embeddings to find the most relevant information in your documents.
-//                 </p>
-//               </div>
+//         {/* ── STATS ── */}
+//         <div className="stats-strip">
+//           <div className="stats-inner">
+//             <div className="stat-item">
+//               <div className="stat-num">50K+</div>
+//               <div className="stat-label">Documents Analyzed</div>
 //             </div>
-//             <div className="flex gap-4">
-//               <div className="flex-shrink-0">
-//                 <div className="w-12 h-12 bg-[#8E84B8]/10 rounded-lg flex items-center justify-center">
-//                   <Shield className="text-[#8E84B8]" size={24} />
-//                 </div>
-//               </div>
-//               <div>
-//                 <h3 className="text-xl font-bold text-slate-900 mb-2">Secure Documents</h3>
-//                 <p className="text-slate-600">
-//                   Your documents are encrypted and stored securely. We never share your data with third parties.
-//                 </p>
-//               </div>
+//             <div className="stat-item">
+//               <div className="stat-num">99.2%</div>
+//               <div className="stat-label">Answer Accuracy</div>
 //             </div>
-//             <div className="flex gap-4">
-//               <div className="flex-shrink-0">
-//                 <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-//                   <FileText className="text-green-600" size={24} />
-//                 </div>
-//               </div>
-//               <div>
-//                 <h3 className="text-xl font-bold text-slate-900 mb-2">OCR Technology</h3>
-//                 <p className="text-slate-600">
-//                   Extract text from scanned PDFs and images using advanced OCR technology powered by Tesseract.
-//                 </p>
-//               </div>
-//             </div>
-//             <div className="flex gap-4">
-//               <div className="flex-shrink-0">
-//                 <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-//                   <Zap className="text-blue-600" size={24} />
-//                 </div>
-//               </div>
-//               <div>
-//                 <h3 className="text-xl font-bold text-slate-900 mb-2">RAG Technology</h3>
-//                 <p className="text-slate-600">
-//                   Retrieval-Augmented Generation ensures accurate, context-aware responses based on your specific documents.
-//                 </p>
-//               </div>
+//             <div className="stat-item">
+//               <div className="stat-num">&lt;2s</div>
+//               <div className="stat-label">Average Response Time</div>
 //             </div>
 //           </div>
 //         </div>
-//       </section>
 
-//       {/* CTA Section */}
-//       <section className="max-w-7xl mx-auto px-6 py-20">
-//         <div className="bg-[#8E84B8] rounded-2xl p-12 text-center text-white">
-//           <h2 className="text-4xl font-bold mb-4">Ready to Get Started?</h2>
-//           <p className="text-xl mb-8 text-white/80">
-//             Join thousands of legal professionals using DeepDoc AI to streamline their document analysis.
-//           </p>
-//           <Link
-//             to={loggedIn ? '/chat' : '/register'}
-//             className="inline-flex items-center gap-2 px-8 py-4 bg-white text-[#8E84B8] rounded-lg hover:bg-[#F4F6FB] transition-all shadow-lg hover:shadow-xl font-semibold text-lg"
-//           >
-//             Create Free Account
-//             <ArrowRight size={20} />
-//           </Link>
-//         </div>
-//       </section>
+//         {/* ── HOW IT WORKS ── */}
+//         <div className="section">
+//           <p className="section-eyebrow">The Process</p>
+//           <h2 className="section-title">Three Steps to Clarity</h2>
+//           <p className="section-sub">No DeepDocAI training needed. No endless scrolling. Just answers.</p>
 
-//       {/* Footer */}
-//       <footer className="bg-white border-t border-[#EAF0F6]">
-//         <div className="max-w-7xl mx-auto px-6 py-16">
-//           {/* Main Footer Content */}
-//           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
-//             {/* Company Info */}
-//             <div>
-//               <div className="mb-6">
-//                 <DeepDocAILogo size="default" showText={true} />
-//               </div>
-//               <p className="text-slate-500 mb-6 leading-relaxed">
-//                 AI-powered legal document assistant revolutionizing how legal professionals analyze, search, and understand complex legal documents.
+//           <div className="steps-grid">
+//             <div className="step-card">
+//               <span className="step-number">01</span>
+//               <div className="step-icon"><FileText size={24} /></div>
+//               <h3 className="step-title">Drop Your Document</h3>
+//               <p className="step-desc">
+//                 Upload any DeepDocAI PDF — contracts, court filings, NDAs, patents. Our OCR engine extracts every word, even from scanned pages.
 //               </p>
-//               <div className="flex gap-4">
-//                 <a href="#" className="w-10 h-10 bg-[#F4F6FB] rounded-lg flex items-center justify-center hover:bg-[#8E84B8] hover:text-white text-slate-500 transition-colors">
-//                   <Facebook size={18} />
-//                 </a>
-//                 <a href="#" className="w-10 h-10 bg-[#F4F6FB] rounded-lg flex items-center justify-center hover:bg-[#8E84B8] hover:text-white text-slate-500 transition-colors">
-//                   <Twitter size={18} />
-//                 </a>
-//                 <a href="#" className="w-10 h-10 bg-[#F4F6FB] rounded-lg flex items-center justify-center hover:bg-[#8E84B8] hover:text-white text-slate-500 transition-colors">
-//                   <Linkedin size={18} />
-//                 </a>
-//                 <a href="#" className="w-10 h-10 bg-[#F4F6FB] rounded-lg flex items-center justify-center hover:bg-[#8E84B8] hover:text-white text-slate-500 transition-colors">
-//                   <Instagram size={18} />
-//                 </a>
-//                 <a href="#" className="w-10 h-10 bg-[#F4F6FB] rounded-lg flex items-center justify-center hover:bg-[#8E84B8] hover:text-white text-slate-500 transition-colors">
-//                   <Github size={18} />
-//                 </a>
+//             </div>
+//             <div className="step-card">
+//               <span className="step-number">02</span>
+//               <div className="step-icon"><Search size={24} /></div>
+//               <h3 className="step-title">Ask Anything</h3>
+//               <p className="step-desc">
+//                 Type your question in plain English. Our RAG pipeline retrieves the exact passages that matter and reasons over them with precision.
+//               </p>
+//             </div>
+//             <div className="step-card">
+//               <span className="step-number">03</span>
+//               <div className="step-icon" style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)', color: '#4ADE80' }}><Zap size={24} /></div>
+//               <h3 className="step-title">Instant, Cited Answers</h3>
+//               <p className="step-desc">
+//                 Get clear responses with exact source references. Every answer is grounded in your document — no hallucinations, no guesswork.
+//               </p>
+//             </div>
+//           </div>
+//         </div>
+
+//         {/* ── FEATURES ── */}
+//         <section className="features-section">
+//           <div className="section">
+//             <p className="section-eyebrow">Capabilities</p>
+//             <h2 className="section-title">Built for DeepDocAI Precision</h2>
+//             <p className="section-sub">Every feature engineered for the demands of DeepDocAI work.</p>
+
+//             <div className="features-grid">
+//               <div className="feature-card">
+//                 <div className="feature-icon-wrap fi-purple"><Search size={22} /></div>
+//                 <h3 className="feature-title">Semantic DeepDocAI Search</h3>
+//                 <p className="feature-desc">
+//                   Vector embeddings map the meaning behind your queries — not just keywords — to surface the most relevant clauses and sections.
+//                 </p>
+//               </div>
+//               <div className="feature-card">
+//                 <div className="feature-icon-wrap fi-rose"><Shield size={22} /></div>
+//                 <h3 className="feature-title">Bank-Grade Security</h3>
+//                 <p className="feature-desc">
+//                   End-to-end encryption protects every document. Your files are yours alone — never shared, never used for model training.
+//                 </p>
+//               </div>
+//               <div className="feature-card">
+//                 <div className="feature-icon-wrap fi-green"><FileText size={22} /></div>
+//                 <h3 className="feature-title">Advanced OCR Engine</h3>
+//                 <p className="feature-desc">
+//                   Scanned PDFs? No problem. Tesseract-powered OCR recovers text from images, handwriting, and legacy document formats.
+//                 </p>
+//               </div>
+//               <div className="feature-card">
+//                 <div className="feature-icon-wrap fi-blue"><Zap size={22} /></div>
+//                 <h3 className="feature-title">RAG Architecture</h3>
+//                 <p className="feature-desc">
+//                   Retrieval-Augmented Generation grounds every response in real document content — delivering accuracy that generic AI simply can't match.
+//                 </p>
+//               </div>
+//             </div>
+//           </div>
+//         </section>
+
+//         {/* ── CTA ── */}
+//         <div className="cta-band">
+//           <div className="cta-band-inner">
+//             <div className="cta-card">
+//               <div className="cta-orb cta-orb-1" />
+//               <div className="cta-orb cta-orb-2" />
+//               <h2 className="cta-title">Ready to read smarter?</h2>
+//               <p className="cta-sub">
+//                 Join thousands of DeepDocAI professionals who've turned document review from hours into seconds.
+//               </p>
+//               <Link to={loggedIn ? '/chat' : '/register'} className="btn-cta">
+//                 Create Your Free Account <ArrowRight size={18} />
+//               </Link>
+//             </div>
+//           </div>
+//         </div>
+
+//         {/* ── FOOTER ── */}
+//         <footer className="footer">
+//           <div className="footer-grid">
+//             {/* Brand */}
+//             <div>
+//               <DeepDocAILogo size="default" showText={true} />
+//               <p className="footer-brand-desc">
+//                 AI-powered DeepDocAI document intelligence — helping DeepDocAI professionals analyze, search, and understand complex documents with unprecedented speed and accuracy.
+//               </p>
+//               <div className="socials">
+//                 {[Facebook, Twitter, Linkedin, Instagram, Github].map((Icon, i) => (
+//                   <a key={i} href="#" className="social-btn"><Icon size={16} /></a>
+//                 ))}
 //               </div>
 //             </div>
 
 //             {/* Quick Links */}
 //             <div>
-//               <h3 className="text-lg font-semibold mb-6 text-[#1E293B]">Quick Links</h3>
-//               <ul className="space-y-3">
-//                 <li>
-//                   <Link to="/" className="text-slate-500 hover:text-[#8E84B8] transition-colors">
-//                     Home
-//                   </Link>
-//                 </li>
-//                 <li>
-//                   <Link to="/register" className="text-slate-500 hover:text-[#8E84B8] transition-colors">
-//                     Get Started
-//                   </Link>
-//                 </li>
-//                 <li>
-//                   <Link to="/login" className="text-slate-500 hover:text-[#8E84B8] transition-colors">
-//                     Sign In
-//                   </Link>
-//                 </li>
-//                 <li>
-//                   <a href="#" className="text-slate-500 hover:text-[#8E84B8] transition-colors">
-//                     Features
-//                   </a>
-//                 </li>
-//                 <li>
-//                   <a href="#" className="text-slate-500 hover:text-[#8E84B8] transition-colors">
-//                     Pricing
-//                   </a>
-//                 </li>
-//                 <li>
-//                   <a href="#" className="text-slate-500 hover:text-[#8E84B8] transition-colors">
-//                     About Us
-//                   </a>
-//                 </li>
+//               <p className="footer-col-title">Quick Links</p>
+//               <ul className="footer-links">
+//                 {[
+//                   { label: 'Home', to: '/' },
+//                   { label: 'Get Started', to: loggedIn ? '/chat' : '/register' },
+//                   { label: 'Sign In', to: loggedIn ? '/chat' : '/login' },
+//                   { label: 'Features', to: '#' },
+//                   { label: 'Pricing', to: '#' },
+//                   { label: 'About Us', to: '#' },
+//                 ].map(({ label, to }) => (
+//                   <li key={label}><Link to={to} style={{ color: 'inherit', textDecoration: 'none' }} className="footer-links a">{label}</Link></li>
+//                 ))}
 //               </ul>
 //             </div>
 
 //             {/* Resources */}
 //             <div>
-//               <h3 className="text-lg font-semibold mb-6 text-[#1E293B]">Resources</h3>
-//               <ul className="space-y-3">
-//                 <li>
-//                   <a href="#" className="text-slate-500 hover:text-[#8E84B8] transition-colors">
-//                     Documentation
-//                   </a>
-//                 </li>
-//                 <li>
-//                   <a href="#" className="text-slate-500 hover:text-[#8E84B8] transition-colors">
-//                     API Reference
-//                   </a>
-//                 </li>
-//                 <li>
-//                   <a href="#" className="text-slate-500 hover:text-[#8E84B8] transition-colors">
-//                     Help Center
-//                   </a>
-//                 </li>
-//                 <li>
-//                   <a href="#" className="text-slate-500 hover:text-[#8E84B8] transition-colors">
-//                     Blog
-//                   </a>
-//                 </li>
-//                 <li>
-//                   <a href="#" className="text-slate-500 hover:text-[#8E84B8] transition-colors">
-//                     Case Studies
-//                   </a>
-//                 </li>
-//                 <li>
-//                   <a href="#" className="text-slate-500 hover:text-[#8E84B8] transition-colors">
-//                     Webinars
-//                   </a>
-//                 </li>
+//               <p className="footer-col-title">Resources</p>
+//               <ul className="footer-links">
+//                 {['Documentation', 'API Reference', 'Help Center', 'Blog', 'Case Studies', 'Webinars'].map(item => (
+//                   <li key={item}><a href="#">{item}</a></li>
+//                 ))}
 //               </ul>
 //             </div>
 
-//             {/* Contact & Legal */}
+//             {/* Contact */}
 //             <div>
-//               <h3 className="text-lg font-semibold mb-6 text-[#1E293B]">Contact & Legal</h3>
-//               <ul className="space-y-4 mb-6">
-//                 <li className="flex items-start gap-3">
-//                   <MapPin className="text-[#8E84B8] mt-1 flex-shrink-0" size={18} />
-//                   <span className="text-slate-500 text-sm">
-//                     123 Legal Tech Avenue<br />
-//                     San Francisco, CA 94105<br />
-//                     United States
-//                   </span>
-//                 </li>
-//                 <li className="flex items-center gap-3">
-//                   <Mail className="text-[#8E84B8] flex-shrink-0" size={18} />
-//                   <a href="mailto:support@DeepDoc AI.com" className="text-slate-500 hover:text-[#8E84B8] transition-colors text-sm">
-//                     support@DeepDoc AI.com
-//                   </a>
-//                 </li>
-//                 <li className="flex items-center gap-3">
-//                   <Phone className="text-[#8E84B8] flex-shrink-0" size={18} />
-//                   <a href="tel:+1-555-123-4567" className="text-slate-500 hover:text-[#8E84B8] transition-colors text-sm">
-//                     +1 (555) 123-4567
-//                   </a>
-//                 </li>
-//               </ul>
-//               <div className="pt-4 border-t border-[#EAF0F6]">
-//                 <ul className="space-y-2">
-//                   <li>
-//                     <a href="#" className="text-slate-500 hover:text-[#8E84B8] transition-colors text-sm">
-//                       Privacy Policy
-//                     </a>
-//                   </li>
-//                   <li>
-//                     <a href="#" className="text-slate-500 hover:text-[#8E84B8] transition-colors text-sm">
-//                       Terms of Service
-//                     </a>
-//                   </li>
-//                   <li>
-//                     <a href="#" className="text-slate-500 hover:text-[#8E84B8] transition-colors text-sm">
-//                       Cookie Policy
-//                     </a>
-//                   </li>
-//                 </ul>
+//               <p className="footer-col-title">Contact &amp; DeepDocAI</p>
+//               <div className="contact-item"><MapPin size={15} /><span>123 DeepDocAI Tech Avenue<br />San Francisco, CA 94105<br />United States</span></div>
+//               <div className="contact-item"><Mail size={15} /><a href="mailto:support@deepdocai.com" style={{ color: 'inherit', textDecoration: 'none' }}>support@deepdocai.com</a></div>
+//               <div className="contact-item"><Phone size={15} /><a href="tel:+15551234567" style={{ color: 'inherit', textDecoration: 'none' }}>+1 (555) 123-4567</a></div>
+//               <div style={{ marginTop: 20, paddingTop: 20, borderTop: '1px solid rgba(180,155,255,0.08)' }}>
+//                 {['Privacy Policy', 'Terms of Service', 'Cookie Policy'].map(item => (
+//                   <div key={item} style={{ marginBottom: 10 }}><a href="#" style={{ fontSize: 13, color: 'rgba(240,237,232,0.28)', textDecoration: 'none' }}>{item}</a></div>
+//                 ))}
 //               </div>
 //             </div>
 //           </div>
 
-//           {/* Newsletter Section */}
-//           <div className="border-t border-[#EAF0F6] pt-12 mb-12">
-//             <div className="max-w-2xl mx-auto text-center">
-//               <h3 className="text-2xl font-semibold mb-3 text-[#1E293B]">Stay Updated</h3>
-//               <p className="text-slate-500 mb-6">
-//                 Subscribe to our newsletter for the latest updates, features, and legal tech insights.
-//               </p>
-//               <div className="flex gap-3 max-w-md mx-auto">
-//                 <input
-//                   type="email"
-//                   placeholder="Enter your email"
-//                   className="flex-1 px-4 py-3 bg-[#F4F6FB] border border-[#EAF0F6] rounded-lg text-[#1E293B] placeholder-slate-400 focus:outline-none focus:border-[#8E84B8] transition-colors"
-//                 />
-//                 <button className="px-6 py-3 bg-[#8E84B8] hover:bg-[#7A70A8] text-white rounded-lg font-semibold transition-colors whitespace-nowrap">
-//                   Subscribe
-//                 </button>
-//               </div>
+//           {/* Newsletter */}
+//           <div className="newsletter-strip">
+//             <div className="newsletter-text">
+//               <h4>Stay in the loop</h4>
+//               <p>DeepDocAI tech insights and product updates, delivered monthly.</p>
+//             </div>
+//             <div className="newsletter-form">
+//               <input type="email" placeholder="your@email.com" />
+//               <button type="button">Subscribe</button>
 //             </div>
 //           </div>
 
-//           {/* Bottom Bar */}
-//           <div className="border-t border-[#EAF0F6] pt-8">
-//             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-//               <p className="text-slate-500 text-sm">
-//                 © {new Date().getFullYear()} DeepDoc AI. All rights reserved.
-//               </p>
-//               <div className="flex items-center gap-6 text-sm">
-//                 <a href="#" className="text-slate-500 hover:text-[#8E84B8] transition-colors">
-//                   Security
-//                 </a>
-//                 <a href="#" className="text-slate-500 hover:text-[#8E84B8] transition-colors">
-//                   Compliance
-//                 </a>
-//                 <a href="#" className="text-slate-500 hover:text-[#8E84B8] transition-colors">
-//                   Status
-//                 </a>
-//                 <a href="#" className="text-slate-500 hover:text-[#8E84B8] transition-colors">
-//                   Sitemap
-//                 </a>
-//               </div>
+//           {/* Bottom */}
+//           <div className="footer-bottom">
+//             <p className="footer-bottom-copy">© {new Date().getFullYear()} DeepDoc AI. All rights reserved.</p>
+//             <div className="footer-bottom-links">
+//               {['Security', 'Compliance', 'Status', 'Sitemap'].map(item => (
+//                 <a key={item} href="#">{item}</a>
+//               ))}
 //             </div>
 //           </div>
-//         </div>
-//       </footer>
+//         </footer>
+//       </div>
 //     </div>
 //   );
 // };
 
 // export default LandingPage;
-
 
 import { Link } from 'react-router-dom';
 import { FileText, Search, Shield, Zap, ArrowRight, Mail, Phone, MapPin, Facebook, Twitter, Linkedin, Instagram, Github } from 'lucide-react';
