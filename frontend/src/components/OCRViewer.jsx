@@ -20,6 +20,7 @@ const OCRViewer = ({ documentId, pdfUrl, activeHighlight }) => {
 
   const containerRef = useRef(null);
   const pageRefs = useRef([]);
+  const virtuosoRef = useRef(null);
 
   // ── Data Loading ───────────────────────────────────────
   useEffect(() => {
@@ -53,16 +54,18 @@ const OCRViewer = ({ documentId, pdfUrl, activeHighlight }) => {
     }
   }, [documentId]);
 
-  // ── Precision Scrolling ───────────────────────────
+  // ── Precision Scrolling (Virtualized) ───────────────────────────
   useEffect(() => {
     if (activeHighlight?.page && layoutData) {
       const pageIndex = parseInt(activeHighlight.page) - 1;
-      const targetPage = pageRefs.current[pageIndex];
-
-      if (targetPage && containerRef.current) {
-        targetPage.scrollIntoView({
-          behavior: 'smooth',
-          block: 'center',
+      
+      // Utilize Virtuoso's imperative scrolling API 
+      // since target DOM nodes might be unmounted off-screen
+      if (virtuosoRef.current) {
+        virtuosoRef.current.scrollToIndex({
+          index: pageIndex,
+          align: 'center',
+          behavior: 'smooth'
         });
       }
     }
@@ -188,6 +191,7 @@ const OCRViewer = ({ documentId, pdfUrl, activeHighlight }) => {
         className="flex-1 overflow-hidden bg-slate-100/50 relative"
       >
         <Virtuoso
+          ref={virtuosoRef}
           style={{ height: '100%', width: '100%' }}
           data={pages}
           itemContent={(index, pageData) => {
