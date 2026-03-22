@@ -4,6 +4,7 @@ import UploadZone from './UploadZone';
 //import DeepDocAILogo from './DeepDocAILogo';
 import { uploadDocument, getUser } from '../services/api';
 import { useChat } from '../contexts/ChatContext';
+import { useDarkColors } from '../utils/darkMode';
 
 const HomePage = () => {
   const navigate = useNavigate();
@@ -13,6 +14,7 @@ const HomePage = () => {
   const [uploadStage, setUploadStage] = useState('');
   const [isNewUser, setIsNewUser] = useState(false);
   const [user, setUser] = useState(null);
+  const dc = useDarkColors();
 
   useEffect(() => {
     const userData = getUser();
@@ -66,18 +68,21 @@ const HomePage = () => {
   };
 
   return (
-    <div className="h-full w-full flex items-center justify-center bg-gray-50 overflow-auto">
+    <div 
+      className="h-full w-full flex items-center justify-center overflow-auto transition-colors duration-300"
+      style={{ backgroundColor: dc.bgSecondary }}
+    >
       <div className="w-full max-w-2xl px-6 py-12">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
             {/* <DeepDocAILogo size="large" /> */}
           </div>
           {user && (
-            <h2 className="text-2xl font-bold text-slate-900 mb-2">
+            <h2 className="text-2xl font-bold mb-2 transition-colors duration-300" style={{ color: dc.textPrimary }}>
               {isNewUser ? `Welcome, ${user.name}!` : `Welcome back, ${user.name}!`}
             </h2>
           )}
-          <p className="text-lg text-slate-600">
+          <p className="text-lg transition-colors duration-300" style={{ color: dc.textSecondary }}>
             Upload a document to start asking questions
           </p>
         </div>

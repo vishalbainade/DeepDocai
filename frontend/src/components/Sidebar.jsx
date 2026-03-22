@@ -20,11 +20,13 @@ import {
 import { useChat } from '../contexts/ChatContext';
 import { renameChat, deleteChat, logout, getUser } from '../services/api';
 import DeepDocAILogo from './DeepDocAILogo';
+import { useDarkColors } from '../utils/darkMode';
 
 const Sidebar = () => {
   const navigate = useNavigate();
   const params = useParams();
   const chatId = params?.chatId || null;
+  const dc = useDarkColors();
   const {
     chats,
     loading,
@@ -224,20 +226,17 @@ const Sidebar = () => {
 
   const handleSettings = () => {
     setUserMenuOpen(false);
-    // Placeholder - navigate to settings page when created
-    alert('Settings page coming soon');
+    navigate('/settings');
   };
 
   const handlePersonalization = () => {
     setUserMenuOpen(false);
-    // Placeholder - navigate to personalization page when created
-    alert('Personalization page coming soon');
+    navigate('/settings');
   };
 
   const handleHelp = () => {
     setUserMenuOpen(false);
-    // Placeholder - navigate to help page when created
-    alert('Help page coming soon');
+    navigate('/help');
   };
 
   const filteredChats = filterChats(chats);
@@ -262,16 +261,17 @@ const Sidebar = () => {
             : `flex-shrink-0 transition-[width] duration-300 ease-in-out ${isCollapsedOnDesktop ? 'w-[64px]' : 'w-[240px]'}`
           }`}
         style={{
-          background: '#FFFFFF',
+          background: dc.bgPrimary,
           borderRadius: '18px',
-          boxShadow: '0 2px 12px rgba(142, 132, 184, 0.08)',
-          border: '1px solid #EAF0F6',
+          boxShadow: dc.shadowCard,
+          border: `1px solid ${dc.borderPrimary}`,
           margin: isMobile ? '0' : '8px',
           height: isMobile ? '100%' : 'calc(100% - 16px)',
+          transition: 'background-color 0.3s, border-color 0.3s',
         }}
       >
         {/* Header */}
-        <div className={`p-4 border-b border-[#EAF0F6] flex items-center ${isCollapsedOnDesktop ? 'justify-center' : 'justify-between'}`}>
+        <div className={`p-4 flex items-center ${isCollapsedOnDesktop ? 'justify-center' : 'justify-between'}`} style={{ borderBottom: `1px solid ${dc.borderPrimary}` }}>
           {!isCollapsedOnDesktop ? (
             <DeepDocAILogo size="small" />
           ) : (
@@ -288,7 +288,7 @@ const Sidebar = () => {
             className={`p-1.5 rounded-lg transition-all duration-250 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#6C63FF] ${isCollapsedOnDesktop ? 'mx-auto' : ''
               }`}
             style={{
-              color: '#64748B',
+              color: dc.textMuted,
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = 'rgba(142, 132, 184, 0.08)';
@@ -313,7 +313,7 @@ const Sidebar = () => {
         </div>
 
         {/* New Chat Button */}
-        <div className={`p-3 border-b border-[#EAF0F6] ${isCollapsedOnDesktop ? 'px-2' : ''}`}>
+        <div className={`p-3 ${isCollapsedOnDesktop ? 'px-2' : ''}`} style={{ borderBottom: `1px solid ${dc.borderPrimary}` }}>
           <button
             onClick={handleNewChat}
             className={`w-full flex items-center ${isCollapsedOnDesktop ? 'justify-center' : 'gap-2'} px-3 py-2.5 rounded-lg transition-all duration-250 ease-in-out font-medium relative group cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#6C63FF]`}
@@ -344,10 +344,10 @@ const Sidebar = () => {
 
         {/* Conversation History Section */}
         {!isCollapsedOnDesktop && (
-          <div className="px-3 pt-3 pb-2 border-b border-[#EAF0F6]">
-            <h2 className="text-sm font-semibold mb-2" style={{ color: '#1E293B' }}>Conversation History</h2>
+          <div className="px-3 pt-3 pb-2" style={{ borderBottom: `1px solid ${dc.borderPrimary}` }}>
+            <h2 className="text-sm font-semibold mb-2" style={{ color: dc.textPrimary }}>Conversation History</h2>
             <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: '#94A3B8' }} />
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: dc.textFaint }} />
               <input
                 type="text"
                 value={searchQuery}
@@ -355,18 +355,18 @@ const Sidebar = () => {
                 placeholder="Search conversations..."
                 className="w-full pl-9 pr-3 py-2 text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6C63FF] transition-all duration-250 ease-in-out sidebar-input"
                 style={{
-                  border: '1px solid #EAF0F6',
-                  backgroundColor: '#F8FAFC',
-                  color: '#1E293B',
+                  border: `1px solid ${dc.borderPrimary}`,
+                  backgroundColor: dc.bgInput,
+                  color: dc.textPrimary,
                 }}
                 onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#8E84B8';
-                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                  e.currentTarget.style.borderColor = dc.borderAccent;
+                  e.currentTarget.style.backgroundColor = dc.bgPrimary;
                   e.currentTarget.style.boxShadow = '0 0 0 2px rgba(142, 132, 184, 0.15)';
                 }}
                 onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#EAF0F6';
-                  e.currentTarget.style.backgroundColor = '#F8FAFC';
+                  e.currentTarget.style.borderColor = dc.borderPrimary;
+                  e.currentTarget.style.backgroundColor = dc.bgInput;
                   e.currentTarget.style.boxShadow = 'none';
                 }}
               />
@@ -489,12 +489,12 @@ const Sidebar = () => {
         </div>
 
         {/* User Avatar Menu */}
-        <div className="border-t border-[#EAF0F6] p-3 relative" ref={userMenuRef}>
+        <div className="p-3 relative" ref={userMenuRef} style={{ borderTop: `1px solid ${dc.borderPrimary}` }}>
           <button
             onClick={() => setUserMenuOpen(!userMenuOpen)}
             className={`w-full flex items-center ${isCollapsedOnDesktop ? 'justify-center' : 'gap-3'} p-2 rounded-lg transition-all duration-250 ease-in-out group cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#8E84B8]`}
             style={{
-              color: '#334155',
+              color: dc.textSecondary,
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = 'rgba(142, 132, 184, 0.08)';
@@ -509,10 +509,10 @@ const Sidebar = () => {
             </div>
             {!isCollapsedOnDesktop && (
               <div className="flex-1 min-w-0 text-left">
-                <p className="text-sm font-medium truncate transition-colors duration-250 ease-in-out" style={{ color: '#1E293B' }}>
+                <p className="text-sm font-medium truncate transition-colors duration-250 ease-in-out" style={{ color: dc.textPrimary }}>
                   {user?.name || 'User'}
                 </p>
-                <p className="text-xs truncate transition-colors duration-250 ease-in-out" style={{ color: '#94A3B8' }}>
+                <p className="text-xs truncate transition-colors duration-250 ease-in-out" style={{ color: dc.textFaint }}>
                   {user?.email || ''}
                 </p>
               </div>
@@ -521,36 +521,45 @@ const Sidebar = () => {
 
           {/* User Dropdown Menu */}
           {userMenuOpen && (
-            <div className={`absolute ${isCollapsedOnDesktop ? 'left-full ml-2 bottom-0' : 'bottom-full mb-2 left-0 right-0'} w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50`}>
+            <div className={`absolute ${isCollapsedOnDesktop ? 'left-full ml-2 bottom-0' : 'bottom-full mb-2 left-0 right-0'} w-56 rounded-lg shadow-lg z-50`} style={{ backgroundColor: dc.bgPrimary, border: `1px solid ${dc.borderPrimary}` }}>
               {!isCollapsedOnDesktop && (
-                <div className="p-3 border-b border-gray-200">
-                  <p className="text-sm font-medium text-slate-900">{user?.name || 'User'}</p>
-                  <p className="text-xs text-slate-500 truncate">{user?.email || ''}</p>
+                <div className="p-3" style={{ borderBottom: `1px solid ${dc.borderPrimary}` }}>
+                  <p className="text-sm font-medium" style={{ color: dc.textPrimary }}>{user?.name || 'User'}</p>
+                  <p className="text-xs truncate" style={{ color: dc.textFaint }}>{user?.email || ''}</p>
                 </div>
               )}
               <div className="py-1">
                 <button
                   onClick={handleSettings}
-                  className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-gray-50 flex items-center gap-2"
+                  className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 transition-colors"
+                  style={{ color: dc.textSecondary }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = dc.bgHover}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                 >
                   <Settings size={16} />
                   Settings
                 </button>
                 <button
                   onClick={handlePersonalization}
-                  className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-gray-50 flex items-center gap-2"
+                  className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 transition-colors"
+                  style={{ color: dc.textSecondary }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = dc.bgHover}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                 >
                   <Palette size={16} />
                   Personalization
                 </button>
                 <button
                   onClick={handleHelp}
-                  className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-gray-50 flex items-center gap-2"
+                  className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 transition-colors"
+                  style={{ color: dc.textSecondary }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = dc.bgHover}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                 >
                   <HelpCircle size={16} />
                   Help
                 </button>
-                <div className="border-t border-gray-200 my-1"></div>
+                <div className="my-1" style={{ borderTop: `1px solid ${dc.borderPrimary}` }}></div>
                 <button
                   onClick={handleLogout}
                   className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
@@ -598,6 +607,7 @@ const ChatItem = ({
   setMenuOpenChatId,
   menuRef,
 }) => {
+  const dc = useDarkColors();
   return (
     <div
       className={`relative mb-1 rounded-lg cursor-pointer transition-all duration-250 ease-in-out group ${isCollapsed ? 'p-2 flex justify-center' : 'p-2.5'
@@ -654,8 +664,8 @@ const ChatItem = ({
                 className="w-full px-2 py-1 text-sm font-medium rounded focus:outline-none focus:ring-2 transition-all duration-250 ease-in-out"
                 style={{
                   border: '1px solid #8E84B8',
-                  backgroundColor: '#F8FAFC',
-                  color: '#1E293B',
+                  backgroundColor: dc.bgInput,
+                  color: dc.textPrimary,
                 }}
                 maxLength={255}
               />
@@ -663,7 +673,7 @@ const ChatItem = ({
               <p
                 className="text-sm font-medium truncate transition-colors duration-250 ease-in-out"
                 style={{
-                  color: isActive ? '#8E84B8' : '#334155',
+                  color: isActive ? '#8E84B8' : dc.textSecondary,
                 }}
                 title={chat.title}
               >
@@ -684,7 +694,7 @@ const ChatItem = ({
             }}
             className="p-1 rounded transition-all duration-250 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#6C63FF] cursor-pointer"
             style={{
-              color: '#64748B',
+              color: dc.textMuted,
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = 'rgba(142, 132, 184, 0.08)';
@@ -701,7 +711,7 @@ const ChatItem = ({
 
           {/* Dropdown menu */}
           {menuOpenChatId === chat.id && (
-            <div className="absolute right-0 mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+            <div className="absolute right-0 mt-1 w-40 rounded-lg shadow-lg z-10" style={{ backgroundColor: dc.bgPrimary, border: `1px solid ${dc.borderPrimary}` }}>
               <button
                 onClick={(e) => {
                   e.stopPropagation();

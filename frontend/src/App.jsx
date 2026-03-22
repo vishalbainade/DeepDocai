@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ChatProvider } from './contexts/ChatContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import LandingPage from './pages/LandingPage';
@@ -11,9 +12,12 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import HomePage from './components/HomePage';
 import ChatPage from './components/ChatPage';
 import ChatHistoryPage from './components/ChatHistoryPage';
+import SettingsPage from './pages/SettingsPage';
+import HelpPage from './pages/HelpPage';
 
 function App() {
   return (
+    <ThemeProvider>
     <ChatProvider>
       <BrowserRouter>
         <Routes>
@@ -36,12 +40,15 @@ function App() {
             <Route path="chat" element={<HomePage />} />
             <Route path="chat/:chatId" element={<ChatPage />} />
             <Route path="history" element={<ChatHistoryPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+            <Route path="help" element={<HelpPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
     </ChatProvider>
+    </ThemeProvider>
   );
 }
 

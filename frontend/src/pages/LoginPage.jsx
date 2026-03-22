@@ -3,8 +3,11 @@ import { Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { FileText, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { login, isAuthenticated } from '../services/api';
 import DeepDocAILogo from '../components/DeepDocAILogo';
+import { useDarkColors, useIsDark } from '../utils/darkMode';
 
 const LoginPage = () => {
+  const dc = useDarkColors();
+  const isDark = useIsDark();
   const navigate = useNavigate();
   const location = useLocation();
   const [formData, setFormData] = useState({
@@ -59,20 +62,20 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F6FB] flex items-center justify-center py-12 px-4">
+    <div className="min-h-screen flex items-center justify-center py-12 px-4 transition-colors duration-300" style={{ backgroundColor: dc.bgSecondary }}>
       <div className="max-w-md w-full">
-        <Link to="/" className="inline-flex items-center gap-2 text-slate-600 hover:text-[#8E84B8] mb-6">
+        <Link to="/" className="inline-flex items-center gap-2 mb-6 transition-colors duration-300" style={{ color: dc.textSecondary }}>
           <ArrowLeft size={20} />
           Back to Home
         </Link>
 
-        <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+        <div className="rounded-2xl shadow-xl p-8 transition-colors duration-300" style={{ backgroundColor: dc.bgPrimary, border: `1px solid ${dc.borderPrimary}` }}>
           <div className="text-center mb-8">
             <div className="flex justify-center mb-4">
               <DeepDocAILogo size="large" useOriginalLogo={true} />
             </div>
-            <h1 className="text-3xl font-bold text-slate-900 mb-2">Welcome Back</h1>
-            <p className="text-slate-600">Sign in to your DeepDoc AI account</p>
+            <h1 className="text-3xl font-bold mb-2 transition-colors duration-300" style={{ color: dc.textPrimary }}>Welcome Back</h1>
+            <p className="transition-colors duration-300" style={{ color: dc.textSecondary }}>Sign in to your DeepDoc AI account</p>
           </div>
 
           {successMessage && (
@@ -88,19 +91,20 @@ const LoginPage = () => {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Email</label>
+              <label className="block text-sm font-medium mb-2 transition-colors duration-300" style={{ color: dc.textPrimary }}>Email</label>
               <input
                 type="email"
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8E84B8] focus:border-transparent"
+                className="w-full px-4 py-2 rounded-lg focus:ring-2 focus:ring-[#8E84B8] transition-all duration-300"
+                style={{ backgroundColor: dc.bgSecondary, color: dc.textPrimary, border: `1px solid ${dc.borderPrimary}` }}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Password</label>
+              <label className="block text-sm font-medium mb-2 transition-colors duration-300" style={{ color: dc.textPrimary }}>Password</label>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
@@ -108,7 +112,8 @@ const LoginPage = () => {
                   value={formData.password}
                   onChange={handleChange}
                   required
-                  className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8E84B8] focus:border-transparent"
+                  className="w-full px-4 py-2 pr-10 rounded-lg focus:ring-2 focus:ring-[#8E84B8] transition-all duration-300"
+                  style={{ backgroundColor: dc.bgSecondary, color: dc.textPrimary, border: `1px solid ${dc.borderPrimary}` }}
                 />
                 <button
                   type="button"

@@ -8,6 +8,7 @@ import ChatPanel from './ChatPanel';
 import ChatStream from './ChatStream';
 import { getAvailableModels, getChatMessages, getDocumentPreview, uploadDocument, getUserSelectedModel, saveUserSelectedModel } from '../services/api';
 import { detectQueryIntent } from '../utils/intentDetection';
+import { useDarkColors, useIsDark } from '../utils/darkMode';
 
 const FALLBACK_MODELS = [
   { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', displayName: 'Gemini 2.5 Flash', modelName: 'gemini-2.5-flash', provider: { slug: 'google', name: 'Google AI Studio' } },
@@ -31,6 +32,8 @@ const flattenParagraphCitations = (paragraphCitations = []) => {
 };
 
 const Workspace = () => {
+  const dc = useDarkColors();
+  const isDark = useIsDark();
   const [currentDocumentId, setCurrentDocumentId] = useState(null);
   const [currentChatId, setCurrentChatId] = useState(null);
   const [pdfUrl, setPdfUrl] = useState(null);
@@ -312,7 +315,7 @@ const Workspace = () => {
   const isCurrentStream = (streamId) => activeStreamIdRef.current === streamId;
 
   return (
-    <div className="flex h-screen flex-col bg-slate-50">
+    <div className="flex h-screen flex-col transition-colors duration-300" style={{ backgroundColor: dc.bgSecondary }}>
       {activeStream ? (
         <ChatStream
           key={activeStream.id}
@@ -405,8 +408,8 @@ const Workspace = () => {
         refreshTrigger={chatListRefreshTrigger}
       />
 
-      <div className="flex flex-1 overflow-hidden">
-        <div className="w-1/2 overflow-hidden border-r border-slate-200">
+      <div className="flex flex-1 overflow-hidden transition-colors duration-300">
+        <div className="w-1/2 overflow-hidden transition-colors duration-300" style={{ borderRight: `1px solid ${dc.borderPrimary}` }}>
           {showUploadZone || !currentDocumentId ? (
             <UploadZone onUpload={handleUpload} isUploading={isUploading} />
           ) : (

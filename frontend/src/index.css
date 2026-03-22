@@ -5,7 +5,138 @@
 @layer base {
   body {
     @apply bg-gray-50 text-slate-900;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
+}
+
+/* ── Dark Mode Theme ────────────────────────────────────────────── */
+/* Applied when .dark class is on <html> via ThemeContext */
+
+html.dark {
+  color-scheme: dark;
+}
+
+html.dark body {
+  background-color: #0f172a;
+  color: #f1f5f9;
+}
+
+/* Surfaces */
+html.dark div[class*="bg-white"],
+html.dark nav[class*="bg-white"],
+html.dark header[class*="bg-white"],
+html.dark section[class*="bg-white"] {
+  background-color: #1e293b !important;
+}
+
+html.dark div[class*="bg-gray-50"],
+html.dark main[class*="bg-gray-50"] {
+  background-color: #0f172a !important;
+}
+
+/* Borders */
+html.dark div[class*="border-"],
+html.dark nav[class*="border-"],
+html.dark details[class*="border-"],
+html.dark button[class*="border-"] {
+  border-color: #334155 !important;
+}
+
+/* Text overrides for dark mode */
+html.dark h1, html.dark h2, html.dark h3 {
+  color: #f1f5f9 !important;
+}
+
+html.dark p[class*="text-slate-"],
+html.dark span[class*="text-slate-"],
+html.dark div[class*="text-slate-"] {
+  color: #cbd5e1 !important;
+}
+
+html.dark p[class*="text-gray-"],
+html.dark span[class*="text-gray-"],
+html.dark li[class*="text-gray-"] {
+  color: #cbd5e1 !important;
+}
+
+/* Inputs */
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background-color: #0f172a !important;
+  color: #f1f5f9 !important;
+  border-color: #334155 !important;
+}
+
+html.dark input:focus,
+html.dark select:focus,
+html.dark textarea:focus {
+  border-color: #8E84B8 !important;
+}
+
+/* Shadows */
+html.dark div[class*="shadow-"] {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Cards and panels */
+html.dark details {
+  background-color: #1e293b !important;
+}
+
+html.dark summary:hover {
+  background-color: rgba(142, 132, 184, 0.08) !important;
+}
+
+html.dark kbd {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+
+/* Sidebar and components with hardcoded inline styles */
+html.dark .fixed[class*="flex-col"],
+html.dark .static[class*="flex-col"] {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+html.dark [style*="background: rgb(255, 255, 255)"],
+html.dark [style*="background: #FFFFFF"],
+html.dark [style*="background-color: #FFFFFF"],
+html.dark [style*="backgroundColor: rgb(255, 255, 255)"] {
+  background-color: #1e293b !important;
+}
+
+html.dark [style*="border: 1px solid rgb(234, 240, 246)"],
+html.dark [style*="border: 1px solid #EAF0F6"] {
+  border-color: #334155 !important;
+}
+
+html.dark [style*="color: rgb(30, 41, 59)"],
+html.dark [style*="color: #1E293B"] {
+  color: #f1f5f9 !important;
+}
+
+html.dark [style*="color: rgb(51, 65, 85)"],
+html.dark [style*="color: #334155"] {
+  color: #cbd5e1 !important;
+}
+
+html.dark [style*="color: rgb(148, 163, 184)"],
+html.dark [style*="color: #94A3B8"] {
+  color: #94a3b8 !important;
+}
+
+html.dark [style*="color: rgb(100, 116, 139)"],
+html.dark [style*="color: #64748B"] {
+  color: #94a3b8 !important;
+}
+
+html.dark [style*="background-color: rgb(248, 250, 252)"],
+html.dark [style*="backgroundColor: #F8FAFC"] {
+  background-color: #0f172a !important;
 }
 
 @layer utilities {
