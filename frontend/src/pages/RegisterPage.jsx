@@ -1,10 +1,13 @@
 import { useState } from 'react';
-import { Link, useNavigate, Navigate } from 'react-router-dom';
-import { FileText, ArrowLeft, Eye, EyeOff } from 'lucide-react';
-import { register, isAuthenticated } from '../services/api';
+import { Link, useNavigate } from 'react-router-dom';
+import { FileText, ArrowLeft, Eye, EyeOff, ShieldCheck, Mail, User, Lock } from 'lucide-react';
+import { register } from '../services/api';
 import DeepDocAILogo from '../components/DeepDocAILogo';
+import { useDarkColors, useIsDark } from '../utils/darkMode';
 
 const RegisterPage = () => {
+  const dc = useDarkColors();
+  const isDark = useIsDark();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
@@ -19,11 +22,6 @@ const RegisterPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-
-  // If user is already authenticated, redirect to chat
-  if (isAuthenticated()) {
-    return <Navigate to="/chat" replace />;
-  }
 
   const professions = [
     'Lawyer',
@@ -73,20 +71,20 @@ const RegisterPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F6FB] flex items-center justify-center py-12 px-4">
+    <div className="min-h-screen flex items-center justify-center py-12 px-4 transition-colors duration-300" style={{ backgroundColor: dc.bgSecondary }}>
       <div className="max-w-md w-full">
-        <Link to="/" className="inline-flex items-center gap-2 text-slate-600 hover:text-[#8E84B8] mb-6">
+        <Link to="/" className="inline-flex items-center gap-2 mb-6 transition-colors duration-300" style={{ color: dc.textSecondary }}>
           <ArrowLeft size={20} />
           Back to Home
         </Link>
 
-        <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+        <div className="rounded-2xl shadow-xl p-8 transition-colors duration-300" style={{ backgroundColor: dc.bgPrimary, border: `1px solid ${dc.borderPrimary}` }}>
           <div className="text-center mb-8">
             <div className="flex justify-center mb-4">
               <DeepDocAILogo size="large" useOriginalLogo={true} />
             </div>
-            <h1 className="text-3xl font-bold text-slate-900 mb-2">Create Account</h1>
-            <p className="text-slate-600">Join DeepDoc AI to get started</p>
+            <h1 className="text-3xl font-bold mb-2 transition-colors duration-300" style={{ color: dc.textPrimary }}>Create Account</h1>
+            <p className="transition-colors duration-300" style={{ color: dc.textSecondary }}>Join DeepDoc AI for smarter document insights</p>
           </div>
 
           {error && (

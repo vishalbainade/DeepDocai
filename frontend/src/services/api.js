@@ -580,4 +580,21 @@ export const diagnoseTableFormat = async (question, documentId) => {
   return response.data;
 };
 
+/**
+ * Fetch user preferences (theme, notifications, language, etc.)
+ */
+export const getUserPreferences = async () => {
+  const response = await api.get('/api/user/preferences');
+  return response.data;
+};
+
+/**
+ * Update user preferences
+ * @param {Object} prefs - Partial preferences object to update
+ */
+export const updateUserPreferences = async (prefs) => {
+  const response = await api.put('/api/user/preferences', prefs);
+  return response.data;
+};
+
 export default api;

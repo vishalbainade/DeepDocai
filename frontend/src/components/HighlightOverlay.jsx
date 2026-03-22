@@ -1,4 +1,9 @@
+import { useDarkColors, useIsDark } from '../utils/darkMode';
+
 const HighlightOverlay = ({ activeHighlight, pageMetrics }) => {
+  const dc = useDarkColors();
+  const isDark = useIsDark();
+
   try {
     if (!activeHighlight?.bbox || !pageMetrics) {
       return null;
@@ -28,9 +33,10 @@ const HighlightOverlay = ({ activeHighlight, pageMetrics }) => {
             top: `${top}px`,
             width: `${width}px`,
             height: `${height}px`,
-            background: 'rgba(255,255,0,0.4)',
-            boxShadow: '0 0 0 2px rgba(245, 158, 11, 0.45)',
-            borderRadius: '6px',
+            background: isDark ? 'rgba(142, 132, 184, 0.2)' : 'rgba(255, 255, 0, 0.25)',
+            boxShadow: isDark ? '0 0 10px rgba(142, 132, 184, 0.5)' : '0 0 0 2px rgba(245, 158, 11, 0.45)',
+            border: isDark ? '1.5px solid #8E84B8' : 'none',
+            borderRadius: '4px',
             transition: 'all 220ms ease',
           }}
         />

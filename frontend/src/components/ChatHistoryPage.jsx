@@ -6,13 +6,17 @@ import {
   Edit2, 
   Trash2, 
   Clock,
-  ArrowLeft
+  ArrowLeft,
+  Search
 } from 'lucide-react';
 import { useChat } from '../contexts/ChatContext';
 import { renameChat, deleteChat } from '../services/api';
+import { useDarkColors, useIsDark } from '../utils/darkMode';
 
 const ChatHistoryPage = () => {
   const navigate = useNavigate();
+  const dc = useDarkColors();
+  const isDark = useIsDark();
   const {
     chats,
     loading,
@@ -58,7 +62,6 @@ const ChatHistoryPage = () => {
   const handleChatClick = (chat) => {
     navigate(`/chat/${chat.id}`);
     setMenuOpenChatId(null);
-    // Collapse sidebar when navigating to chat
     setSidebarCollapsed(true);
   };
 
@@ -70,8 +73,7 @@ const ChatHistoryPage = () => {
 
   const handleRenameSave = async (chatId) => {
     const trimmedTitle = editTitle.trim();
-
-    if (!trimmedTitle || trimmedTitle.length === 0) {
+    if (!trimmedTitle) {
       setEditingChatId(null);
       setEditTitle('');
       return;
@@ -95,17 +97,12 @@ const ChatHistoryPage = () => {
   };
 
   const handleRenameKeyDown = (e, chatId) => {
-    if (e.key === 'Enter') {
-      handleRenameSave(chatId);
-    } else if (e.key === 'Escape') {
-      handleRenameCancel();
-    }
+    if (e.key === 'Enter') handleRenameSave(chatId);
+    else if (e.key === 'Escape') handleRenameCancel();
   };
 
   const handleDelete = async (chatId) => {
-    if (!confirm('Are you sure you want to delete this chat? This action cannot be undone.')) {
-      return;
-    }
+    if (!confirm('Are you sure you want to delete this chat? This action cannot be undone.')) return;
 
     try {
       await deleteChat(chatId);
@@ -139,146 +136,180 @@ const ChatHistoryPage = () => {
   };
 
   return (
-    <div className="h-full w-full flex flex-col bg-gray-50">
+    <div className="h-full w-full flex flex-col transition-colors duration-300" style={{ backgroundColor: dc.bgSecondary }}>
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => navigate('/')}
-            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-            aria-label="Go back"
-          >
-            <ArrowLeft size={20} className="text-slate-600" />
-          </button>
-          <h1 className="text-2xl font-serif font-bold text-slate-900">Chat History</h1>
+      <div 
+        className="px-6 py-6 transition-colors duration-300"
+        style={{ backgroundColor: dc.bgPrimary, borderBottom: `1px solid ${dc.borderPrimary}` }}
+      >
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-6">
+            <button
+              onClick={() => navigate('/')}
+              className="p-2.5 rounded-xl transition-all duration-200"
+              style={{ backgroundColor: dc.bgHover, color: dc.textPrimary }}
+              aria-label="Go back"
+            >
+              <ArrowLeft size={22} />
+            </button>
+            <div>
+              <h1 className="text-3xl font-black tracking-tight" style={{ color: dc.textPrimary }}>All Conversations</h1>
+              <p className="mt-1 text-sm font-medium" style={{ color: dc.textFaint }}>Manage your document intelligence history</p>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="relative max-w-md">
+      {/* Search & Filter Bar */}
+      <div 
+        className="px-6 py-4 shadow-sm transition-colors duration-300"
+        style={{ backgroundColor: dc.bgPrimary, borderBottom: `1px solid ${dc.borderPrimary}` }}
+      >
+        <div className="max-w-4xl mx-auto relative group">
           <input
             type="text"
-            placeholder="Search chats..."
+            placeholder="Search through your chat history..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="w-full pl-12 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all duration-300 shadow-sm"
+            style={{ 
+              backgroundColor: dc.bgSecondary, 
+              color: dc.textPrimary, 
+              borderColor: dc.borderPrimary
+            }}
           />
-          <MessageSquare
-            size={18}
-            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400"
+          <Search
+            size={20}
+            className="absolute left-4 top-1/2 transform -translate-y-1/2 transition-colors duration-300"
+            style={{ color: dc.textFaint }}
           />
         </div>
       </div>
 
       {/* Chat List */}
-      <div className="flex-1 overflow-y-auto p-6">
-        {loading ? (
-          <div className="text-center text-slate-500 py-12">
-            <div className="animate-pulse">Loading...</div>
-          </div>
-        ) : filteredChats.length === 0 ? (
-          <div className="text-center text-slate-500 py-12">
-            <MessageSquare size={48} className="mx-auto mb-4 opacity-50" />
-            <p className="text-lg font-medium mb-2">
-              {searchQuery ? 'No chats found' : 'No chat history'}
-            </p>
-            <p className="text-sm">
-              {searchQuery ? 'Try a different search term' : 'Start a conversation to see it here'}
-            </p>
-          </div>
-        ) : (
-          <div className="max-w-4xl mx-auto grid gap-3">
-            {filteredChats.map((chat) => (
-              <div
-                key={chat.id}
-                className="relative bg-white border border-gray-200 rounded-lg p-4 hover:border-indigo-300 hover:shadow-md transition-all cursor-pointer group"
-                onClick={() => handleChatClick(chat)}
-                onMouseEnter={() => setHoveredChatId(chat.id)}
-                onMouseLeave={() => setHoveredChatId(null)}
-              >
-                <div className="flex items-start gap-3 pr-10">
-                  <MessageSquare
-                    size={20}
-                    className="mt-0.5 flex-shrink-0 text-[#8E84B8]"
-                  />
-                  <div className="flex-1 min-w-0">
-                    {editingChatId === chat.id ? (
-                      <input
-                        ref={editInputRef}
-                        type="text"
-                        value={editTitle}
-                        onChange={(e) => setEditTitle(e.target.value)}
-                        onBlur={() => handleRenameSave(chat.id)}
-                        onKeyDown={(e) => handleRenameKeyDown(e, chat.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="w-full px-2 py-1 text-base font-medium border border-indigo-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-                        maxLength={255}
+      <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
+        <div className="max-w-4xl mx-auto">
+          {loading ? (
+            <div className="text-center py-20" style={{ color: dc.textFaint }}>
+              <div className="animate-pulse flex flex-col items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-indigo-500/10" />
+                <span className="font-medium">Curating your history...</span>
+              </div>
+            </div>
+          ) : filteredChats.length === 0 ? (
+            <div className="text-center py-20 rounded-3xl border-2 border-dashed" style={{ borderColor: dc.borderPrimary }}>
+              <MessageSquare size={64} className="mx-auto mb-6 opacity-20" style={{ color: dc.primary }} />
+              <p className="text-xl font-bold mb-2" style={{ color: dc.textPrimary }}>
+                {searchQuery ? 'No matches found' : 'No history yet'}
+              </p>
+              <p className="text-sm max-w-xs mx-auto" style={{ color: dc.textFaint }}>
+                {searchQuery ? 'Try a more general search term to find your conversation' : 'Upload your first document to begin your journey with DeepDoc AI'}
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {filteredChats.map((chat) => (
+                <div
+                  key={chat.id}
+                  className="relative rounded-2xl p-5 border-2 transition-all duration-300 cursor-pointer group hover:shadow-xl"
+                  style={{ 
+                    backgroundColor: dc.bgPrimary, 
+                    borderColor: dc.borderPrimary,
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.borderColor = dc.primary}
+                  onMouseLeave={(e) => e.currentTarget.style.borderColor = dc.borderPrimary}
+                  onClick={() => handleChatClick(chat)}
+                >
+                  <div className="flex items-start gap-4 pr-12">
+                    <div 
+                      className="p-3 rounded-xl transition-colors duration-300"
+                      style={{ backgroundColor: dc.bgSecondary }}
+                    >
+                      <MessageSquare
+                        size={24}
+                        style={{ color: dc.primary }}
                       />
-                    ) : (
-                      <p className="text-base font-medium text-slate-900 truncate" title={chat.title}>
-                        {chat.title}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-4 mt-2">
-                      <div className="flex items-center gap-1 text-sm text-slate-500">
-                        <Clock size={14} />
-                        <span>{formatDateTime(chat.updatedAt)}</span>
-                      </div>
-                      {chat.messageCount > 0 && (
-                        <span className="text-sm text-slate-500">
-                          {chat.messageCount} {chat.messageCount === 1 ? 'message' : 'messages'}
-                        </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      {editingChatId === chat.id ? (
+                        <input
+                          ref={editInputRef}
+                          type="text"
+                          value={editTitle}
+                          onChange={(e) => setEditTitle(e.target.value)}
+                          onBlur={() => handleRenameSave(chat.id)}
+                          onKeyDown={(e) => handleRenameKeyDown(e, chat.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-full px-3 py-2 text-lg font-bold rounded-lg focus:outline-none transition-all duration-300"
+                          style={{ backgroundColor: dc.bgSecondary, color: dc.textPrimary, border: `2px solid ${dc.primary}` }}
+                          maxLength={255}
+                        />
+                      ) : (
+                        <h3 className="text-lg font-bold truncate transition-colors duration-300" style={{ color: dc.textPrimary }} title={chat.title}>
+                          {chat.title}
+                        </h3>
                       )}
+                      <div className="flex items-center gap-6 mt-3">
+                        <div className="flex items-center gap-2 text-sm" style={{ color: dc.textFaint }}>
+                          <Clock size={16} />
+                          <span>{formatDateTime(chat.updatedAt)}</span>
+                        </div>
+                        {chat.messageCount > 0 && (
+                          <div 
+                            className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider"
+                            style={{ backgroundColor: isDark ? 'rgba(142, 132, 184, 0.2)' : '#f3f2f8', color: dc.primary }}
+                          >
+                            {chat.messageCount} {chat.messageCount === 1 ? 'Message' : 'Messages'}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Three-dot menu */}
-                {hoveredChatId === chat.id && editingChatId !== chat.id && (
-                  <div className="absolute top-4 right-4" ref={menuRef}>
+                  <div className="absolute top-5 right-5" ref={menuRef}>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         setMenuOpenChatId(menuOpenChatId === chat.id ? null : chat.id);
                       }}
-                      className="p-1.5 rounded hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      aria-label="Chat options"
+                      className="p-2 rounded-xl transition-all duration-200"
+                      style={{ color: dc.textFaint }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = dc.bgHover}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
-                      <MoreVertical size={18} className="text-slate-600" />
+                      <MoreVertical size={20} />
                     </button>
 
-                    {/* Dropdown menu */}
                     {menuOpenChatId === chat.id && (
-                      <div className="absolute right-0 mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                      <div 
+                        className="absolute right-0 mt-2 w-48 rounded-2xl shadow-2xl z-20 overflow-hidden border p-1.5 transition-colors duration-300"
+                        style={{ backgroundColor: dc.bgPrimary, borderColor: dc.borderPrimary }}
+                      >
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRenameStart(chat);
-                          }}
-                          className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-gray-50 flex items-center gap-2 focus:outline-none focus:bg-gray-50"
+                          onClick={(e) => { e.stopPropagation(); handleRenameStart(chat); }}
+                          className="w-full px-4 py-3 text-left text-sm font-semibold flex items-center gap-3 rounded-xl transition-all duration-200"
+                          style={{ color: dc.textPrimary }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = dc.bgHover}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                         >
-                          <Edit2 size={14} />
-                          Rename
+                          <Edit2 size={16} /> Rename Chat
                         </button>
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(chat.id);
-                          }}
-                          className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 focus:outline-none focus:bg-red-50"
+                          onClick={(e) => { e.stopPropagation(); handleDelete(chat.id); }}
+                          className="w-full px-4 py-3 text-left text-sm font-semibold text-red-500 flex items-center gap-3 rounded-xl transition-all duration-200"
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                         >
-                          <Trash2 size={14} />
-                          Delete
+                          <Trash2 size={16} /> Delete Forever
                         </button>
                       </div>
                     )}
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

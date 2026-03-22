@@ -8,6 +8,7 @@ import UploadZone from './UploadZone';
 import ChatStream from './ChatStream';
 import { getAvailableModels, getDocumentPreview, uploadDocument } from '../services/api';
 import { detectQueryIntent } from '../utils/intentDetection';
+import { useDarkColors } from '../utils/darkMode';
 
 const FALLBACK_MODELS = [
   { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
@@ -62,6 +63,7 @@ const ChatPage = () => {
   const [isResizing, setIsResizing] = useState(false);
   const [availableModels, setAvailableModels] = useState(FALLBACK_MODELS);
   const [selectedModel, setSelectedModel] = useState(FALLBACK_MODELS[0].id);
+  const dc = useDarkColors();
   const [activeHighlight, setActiveHighlight] = useState(null);
   const [activeStream, setActiveStream] = useState(null);
   const activeStreamIdRef = useRef(null);
@@ -254,16 +256,20 @@ const ChatPage = () => {
 
   if (loading && chatHistory.length === 0) {
     return (
-      <div className="flex h-full w-full items-center justify-center bg-gray-50">
+      <div className="flex h-full w-full items-center justify-center transition-colors duration-300" style={{ backgroundColor: dc.bgSecondary }}>
         <div className="text-center">
-          <div className="animate-pulse text-slate-500">Loading chat...</div>
+          <div className="animate-pulse" style={{ color: dc.textMuted }}>Loading chat...</div>
         </div>
       </div>
     );
   }
 
   return (
-    <div ref={containerRef} className="relative flex h-full w-full overflow-hidden">
+    <div 
+      ref={containerRef} 
+      className="relative flex h-full w-full overflow-hidden transition-colors duration-300"
+      style={{ backgroundColor: dc.bgSecondary }}
+    >
       {activeStream ? (
         <ChatStream
           key={activeStream.id}
@@ -348,7 +354,7 @@ const ChatPage = () => {
         />
       ) : null}
 
-      <div className="flex-shrink-0 overflow-hidden border-r border-gray-200" style={{ width: `${leftPanelWidth}%` }}>
+      <div className="flex-shrink-0 overflow-hidden" style={{ width: `${leftPanelWidth}%`, borderRight: `1px solid ${dc.borderPrimary}` }}>
         {showUploadZone ? (
           <UploadZone onUpload={handleUpload} isUploading={isUploading} />
         ) : pdfUrl && currentDocumentId ? (
@@ -358,23 +364,24 @@ const ChatPage = () => {
             activeHighlight={activeHighlight} 
           />
         ) : (
-          <div className="flex h-full items-center justify-center bg-gray-50">
-            <div className="text-center text-slate-500">
-              <div className="animate-pulse">Loading document...</div>
+          <div className="flex h-full items-center justify-center" style={{ backgroundColor: dc.bgSecondary }}>
+            <div className="text-center">
+              <div className="animate-pulse" style={{ color: dc.textMuted }}>Loading document...</div>
             </div>
           </div>
         )}
       </div>
 
       <div
-        className="group relative w-1 flex-shrink-0 cursor-col-resize bg-gray-200 transition-colors hover:bg-indigo-500"
+        className="group relative w-1 flex-shrink-0 cursor-col-resize transition-colors hover:bg-indigo-500"
+        style={{ backgroundColor: dc.borderPrimary }}
         onMouseDown={(event) => {
           event.preventDefault();
           setIsResizing(true);
         }}
       >
         <div className="absolute inset-y-0 left-1/2 w-1 -translate-x-1/2 bg-transparent transition-colors group-hover:bg-indigo-500" />
-        <div className="absolute left-1/2 top-1/2 h-8 w-2 -translate-x-1/2 -translate-y-1/2 rounded bg-gray-300 transition-colors group-hover:bg-indigo-500" />
+        <div className="absolute left-1/2 top-1/2 h-8 w-2 -translate-x-1/2 -translate-y-1/2 rounded transition-colors group-hover:bg-indigo-500" style={{ backgroundColor: dc.borderPrimary }} />
       </div>
 
       <div className="flex-shrink-0 overflow-hidden" style={{ width: `${100 - leftPanelWidth}%` }}>

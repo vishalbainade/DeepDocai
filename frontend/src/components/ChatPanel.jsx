@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Bot, ChevronDown, Loader2, MessageSquare, Send, Sparkles, User } from 'lucide-react';
 import AnswerCard from './AnswerCard';
+import { useDarkColors, useIsDark } from '../utils/darkMode';
 
 const PROVIDER_COLORS = {
   google: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', dot: 'bg-blue-500' },
@@ -25,6 +26,8 @@ const ChatPanel = ({
   onModelChange,
   onCitationClick,
 }) => {
+  const dc = useDarkColors();
+  const isDark = useIsDark();
   const [input, setInput] = useState('');
   const [isImproving, setIsImproving] = useState(false);
   const scrollerRef = useRef(null);
@@ -126,11 +129,21 @@ const ChatPanel = ({
   }, {});
 
   return (
-    <div className="flex h-full flex-col bg-[linear-gradient(180deg,_#fffdf7_0%,_#f8fafc_55%,_#eef2ff_100%)]">
-      <div className="flex items-center justify-between border-b border-slate-200/80 bg-white/80 px-6 py-4 backdrop-blur">
+    <div 
+      className="flex h-full flex-col transition-colors duration-300"
+      style={{ 
+        background: isDark 
+          ? 'linear-gradient(180deg, #0f172a 0%, #1e293b 100%)' 
+          : 'linear-gradient(180deg, #fffdf7 0%, #f8fafc 55%, #eef2ff 100%)' 
+      }}
+    >
+      <div 
+        className="flex items-center justify-between px-6 py-4 backdrop-blur transition-colors duration-300"
+        style={{ backgroundColor: `${dc.bgPrimary}CC`, borderBottom: `1px solid ${dc.borderPrimary}` }}
+      >
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-amber-700">DeepDocAI Chat</p>
-          <p className="text-sm text-slate-500">Streaming answers with citations and PDF sync</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.3em]" style={{ color: isDark ? '#fbbf24' : '#b45309' }}>DeepDocAI Chat</p>
+          <p className="text-sm" style={{ color: dc.textMuted }}>Streaming answers with citations and PDF sync</p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -146,7 +159,13 @@ const ChatPanel = ({
               value={activeModel}
               onChange={(event) => onModelChange?.(event.target.value)}
               disabled={isThinking}
-              className="min-w-[220px] appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2 pr-9 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+              className="min-w-[220px] appearance-none rounded-xl px-3 py-2 pr-9 text-sm font-medium shadow-sm transition focus:outline-none focus:ring-2 focus:ring-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+              style={{ 
+                backgroundColor: dc.bgPrimary, 
+                borderColor: dc.borderPrimary,
+                color: dc.textSecondary,
+                borderWidth: '1px'
+              }}
             >
               {Object.entries(groupedModels).map(([slug, group]) => (
                 <optgroup key={slug} label={group.name}>
@@ -158,7 +177,7 @@ const ChatPanel = ({
                 </optgroup>
               ))}
             </select>
-            <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2" style={{ color: dc.textFaint }} />
           </div>
         </div>
       </div>
@@ -166,12 +185,18 @@ const ChatPanel = ({
       <div className="flex-1 overflow-y-auto px-2 sm:px-5 py-8" ref={scrollerRef}>
         {!chatHistory.length ? (
           <div className="flex h-full items-center justify-center">
-            <div className="max-w-sm rounded-3xl border border-white/70 bg-white/70 px-8 py-10 text-center shadow-xl shadow-slate-200/70 backdrop-blur">
-              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+            <div 
+              className="max-w-sm rounded-3xl px-8 py-10 text-center shadow-xl backdrop-blur transition-colors duration-300"
+              style={{ backgroundColor: `${dc.bgPrimary}B3`, border: `1px solid ${dc.borderPrimary}`, boxShadow: dc.shadowCard }}
+            >
+              <div 
+                className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full transition-colors duration-300"
+                style={{ backgroundColor: isDark ? '#312e81' : '#eef2ff', color: '#6366f1' }}
+              >
                 <MessageSquare size={24} />
               </div>
-              <h3 className="text-lg font-semibold text-slate-800">Ask about your document</h3>
-              <p className="mt-2 text-sm leading-relaxed text-slate-500">
+              <h3 className="text-lg font-semibold" style={{ color: dc.textPrimary }}>Ask about your document</h3>
+              <p className="mt-2 text-sm leading-relaxed" style={{ color: dc.textMuted }}>
                 Stream answers live, inspect cited paragraphs, and jump straight to the source in the PDF.
               </p>
             </div>
@@ -188,26 +213,37 @@ const ChatPanel = ({
                 <div key={message.id || index} className={`flex w-full items-start gap-4 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
 
                   {/* Avatar */}
-                  <div className={`mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full shadow-sm ${isUser
+                  <div className={`mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full shadow-sm transition-colors duration-300 ${isUser
                       ? 'bg-slate-800 text-white'
-                      : 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-100 via-white to-slate-100 border border-slate-200 text-indigo-700'
+                      : ''
                     }`}
+                    style={{ 
+                      backgroundColor: !isUser ? dc.bgPrimary : undefined,
+                      border: !isUser ? `1px solid ${dc.borderPrimary}` : undefined,
+                      color: !isUser ? '#6366f1' : undefined
+                    }}
                   >
                     {isUser ? <User size={18} strokeWidth={2.5} /> : <Bot size={20} strokeWidth={2} className={`${isStreaming ? 'animate-pulse text-indigo-500' : ''}`} />}
                   </div>
 
                   {/* Message Bubble */}
-                  <div className={`relative max-w-[85%] sm:max-w-[75%] rounded-3xl px-6 py-4.5 ${isUser
+                  <div 
+                    className={`relative max-w-[85%] sm:max-w-[75%] rounded-3xl px-6 py-4.5 transition-colors duration-300 ${isUser
                       ? 'rounded-tr-sm bg-slate-800 text-white shadow-md'
-                      : 'rounded-tl-sm border border-slate-200/60 bg-white/95 text-slate-800 shadow-xl shadow-slate-200/40 backdrop-blur-sm'
+                      : 'rounded-tl-sm shadow-xl backdrop-blur-sm'
                     }`}
+                    style={{
+                      backgroundColor: !isUser ? `${dc.bgPrimary}F2` : undefined,
+                      border: !isUser ? `1px solid ${dc.borderPrimary}` : undefined,
+                      color: !isUser ? dc.textPrimary : undefined,
+                    }}
                   >
                     {isUser ? (
                       <p className="whitespace-pre-wrap text-[15px] leading-relaxed font-normal">{message.content}</p>
                     ) : (
                       <div className="text-[15px] max-w-none">
                         {!message.content && !message.table && isStreaming ? (
-                          <div className="flex items-center gap-3 text-slate-500 py-2">
+                          <div className="flex items-center gap-3 py-2" style={{ color: dc.textMuted }}>
                             <Loader2 size={18} className="animate-spin text-indigo-500" />
                             <span className="animate-pulse">Analyzing document...</span>
                           </div>
@@ -246,7 +282,10 @@ const ChatPanel = ({
         )}
       </div>
 
-      <div className="border-t border-slate-200 bg-white/85 px-4 py-4 backdrop-blur">
+      <div 
+        className="px-4 py-4 backdrop-blur transition-colors duration-300"
+        style={{ borderTop: `1px solid ${dc.borderPrimary}`, backgroundColor: `${dc.bgPrimary}D9` }}
+      >
         <form onSubmit={handleSubmit} className="flex items-end gap-3">
           <div className="relative flex-1">
             <input
@@ -254,7 +293,12 @@ const ChatPanel = ({
               onChange={(event) => setInput(event.target.value)}
               disabled={!currentDocumentId || isThinking}
               placeholder={currentDocumentId ? 'Ask a question about this document...' : 'Upload a document first...'}
-              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 pr-24 text-sm text-slate-800 shadow-sm transition focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+              className="w-full rounded-2xl px-4 py-3 pr-24 text-sm shadow-sm transition focus:outline-none focus:ring-2 focus:ring-amber-200 disabled:cursor-not-allowed"
+              style={{
+                backgroundColor: dc.bgInput,
+                border: `1px solid ${dc.borderPrimary}`,
+                color: dc.textPrimary,
+              }}
             />
 
             {input.trim() ? (
@@ -262,7 +306,8 @@ const ChatPanel = ({
                 type="button"
                 onClick={handleImproveText}
                 disabled={isImproving || isThinking}
-                className="absolute right-12 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-amber-600 transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="absolute right-12 top-1/2 -translate-y-1/2 rounded-lg p-1.5 transition disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ color: isDark ? '#fbbf24' : '#b45309' }}
                 title="Improve question"
               >
                 {isImproving ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
@@ -282,7 +327,12 @@ const ChatPanel = ({
               })
             }
             disabled={!currentDocumentId || isThinking}
-            className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-2xl px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50"
+            style={{ 
+              backgroundColor: isDark ? '#78350f' : '#fff7ed', 
+              color: isDark ? '#fef3c7' : '#7c2d12',
+              border: `1px solid ${isDark ? '#92400e' : '#fed7aa'}`
+            }}
           >
             Summarize
           </button>

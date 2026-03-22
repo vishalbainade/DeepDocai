@@ -1,6 +1,8 @@
 import deepDocLogo from '../assets/deepdoc-logo.png';
+import { useDarkColors } from '../utils/darkMode';
 
 function DeepDocAILogo({ size = 'default', showText = true, className = '', useOriginalLogo = false }) {
+  const dc = useDarkColors();
   const sizeClasses = {
     small: 'h-12',
     default: 'h-14',
@@ -18,7 +20,7 @@ function DeepDocAILogo({ size = 'default', showText = true, className = '', useO
         style={{ borderWidth: '0px' }}
       />
       {showText && (
-        <span className={`font-bold text-lg ${className.includes('text-') ? '' : 'text-[#8E84B8]'}`}>
+        <span className={`font-bold text-lg transition-colors duration-300`} style={{ color: dc.primary }}>
           DeepDoc AI
         </span>
       )}
