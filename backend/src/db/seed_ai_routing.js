@@ -109,13 +109,17 @@ const insertApiKeys = async () => {
   if (nvidiaId) {
     await query('DELETE FROM ai_api_keys WHERE provider_id = $1', [nvidiaId]);
     
-    const nvidiaKey = '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';
-    await query(
-      `INSERT INTO ai_api_keys (provider_id, encrypted_key, label, is_active)
-       VALUES ($1, $2, $3, TRUE)`,
-      [nvidiaId, nvidiaKey, 'nvidia-primary']
-    );
-    console.log(`  ✅ NVIDIA: 1 key`);
+    const nvidiaKey = process.env.NVIDIA_API_KEY;
+    if (nvidiaKey) {
+      await query(
+        `INSERT INTO ai_api_keys (provider_id, encrypted_key, label, is_active)
+         VALUES ($1, $2, $3, TRUE)`,
+        [nvidiaId, nvidiaKey, 'nvidia-primary']
+      );
+      console.log(`  ✅ NVIDIA: 1 key`);
+    } else {
+      console.log(`  ⚠️  NVIDIA: No key found in .env (NVIDIA_API_KEY)`);
+    }
   }
 };
 
