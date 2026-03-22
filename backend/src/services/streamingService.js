@@ -43,7 +43,7 @@ const persistAssistantMessage = async ({ chatId, documentId, finalResult, accumu
   );
 };
 
-export const streamRagResponse = async (req, res, { documentId, question, chatId, intent, model, requestId }) => {
+export const streamRagResponse = async (req, res, { documentId, question, chatId, intent, model, requestId, chatHistory = [] }) => {
   const requestLogger = logger.child({ requestId, chatId, documentId });
 
   res.setHeader('Content-Type', 'text/event-stream');
@@ -76,7 +76,7 @@ export const streamRagResponse = async (req, res, { documentId, question, chatId
   requestLogger.info('LLM', 'Streaming started', { question });
   writeSse(res, { event: 'chatId', data: { chatId } });
 
-  const generator = generateAnswerStream(question, documentId, intent, model);
+  const generator = generateAnswerStream(question, documentId, intent, model, chatHistory);
   let accumulatedText = '';
   let finalResult = null;
   let tokenCount = 0;

@@ -54,6 +54,17 @@ const buildTableContext = (chunks) =>
     .map((chunk, index) => `[Chunk ${index + 1} | Page ${chunk.pageNumber} | Type ${chunk.chunkType}]\n${chunk.content}`)
     .join('\n\n---\n\n');
 
+const buildConversationBlock = (chatHistory = []) => {
+  if (!chatHistory.length) return '';
+  const turns = chatHistory.map((msg) => {
+    const role = msg.role === 'user' ? 'User' : 'Assistant';
+    // Truncate very long assistant answers to keep the prompt lean
+    const content = String(msg.content || '').slice(0, 600);
+    return `${role}: ${content}`;
+  }).join('\n');
+  return `\nCONVERSATION HISTORY (most recent ${chatHistory.length} messages):\n${turns}\n\nUse the conversation history to understand follow-up questions and maintain context. If the user refers to something discussed earlier, use that context.\n`;
+};
+
 const parseJsonResponse = (rawText) => {
   const trimmed = String(rawText || '')
     .trim()
@@ -133,7 +144,8 @@ Rules:
   };
 };
 
-const generateTextAnswerInternal = async (question, chunks, preferredModel) => {
+const generateTextAnswerInternal = async (question, chunks, preferredModel, chatHistory = []) => {
+  const conversationBlock = buildConversationBlock(chatHistory);
   const prompt = `You are an AI assistant integrated into DeepDocAI.
 
 Always format responses in a structured, UI-friendly way using the following rules:
@@ -156,7 +168,7 @@ Do NOT output raw paragraphs.
 Output should be structured and easy to scan.
 
 Use ONLY the supplied context. Do not invent facts that are not present.
-
+${conversationBlock}
 CONTEXT:
 ${buildTextContext(chunks)}
 
@@ -183,12 +195,13 @@ ANSWER:`;
   };
 };
 
-export const generateAnswer = async (question, documentId, intent = null, preferredModel = null) => {
+export const generateAnswer = async (question, documentId, intent = null, preferredModel = null, chatHistory = []) => {
   try {
     const retrieval = await retrieveRelevantChunks({ question, documentId, intent });
     logger.table('INFO', 'DATA FLOW', 'RAG chunk context', summarizeChunksForFlow(retrieval.chunks), {
       documentId,
       flow: 'non-stream',
+      conversationTurns: chatHistory.length,
     });
 
     if (!retrieval.chunks.length) {
@@ -209,7 +222,7 @@ export const generateAnswer = async (question, documentId, intent = null, prefer
       };
     }
 
-    const textResult = await generateTextAnswerInternal(question, retrieval.chunks, preferredModel);
+    const textResult = await generateTextAnswerInternal(question, retrieval.chunks, preferredModel, chatHistory);
     return {
       answer_type: 'text',
       answer: textResult.answer,
@@ -227,11 +240,12 @@ export const generateAnswer = async (question, documentId, intent = null, prefer
   }
 };
 
-export const generateAnswerStream = async function* (question, documentId, intent = null, preferredModel = null) {
+export const generateAnswerStream = async function* (question, documentId, intent = null, preferredModel = null, chatHistory = []) {
   const retrieval = await retrieveRelevantChunks({ question, documentId, intent });
   logger.table('INFO', 'DATA FLOW', 'Streaming chunk context', summarizeChunksForFlow(retrieval.chunks), {
     documentId,
     flow: 'stream',
+    conversationTurns: chatHistory.length,
   });
 
   if (!retrieval.chunks.length) {
@@ -254,6 +268,7 @@ export const generateAnswerStream = async function* (question, documentId, inten
     };
   }
 
+  const conversationBlock = buildConversationBlock(chatHistory);
   const prompt = `You are an AI assistant integrated into DeepDocAI.
 
 Always format responses in a structured, UI-friendly way using the following rules:
@@ -276,7 +291,7 @@ Do NOT output raw paragraphs.
 Output should be structured and easy to scan.
 
 Use ONLY the supplied context. Do not invent facts that are not present.
-
+${conversationBlock}
 CONTEXT:
 ${buildTextContext(retrieval.chunks)}
 

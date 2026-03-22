@@ -1,5 +1,5 @@
 {
-  "name": "DeepDoc AI-backend",
+  "name": "deepdoc-ai-backend",
   "version": "1.0.0",
   "description": "Legal AI RAG application backend",
   "type": "module",

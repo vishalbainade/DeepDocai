@@ -60,8 +60,19 @@ export const askQuestion = async (req, res) => {
       question,
     });
 
+    let chatHistory = [];
+    if (chatId) {
+      const historyResult = await query(
+        `SELECT role, content FROM chat_history 
+         WHERE chat_id = $1 
+         ORDER BY created_at DESC LIMIT 10`,
+        [currentChatId]
+      );
+      chatHistory = historyResult.rows.reverse();
+    }
+
     await storeUserMessage({ chatId: currentChatId, documentId, question });
-    const result = await generateAnswer(question, documentId, intent, model);
+    const result = await generateAnswer(question, documentId, intent, model, chatHistory);
     const citations = buildCitations(result.sources || []);
     requestLogger.info('DATA FLOW', 'Answer generated', {
       answerType: result.answer_type || 'text',
@@ -135,6 +146,17 @@ export const streamQuestion = async (req, res) => {
       question,
     });
 
+    let chatHistory = [];
+    if (chatId) {
+      const historyResult = await query(
+        `SELECT role, content FROM chat_history 
+         WHERE chat_id = $1 
+         ORDER BY created_at DESC LIMIT 10`,
+        [currentChatId]
+      );
+      chatHistory = historyResult.rows.reverse();
+    }
+
     await storeUserMessage({ chatId: currentChatId, documentId, question });
 
     await streamRagResponse(req, res, {
@@ -144,6 +166,7 @@ export const streamQuestion = async (req, res) => {
       intent,
       model,
       requestId,
+      chatHistory,
     });
   } catch (error) {
     requestLogger.error('ERROR', 'Failed to initialize stream', {
