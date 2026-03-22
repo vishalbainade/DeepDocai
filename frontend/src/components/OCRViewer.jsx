@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
+import { Virtuoso } from 'react-virtuoso';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
@@ -181,13 +182,15 @@ const OCRViewer = ({ documentId, pdfUrl, activeHighlight }) => {
         </div>
       </div>
 
-      {/* Main Surface (Horizontal & Vertical Scroll Enabled) */}
+      {/* Main Surface (Virtualization Enabled) */}
       <div
         ref={containerRef}
-        className="flex-1 overflow-auto scroll-smooth py-0.5 bg-slate-100/50 flex flex-col items-center"
+        className="flex-1 overflow-hidden bg-slate-100/50 relative"
       >
-        <div className="inline-flex flex-col gap-[1cm] pb-2 min-w-full items-center px-4">
-          {pages.map((pageData, index) => {
+        <Virtuoso
+          style={{ height: '100%', width: '100%' }}
+          data={pages}
+          itemContent={(index, pageData) => {
             const pageNum = index + 1;
 
             // Dimensions
@@ -198,17 +201,17 @@ const OCRViewer = ({ documentId, pdfUrl, activeHighlight }) => {
             const renderedH = renderedW * aspectRatio;
 
             return (
-              <div
-                key={index}
-                data-index={index}
-                ref={(el) => (pageRefs.current[index] = el)}
-                className="relative bg-white shadow-2xl ring-1 ring-slate-200 shrink-0"
-                style={{
-                  width: `${renderedW}px`,
-                  height: `${renderedH}px`,
-                  minHeight: `${renderedH}px`,
-                }}
-              >
+              <div className="flex justify-center mt-2 mb-[1cm] px-4 w-full">
+                <div
+                  data-index={index}
+                  ref={(el) => { if (pageRefs.current) pageRefs.current[index] = el }}
+                  className="relative bg-white shadow-2xl ring-1 ring-slate-200 shrink-0"
+                  style={{
+                    width: `${renderedW}px`,
+                    height: `${renderedH}px`,
+                    minHeight: `${renderedH}px`,
+                  }}
+                >
                 {/* 
                    Hidden PDF Engine - Internal reference
                 */}
@@ -314,10 +317,11 @@ const OCRViewer = ({ documentId, pdfUrl, activeHighlight }) => {
                 <div className="absolute left-6 bottom-6 text-[10px] font-black text-slate-300 opacity-60">
                   PAG_0{pageNum}
                 </div>
+                </div>
               </div>
             );
-          })}
-        </div>
+          }}
+        />
       </div>
 
       {/* Hidden Print Container for High Fidelity PDF Export */}

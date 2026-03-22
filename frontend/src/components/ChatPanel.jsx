@@ -30,14 +30,14 @@ const ChatPanel = ({
   const scrollerRef = useRef(null);
   const endRef = useRef(null);
   const submitLockRef = useRef(false);
-  
+
   const modelOptions = Array.isArray(availableModels) && availableModels.length > 0 ? availableModels : DEFAULT_MODEL_OPTIONS;
-  
+
   // Wait to determine active model until models are loaded. If not loaded, use the raw selectedModel string if available.
-  const activeModel = modelsLoaded 
+  const activeModel = modelsLoaded
     ? (modelOptions.some((model) => model.id === selectedModel) ? selectedModel : modelOptions[0]?.id)
     : (selectedModel || modelOptions[0]?.id);
-    
+
   const activeModelData = modelOptions.find((m) => m.id === activeModel);
   const providerSlug = activeModelData?.provider?.slug || 'google';
   const providerColors = PROVIDER_COLORS[providerSlug] || PROVIDER_COLORS.google;
@@ -163,90 +163,88 @@ const ChatPanel = ({
         </div>
       </div>
 
-          <div className="flex-1 overflow-y-auto px-2 sm:px-5 py-8" ref={scrollerRef}>
-            {!chatHistory.length ? (
-              <div className="flex h-full items-center justify-center">
-                <div className="max-w-sm rounded-3xl border border-white/70 bg-white/70 px-8 py-10 text-center shadow-xl shadow-slate-200/70 backdrop-blur">
-                  <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
-                    <MessageSquare size={24} />
-                  </div>
-                  <h3 className="text-lg font-semibold text-slate-800">Ask about your document</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                    Stream answers live, inspect cited paragraphs, and jump straight to the source in the PDF.
-                  </p>
-                </div>
+      <div className="flex-1 overflow-y-auto px-2 sm:px-5 py-8" ref={scrollerRef}>
+        {!chatHistory.length ? (
+          <div className="flex h-full items-center justify-center">
+            <div className="max-w-sm rounded-3xl border border-white/70 bg-white/70 px-8 py-10 text-center shadow-xl shadow-slate-200/70 backdrop-blur">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+                <MessageSquare size={24} />
               </div>
-            ) : (
-              <div className="mx-auto max-w-4xl space-y-8 pb-4">
-                {chatHistory.map((message, index) => {
-                if (!message) return null;
-
-                const isUser = (message.role || '').toLowerCase() === 'user';
-                const isStreaming = message.isStreaming;
-
-                return (
-                  <div key={message.id || index} className={`flex w-full items-start gap-4 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
-                    
-                    {/* Avatar */}
-                    <div className={`mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full shadow-sm ${
-                        isUser 
-                          ? 'bg-slate-800 text-white' 
-                          : 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-100 via-white to-slate-100 border border-slate-200 text-indigo-700'
-                      }`}
-                    >
-                      {isUser ? <User size={18} strokeWidth={2.5} /> : <Bot size={20} strokeWidth={2} className={`${isStreaming ? 'animate-pulse text-indigo-500' : ''}`} />}
-                    </div>
-
-                    {/* Message Bubble */}
-                    <div className={`relative max-w-[85%] sm:max-w-[75%] rounded-3xl px-6 py-4.5 ${
-                        isUser 
-                          ? 'rounded-tr-sm bg-slate-800 text-white shadow-md' 
-                          : 'rounded-tl-sm border border-slate-200/60 bg-white/95 text-slate-800 shadow-xl shadow-slate-200/40 backdrop-blur-sm'
-                      }`}
-                    >
-                      {isUser ? (
-                        <p className="whitespace-pre-wrap text-[15px] leading-relaxed font-normal">{message.content}</p>
-                      ) : (
-                        <div className="text-[15px] max-w-none">
-                          {!message.content && !message.table && isStreaming ? (
-                            <div className="flex items-center gap-3 text-slate-500 py-2">
-                              <Loader2 size={18} className="animate-spin text-indigo-500" />
-                              <span className="animate-pulse">Analyzing document...</span>
-                            </div>
-                          ) : (
-                            <AnswerCard 
-                              message={message} 
-                              onCitationClick={onCitationClick} 
-                              onRegenerate={() => {
-                                // Find the closest preceding user message
-                                const idx = chatHistory.findIndex(m => m.id === message.id);
-                                let lastUserMsg = null;
-                                for (let i = idx - 1; i >= 0; i--) {
-                                  if (chatHistory[i].role === 'user') {
-                                    lastUserMsg = chatHistory[i].content;
-                                    break;
-                                  }
-                                }
-                                if (lastUserMsg) {
-                                  onSendMessage(lastUserMsg);
-                                }
-                              }}
-                            />
-                          )}
-
-                          {isStreaming && (
-                            <span className="ml-1 inline-block h-[1em] w-2 animate-pulse rounded-sm bg-indigo-400 align-middle shadow-sm" />
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-              <div ref={endRef} className="h-4 w-full" />
+              <h3 className="text-lg font-semibold text-slate-800">Ask about your document</h3>
+              <p className="mt-2 text-sm leading-relaxed text-slate-500">
+                Stream answers live, inspect cited paragraphs, and jump straight to the source in the PDF.
+              </p>
             </div>
-            )}
           </div>
+        ) : (
+          <div className="mx-auto max-w-4xl space-y-8 pb-4">
+            {chatHistory.map((message, index) => {
+              if (!message) return null;
+
+              const isUser = (message.role || '').toLowerCase() === 'user';
+              const isStreaming = message.isStreaming;
+
+              return (
+                <div key={message.id || index} className={`flex w-full items-start gap-4 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
+
+                  {/* Avatar */}
+                  <div className={`mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full shadow-sm ${isUser
+                      ? 'bg-slate-800 text-white'
+                      : 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-100 via-white to-slate-100 border border-slate-200 text-indigo-700'
+                    }`}
+                  >
+                    {isUser ? <User size={18} strokeWidth={2.5} /> : <Bot size={20} strokeWidth={2} className={`${isStreaming ? 'animate-pulse text-indigo-500' : ''}`} />}
+                  </div>
+
+                  {/* Message Bubble */}
+                  <div className={`relative max-w-[85%] sm:max-w-[75%] rounded-3xl px-6 py-4.5 ${isUser
+                      ? 'rounded-tr-sm bg-slate-800 text-white shadow-md'
+                      : 'rounded-tl-sm border border-slate-200/60 bg-white/95 text-slate-800 shadow-xl shadow-slate-200/40 backdrop-blur-sm'
+                    }`}
+                  >
+                    {isUser ? (
+                      <p className="whitespace-pre-wrap text-[15px] leading-relaxed font-normal">{message.content}</p>
+                    ) : (
+                      <div className="text-[15px] max-w-none">
+                        {!message.content && !message.table && isStreaming ? (
+                          <div className="flex items-center gap-3 text-slate-500 py-2">
+                            <Loader2 size={18} className="animate-spin text-indigo-500" />
+                            <span className="animate-pulse">Analyzing document...</span>
+                          </div>
+                        ) : (
+                          <AnswerCard
+                            message={message}
+                            onCitationClick={onCitationClick}
+                            onRegenerate={() => {
+                              // Find the closest preceding user message
+                              const idx = chatHistory.findIndex(m => m.id === message.id);
+                              let lastUserMsg = null;
+                              for (let i = idx - 1; i >= 0; i--) {
+                                if (chatHistory[i].role === 'user') {
+                                  lastUserMsg = chatHistory[i].content;
+                                  break;
+                                }
+                              }
+                              if (lastUserMsg) {
+                                onSendMessage(lastUserMsg);
+                              }
+                            }}
+                          />
+                        )}
+
+                        {isStreaming && (
+                          <span className="ml-1 inline-block h-[1em] w-2 animate-pulse rounded-sm bg-indigo-400 align-middle shadow-sm" />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            <div ref={endRef} className="h-4 w-full" />
+          </div>
+        )}
+      </div>
 
       <div className="border-t border-slate-200 bg-white/85 px-4 py-4 backdrop-blur">
         <form onSubmit={handleSubmit} className="flex items-end gap-3">
