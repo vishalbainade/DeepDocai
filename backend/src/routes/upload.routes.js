@@ -128,4 +128,60 @@ router.get('/metadata/:documentId', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/upload/download/:documentId/:type
+ * Download the document in PDF or DOCX format
+ */
+router.get('/download/:documentId/:type', async (req, res) => {
+  try {
+    const { documentId, type } = req.params;
+    const { downloadFromOutputBucket, downloadFromInputBucket } = await import('../services/storage.service.js');
+    const { generateDocxFromOCR } = await import('../services/docxService.js');
+
+    // 1. Get document info
+    const docResult = await query(
+      'SELECT file_name, storage_url FROM documents WHERE id = $1',
+      [documentId]
+    );
+
+    if (docResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    const doc = docResult.rows[0];
+
+    if (type === 'pdf') {
+      // PDF is stored in INPUT_BUCKET (reconstructed version)
+      // The storage_url in DB points to the OCR version after processing
+      const storageUrl = doc.storage_url;
+      const storageFileName = storageUrl.split('/').slice(-1)[0];
+      
+      const buffer = await downloadFromInputBucket(storageFileName);
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="Searchable-${doc.file_name}"`);
+      return res.send(buffer);
+    } 
+
+    if (type === 'docx') {
+      // Generate DOCX on the fly from OCR layout data
+      const jsonBuffer = await downloadFromOutputBucket(`ocr-${documentId}.json`);
+      const metadata = JSON.parse(jsonBuffer.toString('utf-8'));
+      
+      const docxBuffer = await generateDocxFromOCR(metadata);
+      
+      const fileNameNoExt = doc.file_name.replace(/\.[^/.]+$/, "");
+      
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      res.setHeader('Content-Disposition', `attachment; filename="${fileNameNoExt}.docx"`);
+      return res.send(docxBuffer);
+    }
+
+    res.status(400).json({ error: 'Invalid download type. Use pdf or docx.' });
+  } catch (error) {
+    console.error('Download error:', error);
+    res.status(500).json({ error: 'Failed to generate download', message: error.message });
+  }
+});
+
 export default router;

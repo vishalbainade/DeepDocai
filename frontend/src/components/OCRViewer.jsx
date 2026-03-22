@@ -14,7 +14,7 @@ const OCRViewer = ({ documentId, pdfUrl, activeHighlight }) => {
   const [layoutData, setLayoutData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [scale, setScale] = useState(0.85); // Defaulting to a fitting 85%
+  const [scale, setScale] = useState(0.84); // Defaulting to a fitting 80%
   const [pageMetrics, setPageMetrics] = useState({});
 
   const containerRef = useRef(null);
@@ -101,7 +101,7 @@ const OCRViewer = ({ documentId, pdfUrl, activeHighlight }) => {
 
         <div className="flex items-center gap-4 bg-slate-100 rounded-lg px-2 py-1 border border-slate-200">
           <button
-            onClick={() => setScale(s => Math.max(0.4, s - 0.1))}
+            onClick={() => setScale(s => Math.max(0.4, s - 0.01))}
             className="p-1 px-2 hover:bg-white rounded transition-all text-slate-600 font-black"
           >
             -
@@ -110,15 +110,15 @@ const OCRViewer = ({ documentId, pdfUrl, activeHighlight }) => {
             {Math.round(scale * 100)}%
           </span>
           <button
-            onClick={() => setScale(s => Math.min(4.0, s + 0.1))}
+            onClick={() => setScale(s => Math.min(4.0, s + 0.01))}
             className="p-1 px-2 hover:bg-white rounded transition-all text-slate-600 font-black"
           >
             +
           </button>
           <div className="w-[1px] h-4 bg-slate-300 mx-1" />
           <button
-            onClick={() => setScale(0.85)}
-            title="Reset to 85%"
+            onClick={() => setScale(0.84)}
+            title="Reset to 80%"
             className="p-1 hover:bg-white rounded transition-all"
           >
             <Maximize2 size={14} className="text-slate-500" />
@@ -126,8 +126,58 @@ const OCRViewer = ({ documentId, pdfUrl, activeHighlight }) => {
         </div>
 
         <div className="hidden lg:flex items-center gap-4">
-          <FileText size={16} className="text-slate-400" />
-          <span className="text-[10px] font-black text-slate-500 uppercase">{pages.length} Pages</span>
+          <div className="relative group/download z-50">
+            <button
+              className="flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-xs font-black text-white hover:bg-slate-800 transition-all shadow-lg shadow-slate-200"
+            >
+              DOWNLOAD
+            </button>
+            
+            {/* Download Dropdown */}
+            <div className="absolute right-0 top-full pt-2 w-48 scale-95 opacity-0 pointer-events-none group-hover/download:scale-100 group-hover/download:opacity-100 group-hover/download:pointer-events-auto transition-all duration-200 z-[100] origin-top-right">
+              <div className="bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden p-1.5 flex flex-col gap-1 ring-1 ring-slate-900/5">
+                <button
+                  onClick={async () => {
+                    try {
+                      const html2pdf = (await import('html2pdf.js')).default;
+                      const element = document.getElementById('ocr-download-target');
+                      
+                      const opt = {
+                        margin:       [-0.5, 0, 0, 0],
+                        filename:     `Digital-Document-${documentId}.pdf`,
+                        image:        { type: 'jpeg', quality: 1.0 },
+                        html2canvas:  { scale: 2, useCORS: true, letterRendering: true, windowWidth: 1000 },
+                        jsPDF:        { unit: 'px', format: [1000, 1414], orientation: 'portrait' }
+                      };
+                      
+                      html2pdf().set(opt).from(element).save();
+                    } catch(err) {
+                      console.error("PDF Export failed", err);
+                      alert("Failed to generate PDF locally. Please try again.");
+                    }
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-[11px] font-black uppercase text-slate-700 hover:bg-slate-50 rounded-lg transition-colors border border-transparent hover:border-slate-100"
+                >
+                  <FileText size={14} className="text-red-500" />
+                  Download PDF
+                </button>
+                <button
+                  onClick={async () => {
+                    const token = localStorage.getItem('token');
+                    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+                    const downloadUrl = `${baseUrl}/api/upload/download/${documentId}/docx?token=${token}`;
+                    window.open(downloadUrl, '_blank');
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-[11px] font-black uppercase text-slate-700 hover:bg-slate-50 rounded-lg transition-colors border border-transparent hover:border-slate-100"
+                >
+                  <FileText size={14} className="text-blue-500" />
+                  Download DOCX
+                </button>
+              </div>
+            </div>
+          </div>
+          <div className="w-[1px] h-6 bg-slate-200 mx-1" />
+          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{pages.length} Pages</span>
         </div>
       </div>
 
@@ -263,6 +313,84 @@ const OCRViewer = ({ documentId, pdfUrl, activeHighlight }) => {
 
                 <div className="absolute left-6 bottom-6 text-[10px] font-black text-slate-300 opacity-60">
                   PAG_0{pageNum}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Hidden Print Container for High Fidelity PDF Export */}
+      <div className="absolute top-0 left-[-9999px] opacity-0 pointer-events-none w-[1000px]">
+        <div id="ocr-download-target" className="flex flex-col bg-white">
+          {pages.map((pageData, index) => {
+            const docW = pageData.image_width || pageData.page_width || 1000;
+            const docH = pageData.image_height || pageData.page_height || 1414;
+            const aspectRatio = docH / docW;
+            const renderedW = 1000;
+            const renderedH = renderedW * aspectRatio;
+
+            return (
+              <div
+                key={`print-${index}`}
+                className="relative bg-white shrink-0"
+                style={{
+                  width: `${renderedW}px`,
+                  height: `${renderedH}px`
+                }}
+              >
+                <div className="absolute inset-0 z-10 select-text overflow-hidden bg-white">
+                  {(pageData.blocks || []).map((block, bIdx) => {
+                    const coords = block.coordinates || block.box;
+                    if (!coords) return null;
+
+                    let x1, y1, x2, y2;
+                    if (Array.isArray(coords)) {
+                      [x1, y1, x2, y2] = coords;
+                    } else {
+                      x1 = coords.x1; y1 = coords.y1; x2 = coords.x2; y2 = coords.y2;
+                    }
+
+                    const finalFontSize = (block.block_type === 'header' || block.block_type === 'title' ? 19 : 14);
+
+                    return (
+                      <div
+                        key={bIdx}
+                        className="absolute tracking-tight border-b border-transparent"
+                        style={{
+                          left: `${(x1 / docW) * 100}%`,
+                          top: `${(y1 / docH) * 100}%`,
+                          width: `${((x2 - x1) / docW) * 100}%`,
+                          height: `${((y2 - y1) / docH) * 100}%`,
+                          color: '#0f172a',
+                          fontSize: `${finalFontSize}px`,
+                          fontWeight: block.block_type === 'header' || block.block_type === 'title' ? '900' : '500',
+                          fontFamily: 'system-ui, sans-serif',
+                          lineHeight: '1.4',
+                          overflow: 'visible'
+                        }}
+                      >
+                         <div className="w-full h-full relative">
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            rehypePlugins={[rehypeRaw]}
+                            components={{
+                              table: (props) => (
+                                <div className="w-full my-1 border rounded bg-white overflow-hidden shadow-sm">
+                                  <table {...props} className="min-w-full border-collapse text-[0.9em]" />
+                                </div>
+                              ),
+                              td: (props) => <td {...props} className="border border-slate-200 px-3 py-2 align-top text-slate-800" />,
+                              th: (props) => <th {...props} className="border border-slate-200 px-3 py-2 bg-slate-50 font-black text-left text-slate-900" />,
+                              p: (props) => <p {...props} className="m-0 leading-normal" />,
+                            }}
+                          >
+                            {block.text}
+                          </ReactMarkdown>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );
