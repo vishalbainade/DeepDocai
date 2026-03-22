@@ -1,20 +1,68 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 import { Copy, Check, Info, FileText } from 'lucide-react';
 import ChatTable from './ChatTable';
 import CitationBadge from './CitationBadge';
 import AIMessageRenderer from './AIMessageRenderer';
 import { formatAIResponse } from '../utils/responseFormatter';
 
-const markdownComponents = {
+// ── Streaming Smoother (Typewriter Queue) ──
+function useSmoothedText(rawText, isStreaming) {
+  const [displayedText, setDisplayedText] = useState('');
+  
+  useEffect(() => {
+    if (!isStreaming) {
+      setDisplayedText(rawText);
+      return;
+    }
+
+    if (rawText.length > displayedText.length) {
+      const remainingBytes = rawText.length - displayedText.length;
+      let addChars = 1;
+      
+      if (remainingBytes > 300) addChars = 35; 
+      else if (remainingBytes > 100) addChars = 12;
+      else if (remainingBytes > 50) addChars = 5;
+      else if (remainingBytes > 10) addChars = 2;
+      
+      const timer = setTimeout(() => {
+        setDisplayedText(rawText.substring(0, displayedText.length + addChars));
+      }, 10);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [rawText, displayedText, isStreaming]);
+
+  return displayedText;
+}
+
+const getMarkdownComponents = (onCitationClick) => ({
   p: ({ children }) => <p className="mb-4 leading-[1.7] text-slate-700">{children}</p>,
   strong: ({ children }) => <strong className="font-[600] text-slate-900">{children}</strong>,
   ul: ({ children }) => <ul className="mb-4 ml-6 list-outside list-disc space-y-1.5 text-slate-700">{children}</ul>,
   ol: ({ children }) => <ol className="mb-4 ml-6 list-outside list-decimal space-y-1.5 text-slate-700">{children}</ol>,
-};
+  h3: ({ children }) => <h3 className="font-semibold text-[17px] text-gray-900 mb-3 tracking-tight border-b border-slate-100 pb-2">{children}</h3>,
+  citation: (props) => (
+    <span
+      className="ml-1 px-2 py-0.5 text-xs bg-indigo-100/80 hover:bg-indigo-200 text-indigo-700 font-medium rounded-md cursor-pointer transition-colors shadow-sm inline-block translate-y-[-1px]"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (onCitationClick) {
+          onCitationClick({ page: parseInt(props.page, 10) });
+        }
+      }}
+      title={`Go to Page ${props.page}`}
+    >
+      [Pg. {props.page}]
+    </span>
+  )
+});
 
 const AnswerCard = ({ message, onCitationClick, onRegenerate }) => {
   const [copied, setCopied] = useState(false);
+  const smoothedContent = useSmoothedText(message?.content || '', message?.isStreaming);
 
   if (!message) return null;
 
@@ -56,17 +104,20 @@ const AnswerCard = ({ message, onCitationClick, onRegenerate }) => {
             <ChatTable title={message.table.title} columns={message.table.columns} rows={message.table.rows} />
             {message.answer && (
               <div className="px-5 py-4 bg-white/50">
-                <ReactMarkdown components={markdownComponents}>{message.answer}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={getMarkdownComponents(onCitationClick)}>{message.answer}</ReactMarkdown>
               </div>
             )}
           </div>
         ) : (
-          <AIMessageRenderer 
-            rawText={message.content} 
-            paragraphCitations={message.paragraphCitations}
-            citations={message.citations}
-            onCitationClick={onCitationClick} 
-          />
+          <div className="text-[15px] space-y-4">
+            <ReactMarkdown 
+              remarkPlugins={[remarkGfm]} 
+              rehypePlugins={[rehypeRaw]} 
+              components={getMarkdownComponents(onCitationClick)}
+            >
+              {smoothedContent.replace(/\[Pg\.\s*(\d+)\]/g, '<citation page="$1"></citation>')}
+            </ReactMarkdown>
+          </div>
         )}
       </div>
 
