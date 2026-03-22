@@ -2,15 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import { Bot, ChevronDown, Loader2, MessageSquare, Send, Sparkles, User } from 'lucide-react';
 import AnswerCard from './AnswerCard';
 
+const PROVIDER_COLORS = {
+  google: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', dot: 'bg-blue-500' },
+  openrouter: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', dot: 'bg-purple-500' },
+  glm: { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200', dot: 'bg-green-500' },
+  nvidia: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', dot: 'bg-emerald-500' },
+};
+
 const DEFAULT_MODEL_OPTIONS = [
-  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-  { id: 'gemini-3-flash', label: 'Gemini 3 Flash' },
-  { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite' },
-  { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
-  { id: 'gemma-3-1b', label: 'Gemma 3 1B' },
-  { id: 'gemma-3-4b', label: 'Gemma 3 4B' },
-  { id: 'gemma-3-12b', label: 'Gemma 3 12B' },
-  { id: 'gemma-3-27b', label: 'Gemma 3 27B' },
+  { id: 'gemini-2.5-flash', displayName: 'Gemini 2.5 Flash', label: 'Gemini 2.5 Flash', provider: { slug: 'google', name: 'Google AI Studio' } },
 ];
 
 const ChatPanel = ({
@@ -21,6 +21,7 @@ const ChatPanel = ({
   currentDocumentId,
   selectedModel,
   availableModels = [],
+  modelsLoaded = false,
   onModelChange,
   onCitationClick,
 }) => {
@@ -29,8 +30,17 @@ const ChatPanel = ({
   const scrollerRef = useRef(null);
   const endRef = useRef(null);
   const submitLockRef = useRef(false);
+  
   const modelOptions = Array.isArray(availableModels) && availableModels.length > 0 ? availableModels : DEFAULT_MODEL_OPTIONS;
-  const activeModel = modelOptions.some((model) => model.id === selectedModel) ? selectedModel : modelOptions[0]?.id || 'gemini-2.5-flash';
+  
+  // Wait to determine active model until models are loaded. If not loaded, use the raw selectedModel string if available.
+  const activeModel = modelsLoaded 
+    ? (modelOptions.some((model) => model.id === selectedModel) ? selectedModel : modelOptions[0]?.id)
+    : (selectedModel || modelOptions[0]?.id);
+    
+  const activeModelData = modelOptions.find((m) => m.id === activeModel);
+  const providerSlug = activeModelData?.provider?.slug || 'google';
+  const providerColors = PROVIDER_COLORS[providerSlug] || PROVIDER_COLORS.google;
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -104,6 +114,17 @@ const ChatPanel = ({
     }
   };
 
+  // Group models by provider for the dropdown
+  const groupedModels = modelOptions.reduce((groups, model) => {
+    const slug = model.provider?.slug || 'google';
+    const name = model.provider?.name || 'Google AI Studio';
+    if (!groups[slug]) {
+      groups[slug] = { name, models: [] };
+    }
+    groups[slug].models.push(model);
+    return groups;
+  }, {});
+
   return (
     <div className="flex h-full flex-col bg-[linear-gradient(180deg,_#fffdf7_0%,_#f8fafc_55%,_#eef2ff_100%)]">
       <div className="flex items-center justify-between border-b border-slate-200/80 bg-white/80 px-6 py-4 backdrop-blur">
@@ -112,78 +133,120 @@ const ChatPanel = ({
           <p className="text-sm text-slate-500">Streaming answers with citations and PDF sync</p>
         </div>
 
-        <div className="relative">
-          <select
-            value={activeModel}
-            onChange={(event) => onModelChange?.(event.target.value)}
-            disabled={isThinking}
-            className="min-w-[220px] appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2 pr-9 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {modelOptions.map((model) => (
-              <option key={model.id} value={model.id}>
-                {model.label}
-              </option>
-            ))}
-          </select>
-          <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <div className="flex items-center gap-2">
+          {/* Provider badge */}
+          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${providerColors.bg} ${providerColors.text} ${providerColors.border} border`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${providerColors.dot}`} />
+            {activeModelData?.provider?.name || 'Google AI Studio'}
+          </span>
+
+          {/* Model selector */}
+          <div className="relative">
+            <select
+              value={activeModel}
+              onChange={(event) => onModelChange?.(event.target.value)}
+              disabled={isThinking}
+              className="min-w-[220px] appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2 pr-9 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {Object.entries(groupedModels).map(([slug, group]) => (
+                <optgroup key={slug} label={group.name}>
+                  {group.models.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.displayName || model.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+            <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          </div>
         </div>
       </div>
 
-      <div ref={scrollerRef} className="flex-1 overflow-y-auto px-5 py-6">
-        {!chatHistory.length ? (
-          <div className="flex h-full items-center justify-center">
-            <div className="max-w-sm rounded-3xl border border-white/70 bg-white/70 px-8 py-10 text-center shadow-xl shadow-slate-200/70 backdrop-blur">
-              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 text-amber-700">
-                <MessageSquare size={24} />
-              </div>
-              <h3 className="text-lg font-semibold text-slate-800">Ask about your document</h3>
-              <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                Stream answers live, inspect cited paragraphs, and jump straight to the source in the PDF.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-5">
-            {chatHistory.map((message, index) => {
-              if (!message) {
-                return null;
-              }
-
-              const isUser = (message.role || '').toLowerCase() === 'user';
-
-              return (
-                <div key={message.id || index} className={`flex items-start gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
-                  <div className={`mt-1 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-2xl ${isUser ? 'bg-slate-900 text-white' : 'bg-amber-100 text-amber-900'}`}>
-                    {isUser ? <User size={17} /> : <Bot size={17} />}
+          <div className="flex-1 overflow-y-auto px-2 sm:px-5 py-8" ref={scrollerRef}>
+            {!chatHistory.length ? (
+              <div className="flex h-full items-center justify-center">
+                <div className="max-w-sm rounded-3xl border border-white/70 bg-white/70 px-8 py-10 text-center shadow-xl shadow-slate-200/70 backdrop-blur">
+                  <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+                    <MessageSquare size={24} />
                   </div>
-
-                  <div className={`max-w-[82%] rounded-3xl px-5 py-4 shadow-sm ${isUser ? 'rounded-tr-md bg-slate-900 text-white' : 'rounded-tl-md border border-white/60 bg-white/85 text-slate-800 shadow-xl shadow-slate-200/50 backdrop-blur'}`}>
-                    {isUser ? (
-                      <p className="whitespace-pre-wrap text-sm leading-relaxed text-white">{message.content}</p>
-                    ) : (
-                      <div className="text-sm">
-                        {!message.content && !message.table && message.isStreaming ? (
-                          <div className="flex items-center gap-2 text-slate-500">
-                            <Loader2 size={16} className="animate-spin" />
-                            <span>Generating answer...</span>
-                          </div>
-                        ) : (
-                          <AnswerCard message={message} onCitationClick={onCitationClick} />
-                        )}
-
-                        {message.isStreaming ? (
-                          <span className="ml-1 inline-block h-4 w-0.5 animate-pulse bg-amber-500 align-middle" />
-                        ) : null}
-                      </div>
-                    )}
-                  </div>
+                  <h3 className="text-lg font-semibold text-slate-800">Ask about your document</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-500">
+                    Stream answers live, inspect cited paragraphs, and jump straight to the source in the PDF.
+                  </p>
                 </div>
-              );
-            })}
+              </div>
+            ) : (
+              <div className="mx-auto max-w-4xl space-y-8 pb-4">
+                {chatHistory.map((message, index) => {
+                if (!message) return null;
+
+                const isUser = (message.role || '').toLowerCase() === 'user';
+                const isStreaming = message.isStreaming;
+
+                return (
+                  <div key={message.id || index} className={`flex w-full items-start gap-4 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
+                    
+                    {/* Avatar */}
+                    <div className={`mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full shadow-sm ${
+                        isUser 
+                          ? 'bg-slate-800 text-white' 
+                          : 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-100 via-white to-slate-100 border border-slate-200 text-indigo-700'
+                      }`}
+                    >
+                      {isUser ? <User size={18} strokeWidth={2.5} /> : <Bot size={20} strokeWidth={2} className={`${isStreaming ? 'animate-pulse text-indigo-500' : ''}`} />}
+                    </div>
+
+                    {/* Message Bubble */}
+                    <div className={`relative max-w-[85%] sm:max-w-[75%] rounded-3xl px-6 py-4.5 ${
+                        isUser 
+                          ? 'rounded-tr-sm bg-slate-800 text-white shadow-md' 
+                          : 'rounded-tl-sm border border-slate-200/60 bg-white/95 text-slate-800 shadow-xl shadow-slate-200/40 backdrop-blur-sm'
+                      }`}
+                    >
+                      {isUser ? (
+                        <p className="whitespace-pre-wrap text-[15px] leading-relaxed font-normal">{message.content}</p>
+                      ) : (
+                        <div className="text-[15px] max-w-none">
+                          {!message.content && !message.table && isStreaming ? (
+                            <div className="flex items-center gap-3 text-slate-500 py-2">
+                              <Loader2 size={18} className="animate-spin text-indigo-500" />
+                              <span className="animate-pulse">Analyzing document...</span>
+                            </div>
+                          ) : (
+                            <AnswerCard 
+                              message={message} 
+                              onCitationClick={onCitationClick} 
+                              onRegenerate={() => {
+                                // Find the closest preceding user message
+                                const idx = chatHistory.findIndex(m => m.id === message.id);
+                                let lastUserMsg = null;
+                                for (let i = idx - 1; i >= 0; i--) {
+                                  if (chatHistory[i].role === 'user') {
+                                    lastUserMsg = chatHistory[i].content;
+                                    break;
+                                  }
+                                }
+                                if (lastUserMsg) {
+                                  onSendMessage(lastUserMsg);
+                                }
+                              }}
+                            />
+                          )}
+
+                          {isStreaming && (
+                            <span className="ml-1 inline-block h-[1em] w-2 animate-pulse rounded-sm bg-indigo-400 align-middle shadow-sm" />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              <div ref={endRef} className="h-4 w-full" />
+            </div>
+            )}
           </div>
-        )}
-        <div ref={endRef} />
-      </div>
 
       <div className="border-t border-slate-200 bg-white/85 px-4 py-4 backdrop-blur">
         <form onSubmit={handleSubmit} className="flex items-end gap-3">

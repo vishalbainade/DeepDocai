@@ -73,10 +73,10 @@ export const askQuestion = async (req, res) => {
     const aiContent =
       result.answer_type === 'table'
         ? JSON.stringify({
-            answer_type: 'table',
-            answer: result.answer || '',
-            table: result.table,
-          })
+          answer_type: 'table',
+          answer: result.answer || '',
+          table: result.table,
+        })
         : result.answer;
 
     await query(

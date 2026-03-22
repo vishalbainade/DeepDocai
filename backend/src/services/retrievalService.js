@@ -146,8 +146,8 @@ export const hybridSearch = async (queryString, queryEmbedding, documentId, isGe
   }
 
   if (isGeneric) {
-    logger.info('RETRIEVAL', 'Generic retrieval started', { documentId });
-    return getTopChunksByOrder(documentId, 10);
+    logger.info('RETRIEVAL', 'Generic retrieval started (Increased Context Window)', { documentId });
+    return getTopChunksByOrder(documentId, 25);
   }
 
   logger.info('RETRIEVAL', 'Hybrid retrieval started', { documentId, query: queryString });

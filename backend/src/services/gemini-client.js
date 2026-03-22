@@ -27,7 +27,10 @@ const loadApiKeys = () => {
     return [singleKey];
   }
 
-  throw new Error('No Gemini API keys found. Set GEMINI_API_KEY or GEMINI_API_KEYS.');
+  // Don't crash — API keys are now managed in the database.
+  // The new providerRouter loads keys from the ai_api_keys table.
+  logger.warn('LLM', 'No Gemini API keys in .env — keys will be loaded from database via providerRouter');
+  return [];
 };
 
 const apiKeys = loadApiKeys();

@@ -10,7 +10,10 @@ import historyRoutes from './routes/history.routes.js';
 import diagnosticsRoutes from './routes/diagnostics.routes.js';
 import chatsRoutes from './routes/chats.routes.js';
 import authRoutes from './routes/auth.routes.js';
+import modelsRoutes from './routes/models.routes.js';
+import userSettingsRoutes from './routes/userSettings.routes.js';
 import { query } from './db/index.js';
+import { seedProvidersAndModels } from './services/aiModelService.js';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -48,6 +51,8 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/history', historyRoutes);
 app.use('/api/diagnostics', diagnosticsRoutes);
 app.use('/api/chats', chatsRoutes);
+app.use('/api/models', modelsRoutes);
+app.use('/api/user', userSettingsRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -65,6 +70,7 @@ app.use((err, req, res, next) => {
 // Initialize database schema
 const initializeDatabase = async () => {
   try {
+    // Run main schema
     const schemaPath = path.join(__dirname, 'db', 'schema.sql');
     const schema = await fs.readFile(schemaPath, 'utf-8');
     
@@ -93,22 +99,64 @@ const initializeDatabase = async () => {
     }
     
     console.log('✅ Database schema initialized successfully');
+
+    // Run AI routing migration
+    const aiRoutingPath = path.join(__dirname, 'db', 'migration_ai_routing.sql');
+    try {
+      const aiRoutingSchema = await fs.readFile(aiRoutingPath, 'utf-8');
+      const aiCleaned = aiRoutingSchema
+        .split('\n')
+        .map(line => line.trim().startsWith('--') ? '' : line)
+        .join('\n');
+      
+      const aiStatements = aiCleaned
+        .split(';')
+        .map(stmt => stmt.trim())
+        .filter(stmt => stmt.length > 0);
+
+      for (const statement of aiStatements) {
+        try {
+          await query(statement);
+        } catch (error) {
+          if (!error.message.includes('already exists') && 
+              !error.message.includes('duplicate')) {
+            console.warn(`AI routing migration warning: ${error.message}`);
+          }
+        }
+      }
+
+      console.log('✅ AI routing schema initialized successfully');
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        console.log('ℹ️  AI routing migration file not found, skipping');
+      } else {
+        console.warn('⚠️  AI routing migration warning:', error.message);
+      }
+    }
   } catch (error) {
     console.error('Error initializing database:', error);
     // Don't exit - schema might already exist
   }
 };
 
+// Seed AI providers and models
+const seedAIData = async () => {
+  try {
+    await seedProvidersAndModels();
+    console.log('✅ AI providers and models seeded successfully');
+  } catch (error) {
+    console.warn('⚠️  AI seeding warning:', error.message);
+  }
+};
+
 // Start server
 const startServer = async () => {
   try {
-    // Validate required environment variables
-    if (!process.env.GEMINI_API_KEY && !process.env.GEMINI_API_KEYS) {
-      throw new Error('GEMINI_API_KEY or GEMINI_API_KEYS environment variable is required');
-    }
-
     // Initialize database
     await initializeDatabase();
+
+    // Seed AI providers, models, and API keys
+    await seedAIData();
 
     // Ensure uploads directory exists
     const uploadsDir = path.join(__dirname, '../uploads');
