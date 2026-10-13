@@ -12,6 +12,9 @@ import chatsRoutes from './routes/chats.routes.js';
 import authRoutes from './routes/auth.routes.js';
 import modelsRoutes from './routes/models.routes.js';
 import userSettingsRoutes from './routes/userSettings.routes.js';
+import projectsRoutes from './routes/projects.routes.js';
+import usageRoutes from './routes/usage.routes.js';
+import liveAudioRoutes from './routes/liveAudio.routes.js';
 import { query } from './db/index.js';
 import { seedProvidersAndModels } from './services/aiModelService.js';
 import fs from 'fs/promises';
@@ -53,6 +56,9 @@ app.use('/api/diagnostics', diagnosticsRoutes);
 app.use('/api/chats', chatsRoutes);
 app.use('/api/models', modelsRoutes);
 app.use('/api/user', userSettingsRoutes);
+app.use('/api/projects', projectsRoutes);
+app.use('/api/usage', usageRoutes);
+app.use('/api/audio', liveAudioRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -131,6 +137,40 @@ const initializeDatabase = async () => {
         console.log('ℹ️  AI routing migration file not found, skipping');
       } else {
         console.warn('⚠️  AI routing migration warning:', error.message);
+      }
+    }
+
+    // Run User Preferences migration
+    const userPrefsPath = path.join(__dirname, 'db', 'migration_user_preferences.sql');
+    try {
+      const userPrefsSchema = await fs.readFile(userPrefsPath, 'utf-8');
+      const upCleaned = userPrefsSchema
+        .split('\n')
+        .map(line => line.trim().startsWith('--') ? '' : line)
+        .join('\n');
+      
+      const upStatements = upCleaned
+        .split(';')
+        .map(stmt => stmt.trim())
+        .filter(stmt => stmt.length > 0);
+
+      for (const statement of upStatements) {
+        try {
+          await query(statement);
+        } catch (error) {
+          if (!error.message.includes('already exists') && 
+              !error.message.includes('duplicate')) {
+            console.warn(`User preferences migration warning: ${error.message}`);
+          }
+        }
+      }
+
+      console.log('✅ User preferences schema initialized successfully');
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        console.log('ℹ️  User preferences migration file not found, skipping');
+      } else {
+        console.warn('⚠️  User preferences migration warning:', error.message);
       }
     }
   } catch (error) {

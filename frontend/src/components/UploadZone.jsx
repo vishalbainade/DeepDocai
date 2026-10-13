@@ -1,12 +1,14 @@
 import { useState, useRef } from 'react';
-import { Upload, FileText, Loader2 } from 'lucide-react';
+import { Upload, FileText, Loader2, FolderUp, Layers } from 'lucide-react';
 import { useDarkColors, useIsDark } from '../utils/darkMode';
+import { useChat } from '../contexts/ChatContext';
 
 const UploadZone = ({ onUpload, isUploading, uploadProgress, uploadStage }) => {
   const [isDragging, setIsDragging] = useState(false);
   const dc = useDarkColors();
   const isDark = useIsDark();
   const fileInputRef = useRef(null);
+  const { setIsMultiUploadOpen } = useChat();
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -23,21 +25,26 @@ const UploadZone = ({ onUpload, isUploading, uploadProgress, uploadStage }) => {
     setIsDragging(false);
 
     const files = Array.from(e.dataTransfer.files);
-    const pdfFile = files.find((file) => file.type === 'application/pdf');
+    if (files.length > 1) {
+      setIsMultiUploadOpen(true);
+      return;
+    }
 
-    if (pdfFile) {
-      onUpload(pdfFile);
-    } else {
-      alert('Please upload a PDF file');
+    const file = files[0];
+    if (file) {
+      onUpload(file);
     }
   };
 
   const handleFileSelect = (e) => {
-    const file = e.target.files[0];
-    if (file && file.type === 'application/pdf') {
+    const files = Array.from(e.target.files);
+    if (files.length > 1) {
+      setIsMultiUploadOpen(true);
+      return;
+    }
+    const file = files[0];
+    if (file) {
       onUpload(file);
-    } else {
-      alert('Please select a PDF file');
     }
   };
 
@@ -53,46 +60,39 @@ const UploadZone = ({ onUpload, isUploading, uploadProgress, uploadStage }) => {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <div className="text-center max-w-md">
+      <div className="text-center max-w-lg w-full">
         <input
           ref={fileInputRef}
           type="file"
-          accept="application/pdf"
+          multiple
+          accept=".pdf,.docx,.txt,.csv"
           onChange={handleFileSelect}
           className="hidden"
         />
         <div
           onClick={handleClick}
-          className={`cursor-pointer border-2 border-dashed rounded-xl p-12 transition-all duration-300 ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+          className={`cursor-pointer border-2 border-dashed rounded-2xl p-10 transition-all duration-300 shadow-sm ${
+            isUploading ? 'opacity-50 cursor-not-allowed' : 'hover:border-amber-500'
+          }`}
           style={{ 
-            borderColor: isDragging ? dc.primary : dc.borderPrimary,
-            backgroundColor: isDragging ? (isDark ? 'rgba(129, 140, 248, 0.05)' : 'rgba(129, 140, 248, 0.05)') : dc.bgPrimary
-          }}
-          onMouseEnter={(e) => {
-            if (!isUploading && !isDragging) {
-              e.currentTarget.style.borderColor = dc.primary;
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!isUploading && !isDragging) {
-              e.currentTarget.style.borderColor = dc.borderPrimary;
-            }
+            borderColor: isDragging ? '#da7756' : dc.borderPrimary,
+            backgroundColor: isDragging ? (isDark ? 'rgba(218, 119, 86, 0.08)' : 'rgba(254, 243, 199, 0.25)') : (isDark ? '#16161a' : '#ffffff')
           }}
         >
           {isUploading ? (
             <div className="flex flex-col items-center gap-4 w-full">
-              <Loader2 className="w-12 h-12 animate-spin" style={{ color: dc.primary }} />
-              <p className="font-medium" style={{ color: dc.textPrimary }}>{uploadStage || 'Uploading document...'}</p>
+              <Loader2 className="w-10 h-10 animate-spin text-amber-500" />
+              <p className="font-semibold text-sm" style={{ color: dc.textPrimary }}>{uploadStage || 'Processing document...'}</p>
 
               {/* Progress Bar */}
               <div className="w-full max-w-xs">
-                <div className="w-full rounded-full h-2.5 overflow-hidden" style={{ backgroundColor: dc.bgSecondary }}>
+                <div className="w-full rounded-full h-2 overflow-hidden bg-slate-200 dark:bg-slate-800">
                   <div
-                    className="h-2.5 rounded-full transition-all duration-300 ease-out"
-                    style={{ width: `${uploadProgress || 0}%`, backgroundColor: dc.primary }}
+                    className="h-2 rounded-full transition-all duration-300 ease-out bg-amber-500"
+                    style={{ width: `${uploadProgress || 0}%` }}
                   />
                 </div>
-                <p className="text-sm mt-2 text-center font-medium" style={{ color: dc.textSecondary }}>
+                <p className="text-xs mt-2 text-center font-mono font-medium" style={{ color: dc.textSecondary }}>
                   {uploadProgress || 0}%
                 </p>
               </div>
@@ -100,19 +100,41 @@ const UploadZone = ({ onUpload, isUploading, uploadProgress, uploadStage }) => {
           ) : (
             <>
               <div className="flex justify-center mb-4">
-                <div className="p-4 rounded-full" style={{ backgroundColor: isDark ? dc.bgHover : dc.primaryLight }}>
-                  <Upload className="w-8 h-8" style={{ color: dc.primary }} />
+                <div 
+                  className="p-3.5 rounded-2xl"
+                  style={{ backgroundColor: 'rgba(218, 119, 86, 0.12)', color: '#da7756' }}
+                >
+                  <Upload className="w-7 h-7" />
                 </div>
               </div>
-              <h3 className="text-xl font-semibold mb-2" style={{ color: dc.textPrimary }}>
-                Upload Legal Document
+              <h3 className="text-lg font-bold mb-1" style={{ color: dc.textPrimary }}>
+                Upload Documents or Project Folders
               </h3>
-              <p className="mb-4" style={{ color: dc.textSecondary }}>
-                Drag and drop your PDF here, or click to browse
+              <p className="text-xs mb-4 leading-relaxed" style={{ color: dc.textSecondary }}>
+                Drag and drop multiple files here, or click to browse
               </p>
-              <div className="flex items-center justify-center gap-2 text-sm" style={{ color: dc.textFaint }}>
-                <FileText size={16} />
-                <span>PDF files only</span>
+
+              <div className="flex flex-wrap items-center justify-center gap-2 mb-4">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsMultiUploadOpen(true);
+                  }}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 transition-colors flex items-center gap-1.5"
+                >
+                  <FolderUp size={13} /> Batch / Folder Upload
+                </button>
+              </div>
+
+              <div className="flex items-center justify-center gap-3 text-[11px] font-medium" style={{ color: dc.textFaint }}>
+                <span className="flex items-center gap-1">
+                  <FileText size={13} /> PDF, Word, Text, CSV
+                </span>
+                <span>•</span>
+                <span className="flex items-center gap-1">
+                  <Layers size={13} /> Sarvam OCR Enabled
+                </span>
               </div>
             </>
           )}
@@ -123,4 +145,3 @@ const UploadZone = ({ onUpload, isUploading, uploadProgress, uploadStage }) => {
 };
 
 export default UploadZone;
-

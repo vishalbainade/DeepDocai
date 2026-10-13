@@ -7,6 +7,8 @@ import { reconstructSearchablePdf } from '../services/documentReconstructionServ
 import { extractLayoutChunks } from '../services/layoutChunkingService.js';
 import { generateEmbeddings } from '../services/embedding.service.js';
 import { storeEmbeddings } from '../services/vector_service.js';
+import { recordUsage } from '../services/usageService.js';
+import { estimateTokens } from '../utils/tokenizer.js';
 import { query } from '../db/index.js';
 import logger from '../utils/logger.js';
 
@@ -115,8 +117,47 @@ export const processDocument = async (req, res) => {
     });
     await storeEmbeddings(embeddings, chunks, documentId);
 
-    await updateDocumentStatus(documentId, 'embedding_complete');
-    logger.info('INGESTION', 'Document processing completed', { documentId, chunkCount: chunks.length });
+    const embeddingTokens = chunkTexts.reduce((acc, text) => acc + estimateTokens(text), 0);
+    const pageCount = ocrMetadataPages.length;
+    const userId = req.user?.id || null;
+
+    // Update document with page count, embedding tokens, and user ID
+    if (userId) {
+      await query(
+        `UPDATE documents SET status = 'embedding_complete', page_count = $1, embedding_tokens = $2, user_id = $3 WHERE id = $4`,
+        [pageCount, embeddingTokens, userId, documentId]
+      );
+
+      // Record OCR page usage
+      await recordUsage({
+        userId,
+        documentId,
+        usageType: 'ocr',
+        ocrPages: pageCount,
+        modelName: 'sarvam-ocr',
+      });
+
+      // Record Embedding tokens usage
+      await recordUsage({
+        userId,
+        documentId,
+        usageType: 'embedding',
+        totalTokens: embeddingTokens,
+        modelName: 'gemini-embedding-001',
+      });
+    } else {
+      await query(
+        `UPDATE documents SET status = 'embedding_complete', page_count = $1, embedding_tokens = $2 WHERE id = $3`,
+        [pageCount, embeddingTokens, documentId]
+      );
+    }
+
+    logger.info('INGESTION', 'Document processing completed', { 
+      documentId, 
+      chunkCount: chunks.length,
+      pageCount,
+      embeddingTokens
+    });
 
     return res.json({
       success: true,
@@ -125,6 +166,8 @@ export const processDocument = async (req, res) => {
       ocrPdfUrl: ocrStorageUrl,
       storageUrl: ocrStorageUrl,
       chunksCount: chunks.length,
+      pageCount,
+      embeddingTokens,
     });
   } catch (error) {
     logger.error('ERROR', 'Document processing failed', {

@@ -79,6 +79,9 @@ const ChatStream = ({
         ...(request.chatId ? { chatId: request.chatId } : {}),
         ...(request.intent ? { intent: request.intent } : {}),
         ...(request.model ? { model: request.model } : {}),
+        ...(request.thinkingMode ? { thinkingMode: 'true' } : {}),
+        ...(request.webMode ? { webMode: 'true' } : {}),
+        ...(request.projectId ? { projectId: request.projectId } : {}),
       });
 
       try {
@@ -147,6 +150,33 @@ const ChatStream = ({
                   return;
                 }
                 handlersRef.current.onChatId?.(parsed.chatId || parsed.id);
+              } catch (error) {
+                safeError(error);
+              }
+              continue;
+            }
+
+            if (eventType === 'webSources') {
+              try {
+                const parsed = JSON.parse(data);
+                meaningfulDataReceived = true;
+                if (isInactive()) {
+                  return;
+                }
+                handlersRef.current.onWebSources?.(parsed.webSources || []);
+              } catch (error) {
+                safeError(error);
+              }
+              continue;
+            }
+
+            if (eventType === 'usage') {
+              try {
+                const parsed = JSON.parse(data);
+                if (isInactive()) {
+                  return;
+                }
+                handlersRef.current.onUsage?.(parsed);
               } catch (error) {
                 safeError(error);
               }

@@ -8,7 +8,7 @@ const smtpPort = parseInt(process.env.SMTP_PORT || '465');
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.hostinger.com',
   port: smtpPort,
-  secure: smtpPort === 465, // true for 465 (SSL), false for 587 (STARTTLS)
+  secure: process.env.SMTP_SECURE !== undefined ? process.env.SMTP_SECURE === 'true' : smtpPort === 465, // true for 465 (SSL), false for 587 (STARTTLS)
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
@@ -84,7 +84,7 @@ export const sendOTPEmail = async (email, otp, type = 'registration') => {
     console.log(`[SMTP CONNECT] Establishing connection for ${email}`);
     
     const info = await transporter.sendMail({
-      from: process.env.SMTP_FROM || `"DeepDoc AI" <${process.env.SMTP_USER}>`,
+      from: process.env.MAIL_FROM || process.env.SMTP_FROM || `"DeepDoc AI" <${process.env.SMTP_USER}>`,
       to: email,
       subject: subject,
       html: html,
@@ -151,7 +151,7 @@ export const sendPasswordResetConfirmation = async (email, name) => {
 
   try {
     const info = await transporter.sendMail({
-      from: process.env.SMTP_FROM || `"DeepDoc AI" <${process.env.SMTP_USER}>`,
+      from: process.env.MAIL_FROM || process.env.SMTP_FROM || `"DeepDoc AI" <${process.env.SMTP_USER}>`,
       to: email,
       subject: 'DeepDoc AI Password Reset Confirmation',
       html: html,

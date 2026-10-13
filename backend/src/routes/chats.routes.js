@@ -20,9 +20,10 @@ router.post('/', async (req, res) => {
     const { documentId } = req.body;
     const userId = getUserId(req);
 
-    if (!documentId) {
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!documentId || !UUID_REGEX.test(documentId)) {
       return res.status(400).json({
-        error: 'documentId is required',
+        error: 'Valid documentId UUID is required to create a document chat',
       });
     }
 

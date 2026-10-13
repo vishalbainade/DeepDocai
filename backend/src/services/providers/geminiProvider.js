@@ -7,134 +7,218 @@ import logger from '../../utils/logger.js';
  */
 export const PROVIDER_SLUG = 'google';
 
+// Model aliases fallback for experimental preview names
+const FALLBACK_CANDIDATES = ['gemini-2.5-flash', 'gemini-3-flash-preview', 'gemini-2.0-flash'];
+
 export const generateText = async ({ apiKey, modelName, prompt, config = {} }) => {
   const startTime = Date.now();
   const providerLogger = logger.child({ provider: PROVIDER_SLUG, model: modelName });
+
+  const isThinking = config.thinkingMode === true || config.thinkingMode === 'true';
+  const isWeb = config.webMode === true || config.webMode === 'true' || config.grounding === true;
 
   providerLogger.info('PROVIDER', 'Gemini request initiated', {
     event: 'EXTERNAL_API_CALL_START',
     endpoint: 'generativelanguage.googleapis.com',
     modelName,
     promptLength: prompt.length,
+    thinkingMode: isThinking,
+    grounding: isWeb,
   });
 
-  try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: modelName,
-      generationConfig: {
-        temperature: config.temperature ?? 0.4,
-        topP: config.topP ?? 0.95,
-        ...(config.responseMimeType ? { responseMimeType: config.responseMimeType } : {}),
-      },
-    });
+  const genAI = new GoogleGenerativeAI(apiKey);
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
-    const latency = Date.now() - startTime;
+  const generationConfig = {
+    temperature: config.temperature ?? 0.4,
+    topP: config.topP ?? 0.95,
+    ...(config.responseMimeType ? { responseMimeType: config.responseMimeType } : {}),
+    ...(isThinking ? { thinkingConfig: { thinkingBudget: config.thinkingBudget || 24576 } } : {}),
+  };
 
-    providerLogger.info('PROVIDER', 'Gemini request completed', {
-      event: 'EXTERNAL_API_CALL_SUCCESS',
-      provider: PROVIDER_SLUG,
-      endpoint: 'generativelanguage.googleapis.com',
-      latencyMs: latency,
-      responseLength: text.length,
-      tokensUsed: response.usageMetadata?.totalTokenCount || null,
-    });
+  const tools = isWeb ? [{ googleSearch: {} }] : undefined;
 
-    return {
-      text,
-      latencyMs: latency,
-      tokensUsed: response.usageMetadata?.totalTokenCount || null,
-      provider: PROVIDER_SLUG,
-      model: modelName,
-    };
-  } catch (error) {
-    const latency = Date.now() - startTime;
-    providerLogger.error('PROVIDER', 'Gemini request failed', {
-      event: 'EXTERNAL_API_CALL_FAILURE',
-      provider: PROVIDER_SLUG,
-      endpoint: 'generativelanguage.googleapis.com',
-      latencyMs: latency,
-      error: error.message,
-      status: error.status || error.httpStatusCode || null,
-    });
-    throw error;
+  // Attempt with requested modelName, fall back if 404
+  const modelsToTry = [modelName, ...FALLBACK_CANDIDATES.filter((m) => m !== modelName)];
+  let lastError = null;
+
+  for (const currentModel of modelsToTry) {
+    try {
+      const model = genAI.getGenerativeModel({
+        model: currentModel,
+        generationConfig,
+        ...(tools ? { tools } : {}),
+      });
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+      const latency = Date.now() - startTime;
+
+      // Extract native Google Search grounding metadata if present
+      const grounding = response.candidates?.[0]?.groundingMetadata;
+      const webSources = (grounding?.groundingChunks || [])
+        .filter((c) => c.web?.uri)
+        .map((c, i) => ({
+          title: c.web.title || `Web Source ${i + 1}`,
+          url: c.web.uri,
+          source: c.web.title || 'Google Search',
+          snippet: c.web.uri,
+        }));
+
+      providerLogger.info('PROVIDER', 'Gemini request completed', {
+        event: 'EXTERNAL_API_CALL_SUCCESS',
+        provider: PROVIDER_SLUG,
+        modelUsed: currentModel,
+        latencyMs: latency,
+        responseLength: text.length,
+        tokensUsed: response.usageMetadata?.totalTokenCount || null,
+        groundingSourcesCount: webSources.length,
+      });
+
+      return {
+        text,
+        latencyMs: latency,
+        tokensUsed: response.usageMetadata?.totalTokenCount || null,
+        provider: PROVIDER_SLUG,
+        model: currentModel,
+        webSources,
+        groundingMetadata: grounding || null,
+      };
+    } catch (err) {
+      lastError = err;
+      if (err.message?.includes('404') || err.message?.includes('not found') || err.message?.includes('bidiGenerateContent') || err.message?.includes('WebSocket') || err.status === 404 || err.status === 400) {
+        providerLogger.warn('PROVIDER', `Model ${currentModel} not available on REST endpoint, attempting candidate fallback...`);
+        continue;
+      }
+      break;
+    }
   }
+
+  const latency = Date.now() - startTime;
+  providerLogger.error('PROVIDER', 'Gemini request failed', {
+    event: 'EXTERNAL_API_CALL_FAILURE',
+    provider: PROVIDER_SLUG,
+    latencyMs: latency,
+    error: lastError?.message,
+  });
+  throw lastError;
 };
 
 export const generateTextStream = async function* ({ apiKey, modelName, prompt, config = {} }) {
   const startTime = Date.now();
   const providerLogger = logger.child({ provider: PROVIDER_SLUG, model: modelName });
 
+  const isThinking = config.thinkingMode === true || config.thinkingMode === 'true';
+  const isWeb = config.webMode === true || config.webMode === 'true' || config.grounding === true;
+
   providerLogger.info('PROVIDER', 'Gemini streaming request initiated', {
     event: 'EXTERNAL_API_STREAM_START',
     endpoint: 'generativelanguage.googleapis.com',
     modelName,
+    thinkingMode: isThinking,
+    grounding: isWeb,
   });
 
-  try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: modelName,
-      generationConfig: {
-        temperature: config.temperature ?? 0.4,
-        topP: config.topP ?? 0.95,
-      },
-    });
+  const genAI = new GoogleGenerativeAI(apiKey);
 
-    let result;
+  const generationConfig = {
+    temperature: config.temperature ?? 0.4,
+    topP: config.topP ?? 0.95,
+    ...(isThinking ? { thinkingConfig: { thinkingBudget: config.thinkingBudget || 24576 } } : {}),
+  };
+
+  const tools = isWeb ? [{ googleSearch: {} }] : undefined;
+
+  const modelsToTry = [modelName, ...FALLBACK_CANDIDATES.filter((m) => m !== modelName)];
+  let activeModelUsed = modelName;
+  let result = null;
+
+  for (const currentModel of modelsToTry) {
     try {
+      const model = genAI.getGenerativeModel({
+        model: currentModel,
+        generationConfig,
+        ...(tools ? { tools } : {}),
+      });
+
       result = await model.generateContentStream(prompt);
+      activeModelUsed = currentModel;
+      break;
     } catch (initError) {
+      if (initError.message?.includes('404') || initError.message?.includes('not found') || initError.message?.includes('bidiGenerateContent') || initError.message?.includes('WebSocket') || initError.status === 404 || initError.status === 400) {
+        providerLogger.warn('PROVIDER', `Stream model ${currentModel} requires WebSocket or not found, trying candidate...`);
+        continue;
+      }
       providerLogger.error('PROVIDER', 'Gemini stream initialization failed', {
         event: 'EXTERNAL_API_STREAM_INIT_FAILURE',
         error: initError.message,
-        modelName,
+        modelName: currentModel,
       });
-      throw new Error(`Failed to initialize stream for ${modelName}: ${initError.message}`);
+      throw new Error(`Failed to initialize stream for ${currentModel}: ${initError.message}`);
     }
-
-    let totalTokens = 0;
-    try {
-      for await (const chunk of result.stream) {
-        const token = chunk.text();
-        if (token) {
-          totalTokens++;
-          yield token;
-        }
-      }
-    } catch (streamError) {
-      providerLogger.error('PROVIDER', 'Gemini stream parsing failed during iteration', {
-        event: 'EXTERNAL_API_STREAM_ITERATION_FAILURE',
-        error: streamError.message,
-        modelName,
-      });
-      
-      if (streamError.message.includes('Failed to parse stream')) {
-        throw new Error(`The model "${modelName}" returned an invalid stream response. This often happens if the model is unavailable or the API key has exceeded its quota.`);
-      }
-      throw streamError;
-    }
-
-    const latency = Date.now() - startTime;
-    providerLogger.info('PROVIDER', 'Gemini streaming completed', {
-      event: 'EXTERNAL_API_STREAM_SUCCESS',
-      provider: PROVIDER_SLUG,
-      latencyMs: latency,
-      tokenCount: totalTokens,
-    });
-  } catch (error) {
-    const latency = Date.now() - startTime;
-    providerLogger.error('PROVIDER', 'Gemini streaming fatal error', {
-      event: 'EXTERNAL_API_STREAM_FATAL',
-      provider: PROVIDER_SLUG,
-      latencyMs: latency,
-      error: error.message,
-    });
-    throw error;
   }
+
+  if (!result) {
+    throw new Error(`Failed to initialize stream with model ${modelName}`);
+  }
+
+  let totalTokens = 0;
+  let webSources = [];
+
+  try {
+    for await (const chunk of result.stream) {
+      const token = chunk.text();
+      if (token) {
+        totalTokens++;
+        yield token;
+      }
+    }
+
+    // Attempt to extract grounding metadata from the final resolved response
+    try {
+      const finalResp = await result.response;
+      const grounding = finalResp.candidates?.[0]?.groundingMetadata;
+      if (grounding?.groundingChunks?.length) {
+        webSources = grounding.groundingChunks
+          .filter((c) => c.web?.uri)
+          .map((c, i) => ({
+            title: c.web.title || `Web Source ${i + 1}`,
+            url: c.web.uri,
+            source: c.web.title || 'Google Search',
+            snippet: c.web.uri,
+          }));
+      }
+    } catch (metaErr) {
+      // Non-fatal metadata read
+    }
+  } catch (streamError) {
+    providerLogger.error('PROVIDER', 'Gemini stream parsing failed during iteration', {
+      event: 'EXTERNAL_API_STREAM_ITERATION_FAILURE',
+      error: streamError.message,
+      modelName: activeModelUsed,
+    });
+    
+    if (streamError.message?.includes('Failed to parse stream')) {
+      throw new Error(`The model "${activeModelUsed}" returned an invalid stream response. This often happens if the model is unavailable or the API key has exceeded its quota.`);
+    }
+    throw streamError;
+  }
+
+  const latency = Date.now() - startTime;
+  providerLogger.info('PROVIDER', 'Gemini streaming completed', {
+    event: 'EXTERNAL_API_STREAM_SUCCESS',
+    provider: PROVIDER_SLUG,
+    modelUsed: activeModelUsed,
+    latencyMs: latency,
+    tokenCount: totalTokens,
+    groundingSourcesCount: webSources.length,
+  });
+
+  return {
+    modelName: activeModelUsed,
+    totalTokens,
+    webSources,
+  };
 };
 
 export const isRateLimitError = (error) => {

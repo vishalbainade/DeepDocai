@@ -12,11 +12,13 @@ const pool = new Pool({
   ssl: {
     rejectUnauthorized: false,
   },
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
 });
 
 pool.on('error', (err) => {
-  console.error('Unexpected error on idle client', err);
-  process.exit(-1);
+  logger.warn('DB', 'Idle client disconnected or reset by serverless host', { error: err.message });
 });
 
 export const query = async (text, params) => {

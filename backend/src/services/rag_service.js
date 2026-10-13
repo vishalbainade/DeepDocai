@@ -3,6 +3,8 @@ import { retrieveRelevantChunks, isGenericQuery, isTableRequest } from './retrie
 import { buildParagraphCitations } from './citationService.js';
 import logger from '../utils/logger.js';
 import { routeTextRequest, routeStreamRequest } from './providerRouter.js';
+import { searchWeb } from './webSearchService.js';
+import { estimateTokens } from '../utils/tokenizer.js';
 
 const summarizeChunksForFlow = (chunks = []) =>
   chunks.map((chunk, index) => ({
@@ -144,9 +146,40 @@ Rules:
   };
 };
 
-const generateTextAnswerInternal = async (question, chunks, preferredModel, chatHistory = []) => {
+const buildPromptContext = ({ question, chunks, chatHistory = [], personalization = null, thinkingMode = false, webResults = [] }) => {
   const conversationBlock = buildConversationBlock(chatHistory);
-  const prompt = `You are an AI assistant integrated into DeepDocAI.
+
+  let systemDirectives = 'You are an advanced AI assistant integrated into DeepDoc AI.';
+  if (personalization?.persona) {
+    systemDirectives += `\nRole Persona: Act as ${personalization.persona}.`;
+  }
+  if (personalization?.tone) {
+    systemDirectives += `\nTone: Maintain a ${personalization.tone} tone throughout.`;
+  }
+  if (personalization?.jurisdiction && personalization.jurisdiction !== 'general') {
+    systemDirectives += `\nJurisdiction/Legal Framework: Frame interpretations and compliance within ${personalization.jurisdiction}.`;
+  }
+  if (personalization?.customInstructions?.trim()) {
+    systemDirectives += `\nUser Custom Instructions: ${personalization.customInstructions.trim()}`;
+  }
+
+  let thinkingDirective = '';
+  if (thinkingMode) {
+    thinkingDirective = `\n\nCRITICAL THINKING PROCESS:
+Because Thinking Mode is enabled, you MUST first produce your thorough chain-of-thought analysis enclosed in <thought> and </thought> tags.
+In this thought block:
+- Thoroughly evaluate facts, clauses, precedents, and contradictions.
+- Weigh legal liabilities and counterarguments.
+- Formulate the precise structure of the response.
+Close with </thought>, followed immediately by your definitive response for the user.`;
+  }
+
+  let webGroundingBlock = '';
+  if (webResults && webResults.length > 0) {
+    webGroundingBlock = `\n\nREAL-TIME LIVE WEB INTELLIGENCE:\n${webResults.map((w, idx) => `[Web Source ${idx + 1}: ${w.title} | ${w.url}]\n${w.snippet}`).join('\n\n')}\n`;
+  }
+
+  return `${systemDirectives}
 
 Always format responses in a structured, UI-friendly way using the following rules:
 
@@ -163,39 +196,77 @@ Use [Pg. X] inside sentences
 Example: "The system uses Vue 3 [Pg. 1]"
 At the end, include:
 "📚 Sources: Pg. 1, Pg. 2"
+${webResults?.length ? 'If citing external web facts, cite them as [Web: Title] or [Web 1].' : ''}
 Avoid repeating the same citation multiple times.
 Do NOT output raw paragraphs.
 Output should be structured and easy to scan.
-
-Use ONLY the supplied context. Do not invent facts that are not present.
+${thinkingDirective}
 ${conversationBlock}
-CONTEXT:
+DOCUMENT CONTEXT:
 ${buildTextContext(chunks)}
-
+${webGroundingBlock}
 QUESTION:
 ${question}
 
 ANSWER:`;
+};
+
+const generateTextAnswerInternal = async (question, chunks, preferredModel, chatHistory = [], options = {}) => {
+  const { thinkingMode = false, webMode = false, personalization = null } = options;
+  let webResults = [];
+  if (webMode) {
+    try {
+      webResults = await searchWeb(question);
+    } catch (e) {
+      logger.warn('RAG', 'Web search failed in generateTextAnswerInternal', { error: e.message });
+    }
+  }
+
+  const prompt = buildPromptContext({
+    question,
+    chunks,
+    chatHistory,
+    personalization,
+    thinkingMode,
+    webResults,
+  });
 
   const result = await routeTextRequest({
     modelIdentifier: preferredModel,
     prompt,
-    config: { temperature: 0.4, top_p: 0.95 },
+    config: { 
+      temperature: 0.4, 
+      top_p: 0.95,
+      thinkingMode,
+      webMode,
+      grounding: webMode,
+      thinkingBudget: thinkingMode ? 24576 : 0,
+    },
   });
+
+  const inputTokens = estimateTokens(prompt);
+  const outputTokens = estimateTokens(result.text || '');
 
   logger.info('LLM', 'Text answer generated', {
     modelUsed: result.modelName,
     requestedModel: preferredModel || 'auto-resolved',
     chunkCount: chunks.length,
+    inputTokens,
+    outputTokens,
+    webSourcesCount: webResults.length,
   });
 
   return {
     answer: result.text.trim(),
     modelUsed: result.modelName,
+    inputTokens,
+    outputTokens,
+    totalTokens: inputTokens + outputTokens,
+    webSources: webResults,
   };
 };
 
-export const generateAnswer = async (question, documentId, intent = null, preferredModel = null, chatHistory = []) => {
+export const generateAnswer = async (question, documentId, intent = null, preferredModel = null, chatHistory = [], options = {}) => {
   try {
     const retrieval = await retrieveRelevantChunks({ question, documentId, intent });
     logger.table('INFO', 'DATA FLOW', 'RAG chunk context', summarizeChunksForFlow(retrieval.chunks), {
@@ -222,13 +293,17 @@ export const generateAnswer = async (question, documentId, intent = null, prefer
       };
     }
 
-    const textResult = await generateTextAnswerInternal(question, retrieval.chunks, preferredModel, chatHistory);
+    const textResult = await generateTextAnswerInternal(question, retrieval.chunks, preferredModel, chatHistory, options);
     return {
       answer_type: 'text',
       answer: textResult.answer,
       sources: retrieval.chunks,
       paragraphCitations: buildParagraphCitations(textResult.answer, retrieval.chunks),
       modelUsed: textResult.modelUsed,
+      inputTokens: textResult.inputTokens,
+      outputTokens: textResult.outputTokens,
+      totalTokens: textResult.totalTokens,
+      webSources: textResult.webSources || [],
     };
   } catch (error) {
     logger.error('ERROR', 'RAG generation failed', {
@@ -240,7 +315,17 @@ export const generateAnswer = async (question, documentId, intent = null, prefer
   }
 };
 
-export const generateAnswerStream = async function* (question, documentId, intent = null, preferredModel = null, chatHistory = []) {
+export const generateAnswerStream = async function* (question, documentId, intent = null, preferredModel = null, chatHistory = [], options = {}) {
+  const { thinkingMode = false, webMode = false, personalization = null } = options;
+  let webResults = [];
+  if (webMode) {
+    try {
+      webResults = await searchWeb(question);
+    } catch (e) {
+      logger.warn('RAG', 'Web search failed in generateAnswerStream', { error: e.message });
+    }
+  }
+
   const retrieval = await retrieveRelevantChunks({ question, documentId, intent });
   logger.table('INFO', 'DATA FLOW', 'Streaming chunk context', summarizeChunksForFlow(retrieval.chunks), {
     documentId,
@@ -255,6 +340,7 @@ export const generateAnswerStream = async function* (question, documentId, inten
       answer: 'I could not find relevant information in the document.',
       sources: [],
       paragraphCitations: [],
+      webSources: webResults,
     };
   }
 
@@ -265,45 +351,30 @@ export const generateAnswerStream = async function* (question, documentId, inten
       sources: retrieval.chunks,
       paragraphCitations: [],
       modelUsed: tableResult.modelUsed,
+      webSources: webResults,
     };
   }
 
-  const conversationBlock = buildConversationBlock(chatHistory);
-  const prompt = `You are an AI assistant integrated into DeepDocAI.
-
-Always format responses in a structured, UI-friendly way using the following rules:
-
-Divide the response into sections:
-📄 Overview
-🔍 Key Details
-⚙️ Technical Points (if applicable)
-✅ Final Summary
-Use bullet points instead of long paragraphs.
-Keep sentences short and clean.
-Add relevant emojis for readability (not excessive).
-Inline citations format:
-Use [Pg. X] inside sentences
-Example: "The system uses Vue 3 [Pg. 1]"
-At the end, include:
-"📚 Sources: Pg. 1, Pg. 2"
-Avoid repeating the same citation multiple times.
-Do NOT output raw paragraphs.
-Output should be structured and easy to scan.
-
-Use ONLY the supplied context. Do not invent facts that are not present.
-${conversationBlock}
-CONTEXT:
-${buildTextContext(retrieval.chunks)}
-
-QUESTION:
-${question}
-
-ANSWER:`;
+  const prompt = buildPromptContext({
+    question,
+    chunks: retrieval.chunks,
+    chatHistory,
+    personalization,
+    thinkingMode,
+    webResults,
+  });
 
   const generator = routeStreamRequest({
     modelIdentifier: preferredModel,
     prompt,
-    config: { temperature: 0.4, top_p: 0.95 },
+    config: { 
+      temperature: 0.4, 
+      top_p: 0.95,
+      thinkingMode,
+      webMode,
+      grounding: webMode,
+      thinkingBudget: thinkingMode ? 24576 : 0,
+    },
   });
 
   let answer = '';
@@ -321,10 +392,16 @@ ANSWER:`;
     }
   }
 
+  const inputTokens = estimateTokens(prompt);
+  const outputTokens = estimateTokens(answer);
+
   logger.info('LLM', 'Streaming stream finished', {
     modelUsed: meta?.modelName || 'unknown',
     requestedModel: preferredModel || 'auto-resolved',
     chunkCount: retrieval.chunks.length,
+    inputTokens,
+    outputTokens,
+    webSourcesCount: webResults.length,
   });
 
   return {
@@ -333,6 +410,10 @@ ANSWER:`;
     sources: retrieval.chunks,
     paragraphCitations: buildParagraphCitations(answer, retrieval.chunks),
     modelUsed: meta?.modelName || 'unknown',
+    inputTokens,
+    outputTokens,
+    totalTokens: inputTokens + outputTokens,
+    webSources: meta?.webSources?.length ? meta.webSources : (webResults || []),
   };
 };
 

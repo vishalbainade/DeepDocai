@@ -1,6 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bot, ChevronDown, Loader2, MessageSquare, Send, Sparkles, User } from 'lucide-react';
+import { 
+  Bot, 
+  ChevronDown, 
+  Loader2, 
+  MessageSquare, 
+  ArrowUp, 
+  Sparkles, 
+  User, 
+  Brain, 
+  Globe, 
+  Upload, 
+  Cpu, 
+  Sliders, 
+  Folder,
+  Mic
+} from 'lucide-react';
 import AnswerCard from './AnswerCard';
+import ClaudeModelSelector from './ClaudeModelSelector';
+import { useChat } from '../contexts/ChatContext';
 import { useDarkColors, useIsDark } from '../utils/darkMode';
 
 const PROVIDER_COLORS = {
@@ -11,7 +28,16 @@ const PROVIDER_COLORS = {
 };
 
 const DEFAULT_MODEL_OPTIONS = [
-  { id: 'gemini-2.5-flash', displayName: 'Gemini 2.5 Flash', label: 'Gemini 2.5 Flash', provider: { slug: 'google', name: 'Google AI Studio' } },
+  { id: 'gemini-3.8-flash', modelName: 'gemini-3.8-flash', displayName: 'Gemini 3.8 Flash', label: 'Gemini 3.8 Flash', provider: { slug: 'google', name: 'Google AI Studio' } },
+  { id: 'gemini-3.7-flash', modelName: 'gemini-3.7-flash', displayName: 'Gemini 3.7 Flash', label: 'Gemini 3.7 Flash', provider: { slug: 'google', name: 'Google AI Studio' } },
+  { id: 'gemini-3.8-live-extended-thinking', modelName: 'gemini-3.8-live-extended-thinking', displayName: 'Gemini 3.8 Live Extended Thinking', label: 'Gemini 3.8 Live Extended Thinking', provider: { slug: 'google', name: 'Google AI Studio' } },
+  { id: 'gemini-3.8-live', modelName: 'gemini-3.8-live', displayName: 'Gemini 3.8 Live', label: 'Gemini 3.8 Live', provider: { slug: 'google', name: 'Google AI Studio' } },
+  { id: 'gemini-3-flash-live', modelName: 'gemini-3-flash-live', displayName: 'Gemini 3 Flash Live', label: 'Gemini 3 Flash Live', provider: { slug: 'google', name: 'Google AI Studio' } },
+  { id: 'gemini-3.6-flash', modelName: 'gemini-3.6-flash', displayName: 'Gemini 3.6 Flash', label: 'Gemini 3.6 Flash', provider: { slug: 'google', name: 'Google AI Studio' } },
+  { id: 'gemini-3.5-flash-lite', modelName: 'gemini-3.5-flash-lite', displayName: 'Gemini 3.5 Flash Lite', label: 'Gemini 3.5 Flash Lite', provider: { slug: 'google', name: 'Google AI Studio' } },
+  { id: 'gemini-3.1-flash-lite', modelName: 'gemini-3.1-flash-lite', displayName: 'Gemini 3.1 Flash Lite', label: 'Gemini 3.1 Flash Lite', provider: { slug: 'google', name: 'Google AI Studio' } },
+  { id: 'gemma-4-31b', modelName: 'gemma-4-31b', displayName: 'Gemma 4 31B', label: 'Gemma 4 31B', provider: { slug: 'google', name: 'Google AI Studio' } },
+  { id: 'gemma-4-26b', modelName: 'gemma-4-26b', displayName: 'Gemma 4 26B', label: 'Gemma 4 26B', provider: { slug: 'google', name: 'Google AI Studio' } },
 ];
 
 const ChatPanel = ({
@@ -34,9 +60,22 @@ const ChatPanel = ({
   const endRef = useRef(null);
   const submitLockRef = useRef(false);
 
+  const {
+    thinkingMode,
+    setThinkingMode,
+    webMode,
+    setWebMode,
+    activeProject,
+    setIsMultiUploadOpen,
+    setIsUsageModalOpen,
+    setIsPersonalizationModalOpen,
+    setIsLiveAudioOpen,
+    usageSummary,
+  } = useChat();
+
   const modelOptions = Array.isArray(availableModels) && availableModels.length > 0 ? availableModels : DEFAULT_MODEL_OPTIONS;
 
-  // Wait to determine active model until models are loaded. If not loaded, use the raw selectedModel string if available.
+  // Wait to determine active model until models are loaded
   const activeModel = modelsLoaded
     ? (modelOptions.some((model) => model.id === selectedModel) ? selectedModel : modelOptions[0]?.id)
     : (selectedModel || modelOptions[0]?.id);
@@ -69,7 +108,7 @@ const ChatPanel = ({
   };
 
   const handleSubmit = (event) => {
-    event.preventDefault();
+    if (event) event.preventDefault();
     runSingleSubmit(() => {
       if (!input.trim() || !currentDocumentId || isThinking) {
         return false;
@@ -83,6 +122,13 @@ const ChatPanel = ({
       setInput('');
       return true;
     });
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit();
+    }
   };
 
   const handleImproveText = async () => {
@@ -117,7 +163,7 @@ const ChatPanel = ({
     }
   };
 
-  // Group models by provider for the dropdown
+  // Group models by provider for dropdown
   const groupedModels = modelOptions.reduce((groups, model) => {
     const slug = model.provider?.slug || 'google';
     const name = model.provider?.name || 'Google AI Studio';
@@ -132,77 +178,92 @@ const ChatPanel = ({
     <div 
       className="flex h-full flex-col transition-colors duration-300"
       style={{ 
-        background: isDark 
-          ? 'linear-gradient(180deg, #0f172a 0%, #1e293b 100%)' 
-          : 'linear-gradient(180deg, #fffdf7 0%, #f8fafc 55%, #eef2ff 100%)' 
+        backgroundColor: isDark ? '#101013' : '#fcfcfc' 
       }}
     >
+      {/* Header Bar */}
       <div 
-        className="flex items-center justify-between px-6 py-4 backdrop-blur transition-colors duration-300"
-        style={{ backgroundColor: `${dc.bgPrimary}CC`, borderBottom: `1px solid ${dc.borderPrimary}` }}
+        className="flex items-center justify-between px-5 py-3 border-b backdrop-blur z-10"
+        style={{ 
+          backgroundColor: isDark ? 'rgba(19, 19, 22, 0.85)' : 'rgba(255, 255, 255, 0.85)', 
+          borderColor: isDark ? '#27272a' : '#f0f0f2' 
+        }}
       >
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.3em]" style={{ color: isDark ? '#fbbf24' : '#b45309' }}>DeepDocAI Chat</p>
-          <p className="text-sm" style={{ color: dc.textMuted }}>Streaming answers with citations and PDF sync</p>
+        <div className="flex items-center gap-2.5 min-w-0">
+          {activeProject ? (
+            <span 
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold shrink-0"
+              style={{ backgroundColor: `${activeProject.color}15`, color: activeProject.color }}
+            >
+              <Folder size={12} /> {activeProject.name}
+            </span>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-xs font-semibold" style={{ color: dc.textPrimary }}>Document Analysis</span>
+            </div>
+          )}
         </div>
 
+        {/* Right side controls: Token usage pill, Personalization, Model switcher */}
         <div className="flex items-center gap-2">
-          {/* Provider badge */}
-          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${providerColors.bg} ${providerColors.text} ${providerColors.border} border`}>
-            <span className={`h-1.5 w-1.5 rounded-full ${providerColors.dot}`} />
-            {activeModelData?.provider?.name || 'Google AI Studio'}
-          </span>
+          {/* Quick Token pill */}
+          <button
+            onClick={() => setIsUsageModalOpen(true)}
+            className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-mono border hover:bg-slate-500/5 transition-colors cursor-pointer"
+            style={{ borderColor: isDark ? '#27272a' : '#e4e4e7', color: dc.textSecondary }}
+            title="View Usage & Token Consumption"
+          >
+            <Cpu size={12} className="text-amber-500" />
+            <span>{Math.round((usageSummary?.aiTokens?.totalTokens ?? 12300) / 1000)}k tkn</span>
+          </button>
 
-          {/* Model selector */}
-          <div className="relative">
-            <select
-              value={activeModel}
-              onChange={(event) => onModelChange?.(event.target.value)}
-              disabled={isThinking}
-              className="min-w-[220px] appearance-none rounded-xl px-3 py-2 pr-9 text-sm font-medium shadow-sm transition focus:outline-none focus:ring-2 focus:ring-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
-              style={{ 
-                backgroundColor: dc.bgPrimary, 
-                borderColor: dc.borderPrimary,
-                color: dc.textSecondary,
-                borderWidth: '1px'
-              }}
-            >
-              {Object.entries(groupedModels).map(([slug, group]) => (
-                <optgroup key={slug} label={group.name}>
-                  {group.models.map((model) => (
-                    <option key={model.id} value={model.id}>
-                      {model.displayName || model.label}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-            <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2" style={{ color: dc.textFaint }} />
-          </div>
+          {/* Personalization shortcut */}
+          <button
+            onClick={() => setIsPersonalizationModalOpen(true)}
+            className="p-1.5 rounded-lg border hover:bg-slate-500/5 transition-colors text-slate-500"
+            title="Personalization settings"
+          >
+            <Sliders size={14} />
+          </button>
+
+          {/* Claude Model Selector */}
+          <ClaudeModelSelector
+            selectedModel={activeModel}
+            onModelChange={onModelChange}
+            availableModels={modelOptions}
+            disabled={isThinking}
+            placement="top-down"
+            compact={true}
+          />
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-2 sm:px-5 py-8" ref={scrollerRef}>
+      {/* Messages Stream */}
+      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-6" ref={scrollerRef}>
         {!chatHistory.length ? (
           <div className="flex h-full items-center justify-center">
             <div 
-              className="max-w-sm rounded-3xl px-8 py-10 text-center shadow-xl backdrop-blur transition-colors duration-300"
-              style={{ backgroundColor: `${dc.bgPrimary}B3`, border: `1px solid ${dc.borderPrimary}`, boxShadow: dc.shadowCard }}
+              className="max-w-md rounded-2xl p-8 text-center border shadow-sm backdrop-blur"
+              style={{ 
+                backgroundColor: isDark ? '#141417' : '#ffffff', 
+                borderColor: isDark ? '#27272a' : '#f0f0f2' 
+              }}
             >
               <div 
-                className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full transition-colors duration-300"
-                style={{ backgroundColor: isDark ? '#312e81' : '#eef2ff', color: '#6366f1' }}
+                className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl"
+                style={{ backgroundColor: 'rgba(218, 119, 86, 0.15)', color: '#da7756' }}
               >
-                <MessageSquare size={24} />
+                <Sparkles size={22} />
               </div>
-              <h3 className="text-lg font-semibold" style={{ color: dc.textPrimary }}>Ask about your document</h3>
-              <p className="mt-2 text-sm leading-relaxed" style={{ color: dc.textMuted }}>
-                Stream answers live, inspect cited paragraphs, and jump straight to the source in the PDF.
+              <h3 className="text-base font-bold" style={{ color: dc.textPrimary }}>Ask anything about this document</h3>
+              <p className="mt-1.5 text-xs leading-relaxed" style={{ color: dc.textSecondary }}>
+                Stream real-time answers with verified citations, extended chain-of-thought reasoning, and live web intelligence.
               </p>
             </div>
           </div>
         ) : (
-          <div className="mx-auto max-w-4xl space-y-8 pb-4">
+          <div className="max-w-3xl mx-auto space-y-6 pb-4">
             {chatHistory.map((message, index) => {
               if (!message) return null;
 
@@ -210,50 +271,48 @@ const ChatPanel = ({
               const isStreaming = message.isStreaming;
 
               return (
-                <div key={message.id || index} className={`flex w-full items-start gap-4 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
-
+                <div key={message.id || index} className={`flex w-full items-start gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
                   {/* Avatar */}
-                  <div className={`mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full shadow-sm transition-colors duration-300 ${isUser
-                      ? 'bg-slate-800 text-white'
-                      : ''
+                  <div 
+                    className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-semibold shadow-xs ${
+                      isUser ? 'bg-slate-900 text-white' : ''
                     }`}
                     style={{ 
-                      backgroundColor: !isUser ? dc.bgPrimary : undefined,
-                      border: !isUser ? `1px solid ${dc.borderPrimary}` : undefined,
-                      color: !isUser ? '#6366f1' : undefined
+                      backgroundColor: !isUser ? (isDark ? '#232328' : '#f4f4f5') : undefined,
+                      color: !isUser ? '#da7756' : undefined,
                     }}
                   >
-                    {isUser ? <User size={18} strokeWidth={2.5} /> : <Bot size={20} strokeWidth={2} className={`${isStreaming ? 'animate-pulse text-indigo-500' : ''}`} />}
+                    {isUser ? <User size={15} /> : <Sparkles size={16} className={isStreaming ? 'animate-spin text-amber-500' : ''} />}
                   </div>
 
                   {/* Message Bubble */}
                   <div 
-                    className={`relative max-w-[85%] sm:max-w-[75%] rounded-3xl px-6 py-4.5 transition-colors duration-300 ${isUser
-                      ? 'rounded-tr-sm bg-slate-800 text-white shadow-md'
-                      : 'rounded-tl-sm shadow-xl backdrop-blur-sm'
+                    className={`relative max-w-[85%] rounded-2xl px-5 py-3.5 transition-colors ${
+                      isUser
+                        ? 'bg-slate-900 text-white shadow-sm'
+                        : 'border shadow-xs'
                     }`}
                     style={{
-                      backgroundColor: !isUser ? `${dc.bgPrimary}F2` : undefined,
-                      border: !isUser ? `1px solid ${dc.borderPrimary}` : undefined,
+                      backgroundColor: !isUser ? (isDark ? '#16161a' : '#ffffff') : undefined,
+                      borderColor: !isUser ? (isDark ? '#27272a' : '#e4e4e7') : undefined,
                       color: !isUser ? dc.textPrimary : undefined,
                     }}
                   >
                     {isUser ? (
-                      <p className="whitespace-pre-wrap text-[15px] leading-relaxed font-normal">{message.content}</p>
+                      <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
                     ) : (
-                      <div className="text-[15px] max-w-none">
+                      <div className="text-sm">
                         {!message.content && !message.table && isStreaming ? (
-                          <div className="flex items-center gap-3 py-2" style={{ color: dc.textMuted }}>
-                            <Loader2 size={18} className="animate-spin text-indigo-500" />
-                            <span className="animate-pulse">Analyzing document...</span>
+                          <div className="flex items-center gap-2 py-1 text-xs text-amber-500">
+                            <Loader2 size={15} className="animate-spin" />
+                            <span className="animate-pulse">Reasoning and analyzing document...</span>
                           </div>
                         ) : (
                           <AnswerCard
                             message={message}
                             onCitationClick={onCitationClick}
                             onRegenerate={() => {
-                              // Find the closest preceding user message
-                              const idx = chatHistory.findIndex(m => m.id === message.id);
+                              const idx = chatHistory.findIndex((m) => m.id === message.id);
                               let lastUserMsg = null;
                               for (let i = idx - 1; i >= 0; i--) {
                                 if (chatHistory[i].role === 'user') {
@@ -269,7 +328,7 @@ const ChatPanel = ({
                         )}
 
                         {isStreaming && (
-                          <span className="ml-1 inline-block h-[1em] w-2 animate-pulse rounded-sm bg-indigo-400 align-middle shadow-sm" />
+                          <span className="ml-1 inline-block h-[1em] w-1.5 animate-pulse rounded-full bg-amber-500 align-middle" />
                         )}
                       </div>
                     )}
@@ -282,70 +341,144 @@ const ChatPanel = ({
         )}
       </div>
 
+      {/* Claude-style Floating Prompt Box */}
       <div 
-        className="px-4 py-4 backdrop-blur transition-colors duration-300"
-        style={{ borderTop: `1px solid ${dc.borderPrimary}`, backgroundColor: `${dc.bgPrimary}D9` }}
+        className="p-4 border-t transition-colors"
+        style={{ 
+          borderColor: isDark ? '#27272a' : '#f0f0f2',
+          backgroundColor: isDark ? '#101013' : '#fafafa',
+        }}
       >
-        <form onSubmit={handleSubmit} className="flex items-end gap-3">
-          <div className="relative flex-1">
-            <input
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              disabled={!currentDocumentId || isThinking}
-              placeholder={currentDocumentId ? 'Ask a question about this document...' : 'Upload a document first...'}
-              className="w-full rounded-2xl px-4 py-3 pr-24 text-sm shadow-sm transition focus:outline-none focus:ring-2 focus:ring-amber-200 disabled:cursor-not-allowed"
-              style={{
-                backgroundColor: dc.bgInput,
-                border: `1px solid ${dc.borderPrimary}`,
-                color: dc.textPrimary,
-              }}
-            />
-
-            {input.trim() ? (
-              <button
-                type="button"
-                onClick={handleImproveText}
-                disabled={isImproving || isThinking}
-                className="absolute right-12 top-1/2 -translate-y-1/2 rounded-lg p-1.5 transition disabled:cursor-not-allowed disabled:opacity-50"
-                style={{ color: isDark ? '#fbbf24' : '#b45309' }}
-                title="Improve question"
-              >
-                {isImproving ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-              </button>
-            ) : null}
-          </div>
-
-          <button
-            type="button"
-            onClick={() =>
-              runSingleSubmit(() => {
-                if (!currentDocumentId || isThinking) {
-                  return false;
-                }
-
-                return onSummarize?.();
-              })
-            }
-            disabled={!currentDocumentId || isThinking}
-            className="rounded-2xl px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50"
-            style={{ 
-              backgroundColor: isDark ? '#78350f' : '#fff7ed', 
-              color: isDark ? '#fef3c7' : '#7c2d12',
-              border: `1px solid ${isDark ? '#92400e' : '#fed7aa'}`
+        <div className="max-w-3xl mx-auto">
+          <div 
+            className="rounded-2xl border shadow-lg p-3 transition-all focus-within:ring-2 focus-within:ring-amber-500/30"
+            style={{
+              backgroundColor: isDark ? '#18181b' : '#ffffff',
+              borderColor: isDark ? '#2e2e34' : '#e4e4e7',
             }}
           >
-            Summarize
-          </button>
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={!currentDocumentId || isThinking}
+              placeholder={currentDocumentId ? 'Ask anything about this document (Shift+Enter for new line)...' : 'Upload a document first...'}
+              rows={2}
+              className="w-full bg-transparent resize-none text-sm outline-none leading-relaxed placeholder:text-slate-400"
+              style={{ color: dc.textPrimary }}
+            />
 
-          <button
-            type="submit"
-            disabled={!currentDocumentId || !input.trim() || isThinking}
-            className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Send size={16} />
-            Send
-          </button>
-        </form>
+            {/* Bottom Controls Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t mt-1"
+              style={{ borderColor: isDark ? '#27272a' : '#f4f4f5' }}
+            >
+              <div className="flex flex-wrap items-center gap-1.5">
+                {/* Claude Model Selector in prompt box */}
+                <ClaudeModelSelector
+                  selectedModel={activeModel}
+                  onModelChange={onModelChange}
+                  availableModels={modelOptions}
+                  disabled={isThinking}
+                  placement="bottom-up"
+                  compact={false}
+                />
+
+                {/* Thinking Mode Toggle */}
+                <button
+                  type="button"
+                  onClick={() => setThinkingMode(!thinkingMode)}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
+                    thinkingMode 
+                      ? 'border-amber-500 bg-amber-500/15 text-amber-600 dark:text-amber-400 font-semibold' 
+                      : 'border-transparent text-slate-500 hover:bg-slate-500/5'
+                  }`}
+                  title="Toggle Extended Thinking Mode (Deep reasoning trace)"
+                >
+                  <Brain size={13} className={thinkingMode ? 'text-amber-500' : 'text-slate-400'} />
+                  <span>Thinking: {thinkingMode ? 'ON' : 'OFF'}</span>
+                </button>
+
+                {/* Web Search Mode Toggle */}
+                <button
+                  type="button"
+                  onClick={() => setWebMode(!webMode)}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
+                    webMode 
+                      ? 'border-blue-500 bg-blue-500/15 text-blue-600 dark:text-blue-400 font-semibold' 
+                      : 'border-transparent text-slate-500 hover:bg-slate-500/5'
+                  }`}
+                  title="Toggle Real-time Web Search Grounding"
+                >
+                  <Globe size={13} className={webMode ? 'text-blue-500' : 'text-slate-400'} />
+                  <span>Web: {webMode ? 'ON' : 'OFF'}</span>
+                </button>
+
+                {/* Upload More Files */}
+                <button
+                  type="button"
+                  onClick={() => setIsMultiUploadOpen(true)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                  title="Upload more files to project"
+                >
+                  <Upload size={14} />
+                </button>
+
+                {/* Improve Prompt */}
+                {input.trim() && (
+                  <button
+                    type="button"
+                    onClick={handleImproveText}
+                    disabled={isImproving || isThinking}
+                    className="p-1 rounded-lg text-amber-500 hover:text-amber-600 transition-colors"
+                    title="Improve prompt with AI"
+                  >
+                    {isImproving ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                {/* Summarize button */}
+                <button
+                  type="button"
+                  onClick={() => onSummarize?.()}
+                  disabled={!currentDocumentId || isThinking}
+                  className="px-2.5 py-1 rounded-lg text-xs font-medium border hover:bg-slate-500/5 transition-colors disabled:opacity-40"
+                  style={{ borderColor: isDark ? '#27272a' : '#e4e4e7', color: dc.textSecondary }}
+                >
+                  Summarize
+                </button>
+
+                {/* Gemini Live Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsLiveAudioOpen(true)}
+                  className="h-8 px-2.5 rounded-xl flex items-center gap-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:opacity-90 text-white font-medium text-xs shadow-sm transition-all cursor-pointer group"
+                  title="Open Gemini Live Voice Session"
+                >
+                  <div className="flex items-center gap-0.5 h-3">
+                    <span className="w-0.5 h-2 bg-white rounded-full group-hover:h-3 transition-all animate-pulse" />
+                    <span className="w-0.5 h-3 bg-white rounded-full group-hover:h-3.5 transition-all animate-pulse delay-75" />
+                    <span className="w-0.5 h-2.5 bg-white rounded-full group-hover:h-3 transition-all animate-pulse delay-150" />
+                    <span className="w-0.5 h-1.5 bg-white rounded-full group-hover:h-2.5 transition-all animate-pulse delay-200" />
+                  </div>
+                  <span className="font-semibold tracking-tight text-[11px]">Live</span>
+                </button>
+
+                {/* Send Button */}
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={!currentDocumentId || !input.trim() || isThinking}
+                  className="w-8 h-8 rounded-xl flex items-center justify-center text-white transition-all disabled:opacity-40 cursor-pointer shadow-sm"
+                  style={{ backgroundColor: '#da7756' }}
+                >
+                  <ArrowUp size={16} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

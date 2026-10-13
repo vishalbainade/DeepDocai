@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { getChats, getChatMessages, createChat } from '../services/api';
+import { getChats, getChatMessages, createChat, getProjects, getUsageSummary } from '../services/api';
 
 const ChatContext = createContext(null);
 
@@ -19,6 +19,42 @@ export function ChatProvider({ children }) {
   const [currentDocumentId, setCurrentDocumentId] = useState(null);
   const [chatHistory, setChatHistory] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  // Projects state
+  const [projects, setProjects] = useState([]);
+  const [activeProject, setActiveProject] = useState(null);
+
+  // Claude-style mode toggles (persisted in localStorage)
+  const [thinkingMode, setThinkingModeState] = useState(() => {
+    return localStorage.getItem('claude_thinking_mode') === 'true';
+  });
+  const [webMode, setWebModeState] = useState(() => {
+    return localStorage.getItem('claude_web_mode') === 'true';
+  });
+
+  const setThinkingMode = (val) => {
+    const nextVal = typeof val === 'function' ? val(thinkingMode) : val;
+    setThinkingModeState(nextVal);
+    localStorage.setItem('claude_thinking_mode', String(nextVal));
+  };
+
+  const setWebMode = (val) => {
+    const nextVal = typeof val === 'function' ? val(webMode) : val;
+    setWebModeState(nextVal);
+    localStorage.setItem('claude_web_mode', String(nextVal));
+  };
+
+  // Usage summary state
+  const [usageSummary, setUsageSummary] = useState(null);
+
+  // Modals state
+  const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
+  const [isPersonalizationModalOpen, setIsPersonalizationModalOpen] = useState(false);
+  const [isProjectsModalOpen, setIsProjectsModalOpen] = useState(false);
+  const [projectToEdit, setProjectToEdit] = useState(null);
+  const [isMultiUploadOpen, setIsMultiUploadOpen] = useState(false);
+  const [isLiveAudioOpen, setIsLiveAudioOpen] = useState(false);
+
   // Load sidebar collapse state from localStorage on mount
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     const saved = localStorage.getItem('sidebar_collapsed');
@@ -63,8 +99,32 @@ export function ChatProvider({ children }) {
     }
   }, []);
 
+  // Load projects list
+  const loadProjects = useCallback(async () => {
+    try {
+      const res = await getProjects();
+      if (res?.projects) {
+        setProjects(res.projects);
+      }
+    } catch (err) {
+      console.error('Error loading projects:', err);
+    }
+  }, []);
+
+  // Load usage summary
+  const loadUsageSummary = useCallback(async () => {
+    try {
+      const res = await getUsageSummary();
+      if (res?.data) {
+        setUsageSummary(res.data);
+      }
+    } catch (err) {
+      console.error('Error loading usage summary:', err);
+    }
+  }, []);
+
   // Create new chat
-  const createNewChat = useCallback(async (documentId) => {
+  const createNewChat = useCallback(async (documentId, projectId = null) => {
     try {
       const result = await createChat(documentId);
       if (result?.chat) {
@@ -99,51 +159,45 @@ export function ChatProvider({ children }) {
               tableData = parsed.table;
               parsedContent = parsed.answer || '';
             }
-          } catch (e) {}
+          } catch {
+            // Not JSON
+          }
         }
-        
+
         return {
-          id: msg?.id || `${normalizedRole}-${index}-${msg?.createdAt || Date.now()}`,
+          id: msg?.id || `msg-${index}`,
           role: normalizedRole,
           content: parsedContent,
-          createdAt: msg?.createdAt || new Date().toISOString(),
-          answer_type: answerType,
-          table: tableData,
-          sources: msg?.sources,
+          answerType: answerType,
+          tableData: tableData,
+          timestamp: msg?.createdAt || new Date().toISOString(),
           citations: msg?.citations || [],
           paragraphCitations: msg?.paragraphCitations || [],
+          webSources: msg?.webSources || [],
         };
       });
+
       setChatHistory(formattedMessages);
       setCurrentChatId(chatId);
-      setCurrentDocumentId(result?.chat?.documentId || null);
-      return formattedMessages;
     } catch (error) {
       console.error('Error loading chat messages:', error);
       setChatHistory([]);
-      throw error;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Add message to current chat history
+  // Add message to chat history
   const addMessage = useCallback((message) => {
     setChatHistory((prev) => [...prev, message]);
   }, []);
 
-  // Update message in chat history
+  // Update existing message
   const updateMessage = useCallback((messageId, updates) => {
     setChatHistory((prev) =>
-      prev.map((msg) => {
-        if (msg.id === messageId) {
-          if (typeof updates === 'function') {
-            return updates(msg);
-          }
-          return { ...msg, ...updates };
-        }
-        return msg;
-      })
+      prev.map((msg) =>
+        msg.id === messageId ? { ...msg, ...updates } : msg
+      )
     );
   }, []);
 
@@ -158,13 +212,15 @@ export function ChatProvider({ children }) {
     setChatHistory([]);
   }, []);
 
-  // Load chats on mount (only if authenticated)
+  // Load initial data on mount (only if authenticated)
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
       loadChats();
+      loadProjects();
+      loadUsageSummary();
     }
-  }, [loadChats]);
+  }, [loadChats, loadProjects, loadUsageSummary]);
 
   const value = {
     chats,
@@ -184,8 +240,33 @@ export function ChatProvider({ children }) {
     setCurrentChatId,
     setCurrentDocumentId,
     setChatHistory,
+    // Projects
+    projects,
+    activeProject,
+    setActiveProject,
+    loadProjects,
+    // Thinking & Web Mode
+    thinkingMode,
+    setThinkingMode,
+    webMode,
+    setWebMode,
+    // Usage
+    usageSummary,
+    loadUsageSummary,
+    // Modals
+    isUsageModalOpen,
+    setIsUsageModalOpen,
+    isPersonalizationModalOpen,
+    setIsPersonalizationModalOpen,
+    isProjectsModalOpen,
+    setIsProjectsModalOpen,
+    projectToEdit,
+    setProjectToEdit,
+    isMultiUploadOpen,
+    setIsMultiUploadOpen,
+    isLiveAudioOpen,
+    setIsLiveAudioOpen,
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
-};
-
+}

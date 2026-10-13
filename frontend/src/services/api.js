@@ -597,4 +597,83 @@ export const updateUserPreferences = async (prefs) => {
   return response.data;
 };
 
+/**
+ * Fetch comprehensive usage metrics (OCR pages, embedding tokens, AI tokens)
+ */
+export const getUsageSummary = async () => {
+  const response = await api.get('/api/usage/summary');
+  return response.data;
+};
+
+/**
+ * Fetch all projects for the current user
+ */
+export const getProjects = async () => {
+  const response = await api.get('/api/projects');
+  return response.data;
+};
+
+/**
+ * Create a new project folder
+ */
+export const createProject = async (data) => {
+  const response = await api.post('/api/projects', data);
+  return response.data;
+};
+
+/**
+ * Get project details with documents and chats
+ */
+export const getProject = async (id) => {
+  const response = await api.get(`/api/projects/${id}`);
+  return response.data;
+};
+
+/**
+ * Update a project
+ */
+export const updateProject = async (id, data) => {
+  const response = await api.put(`/api/projects/${id}`, data);
+  return response.data;
+};
+
+/**
+ * Delete a project
+ */
+export const deleteProject = async (id) => {
+  const response = await api.delete(`/api/projects/${id}`);
+  return response.data;
+};
+
+/**
+ * Add document to a project folder
+ */
+export const addDocumentToProject = async (projectId, documentId) => {
+  const response = await api.post(`/api/projects/${projectId}/documents`, { documentId });
+  return response.data;
+};
+
+/**
+ * Remove document from a project folder
+ */
+export const removeDocumentFromProject = async (projectId, documentId) => {
+  const response = await api.delete(`/api/projects/${projectId}/documents/${documentId}`);
+  return response.data;
+};
+
+/**
+ * Send interactive live audio dialog turn
+ */
+export const sendLiveAudioDialog = async ({ transcript, documentId, modelName, thinkingMode, grounding }) => {
+  const response = await api.post('/api/audio/dialog', {
+    transcript,
+    documentId,
+    modelName,
+    thinkingMode,
+    grounding,
+  });
+  return response.data;
+};
+
 export default api;
+

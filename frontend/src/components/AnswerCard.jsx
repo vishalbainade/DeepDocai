@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Copy, Check, Info, FileText } from 'lucide-react';
+import { Copy, Check, Info, FileText, Zap } from 'lucide-react';
 import ChatTable from './ChatTable';
 import CitationBadge from './CitationBadge';
 import AIMessageRenderer from './AIMessageRenderer';
+import ThinkingBlock from './ThinkingBlock';
+import WebSourcesBox from './WebSourcesBox';
 import { formatAIResponse } from '../utils/responseFormatter';
 import { useDarkColors, useIsDark } from '../utils/darkMode';
 
@@ -22,14 +24,29 @@ const AnswerCard = ({ message, onCitationClick, onRegenerate }) => {
 
   if (!message) return null;
 
+  // Extract thinking tags if present
+  let rawContent = message.content || '';
+  let thoughtContent = message.thoughtContent || null;
+  let cleanContent = rawContent;
+
+  const thoughtMatch = rawContent.match(/<thought>([\s\S]*?)<\/thought>/);
+  if (thoughtMatch) {
+    thoughtContent = thoughtMatch[1].trim();
+    cleanContent = rawContent.replace(/<thought>[\s\S]*?<\/thought>/, '').trim();
+  } else if (rawContent.includes('<thought>') && !rawContent.includes('</thought>')) {
+    // Currently streaming thought
+    thoughtContent = rawContent.replace('<thought>', '').trim();
+    cleanContent = '';
+  }
+
   const handleCopy = () => {
-    navigator.clipboard.writeText(message.content || '');
+    navigator.clipboard.writeText(cleanContent || message.content || '');
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   // If the parsed JSON provides dynamic text sources, use those. Otherwise fallback to the backend properties.
-  const parsedResponse = message.content ? formatAIResponse(message.content) : { sources: [] };
+  const parsedResponse = cleanContent ? formatAIResponse(cleanContent) : { sources: [] };
   const getUniqueCitations = (citationsArray) => {
     if (!citationsArray || !citationsArray.length) return [];
     const seen = new Set();
@@ -47,11 +64,26 @@ const AnswerCard = ({ message, onCitationClick, onRegenerate }) => {
   // Natively mapped deduplicated sources from either backend or dynamically parsed LLM tokens
   const backendCitations = getUniqueCitations(message.citations || (message.paragraphCitations || []).flatMap((p) => p.citations || []));
   const dynamicSources = parsedResponse.sources.map(pg => ({ page: pg }));
-
   const uniqueCitations = dynamicSources.length > 0 ? dynamicSources : backendCitations;
+
+  const webSources = message.webSources || [];
+  const tokenCount = message.usage?.totalTokens || message.totalTokens;
 
   return (
     <div className="group relative transition-all duration-300">
+
+      {/* Claude-style Expandable Thinking Block */}
+      {thoughtContent && (
+        <ThinkingBlock 
+          content={thoughtContent} 
+          isStreaming={message.isStreaming && !cleanContent} 
+        />
+      )}
+
+      {/* Claude-style Real-time Web Sources Grounding */}
+      {webSources.length > 0 && (
+        <WebSourcesBox sources={webSources} />
+      )}
 
       {/* Dynamic structured content */}
       <div className="transition-colors duration-300" style={{ color: dc.textPrimary }}>
@@ -66,7 +98,7 @@ const AnswerCard = ({ message, onCitationClick, onRegenerate }) => {
           </div>
         ) : (
           <AIMessageRenderer
-            rawText={message.content}
+            rawText={cleanContent}
             paragraphCitations={message.paragraphCitations}
             citations={message.citations}
             onCitationClick={onCitationClick}
@@ -77,22 +109,32 @@ const AnswerCard = ({ message, onCitationClick, onRegenerate }) => {
       {/* Footer Meta: Actions & Deduplicated Sources */}
       <div className="mt-4 flex flex-wrap items-center justify-between pt-3 transition-colors duration-300" style={{ borderTop: `1px solid ${dc.borderPrimary}99` }}>
 
-        {/* Sources List & Model Badge */}
-        <div className="flex-1 space-y-2">
+        {/* Sources List & Model & Token Badge */}
+        <div className="flex flex-wrap items-center gap-2">
           {uniqueCitations.length > 0 && (
-            <div className="text-[13.5px] font-medium transition-colors duration-300" style={{ color: dc.textMuted }}>
+            <div className="text-[13px] font-medium transition-colors duration-300 mr-2" style={{ color: dc.textMuted }}>
               📚 Sources:{' '}
               <span style={{ color: dc.textSecondary }}>
                 {uniqueCitations.map(c => `Pg. ${c.page}`).join(', ')}
               </span>
             </div>
           )}
+
           {message.modelUsed && (
             <div 
-              className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide transition-colors duration-300"
+              className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold tracking-wide transition-colors duration-300"
               style={{ backgroundColor: dc.bgSecondary, border: `1px solid ${dc.borderPrimary}`, color: dc.textFaint }}
             >
-              <span style={{ color: dc.textFaint }}>🤖</span> {message.modelUsed}
+              <span>🤖</span> {message.modelUsed}
+            </div>
+          )}
+
+          {tokenCount && (
+            <div 
+              className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-mono font-medium"
+              style={{ backgroundColor: 'rgba(16, 185, 129, 0.08)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.2)' }}
+            >
+              <Zap size={10} /> {tokenCount.toLocaleString()} tokens
             </div>
           )}
         </div>

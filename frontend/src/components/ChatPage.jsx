@@ -12,14 +12,16 @@ import { detectQueryIntent } from '../utils/intentDetection';
 import { useDarkColors } from '../utils/darkMode';
 
 const FALLBACK_MODELS = [
-  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-  { id: 'gemini-3-flash', label: 'Gemini 3 Flash' },
-  { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite' },
-  { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
-  { id: 'gemma-3-1b', label: 'Gemma 3 1B' },
-  { id: 'gemma-3-4b', label: 'Gemma 3 4B' },
-  { id: 'gemma-3-12b', label: 'Gemma 3 12B' },
-  { id: 'gemma-3-27b', label: 'Gemma 3 27B' },
+  { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash' },
+  { id: 'gemini-3.7-flash', label: 'Gemini 3.7 Flash' },
+  { id: 'gemini-3.8-live-extended-thinking', label: 'Gemini 3.8 Live Extended Thinking' },
+  { id: 'gemini-3.8-live', label: 'Gemini 3.8 Live' },
+  { id: 'gemini-3-flash-live', label: 'Gemini 3 Flash Live' },
+  { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash' },
+  { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash Lite' },
+  { id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash Lite' },
+  { id: 'gemma-4-31b', label: 'Gemma 4 31B' },
+  { id: 'gemma-4-26b', label: 'Gemma 4 26B' },
 ];
 
 const flattenParagraphCitations = (paragraphCitations = []) => {
@@ -53,6 +55,10 @@ const ChatPage = () => {
     refreshChats,
     setCurrentChatId,
     setCurrentDocumentId,
+    thinkingMode,
+    webMode,
+    activeProject,
+    loadUsageSummary,
   } = useChat();
 
   const [pdfUrl, setPdfUrl] = useState(null);
@@ -247,6 +253,9 @@ const ChatPage = () => {
       chatId: currentChatId || chatId || null,
       intent,
       model: selectedModel,
+      thinkingMode: thinkingMode,
+      webMode: webMode,
+      projectId: activeProject?.id || null,
     });
 
     return true;
@@ -314,6 +323,25 @@ const ChatPage = () => {
               isStreaming: true,
             });
           }}
+          onWebSources={(webSources) => {
+            if (!isCurrentStream(activeStream.id)) {
+              return;
+            }
+            updateMessage(activeStream.messageId, {
+              webSources: webSources || [],
+              isStreaming: true,
+            });
+          }}
+          onUsage={(usage) => {
+            if (!isCurrentStream(activeStream.id)) {
+              return;
+            }
+            updateMessage(activeStream.messageId, {
+              usage,
+              totalTokens: usage?.totalTokens,
+            });
+            loadUsageSummary?.();
+          }}
           onComplete={(payload) => {
             if (!isCurrentStream(activeStream.id)) {
               return;
@@ -332,9 +360,11 @@ const ChatPage = () => {
                     ? message.citations
                     : flattenParagraphCitations(payload.paragraphCitations || []),
               paragraphCitations: payload.paragraphCitations || message.paragraphCitations || [],
+              webSources: payload.webSources || message.webSources || [],
             }));
             setIsThinking(false);
             refreshChats();
+            loadUsageSummary?.();
           }}
           onDone={() => {
             if (!isCurrentStream(activeStream.id)) {

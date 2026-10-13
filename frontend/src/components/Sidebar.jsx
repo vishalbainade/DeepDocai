@@ -15,7 +15,14 @@ import {
   Palette,
   HelpCircle,
   LogOut,
-  Search
+  Search,
+  Folder,
+  FolderPlus,
+  UploadCloud,
+  Zap,
+  Sliders,
+  Cpu,
+  Mic
 } from 'lucide-react';
 import { useChat } from '../contexts/ChatContext';
 import { renameChat, deleteChat, logout, getUser } from '../services/api';
@@ -36,6 +43,16 @@ const Sidebar = () => {
     currentDocumentId,
     refreshChats,
     setCurrentDocumentId,
+    projects,
+    activeProject,
+    setActiveProject,
+    setIsProjectsModalOpen,
+    setProjectToEdit,
+    setIsMultiUploadOpen,
+    setIsUsageModalOpen,
+    setIsPersonalizationModalOpen,
+    setIsLiveAudioOpen,
+    usageSummary,
   } = useChat();
 
   const [editingChatId, setEditingChatId] = useState(null);
@@ -312,35 +329,118 @@ const Sidebar = () => {
           </button>
         </div>
 
-        {/* New Chat Button */}
-        <div className={`p-3 ${isCollapsedOnDesktop ? 'px-2' : ''}`} style={{ borderBottom: `1px solid ${dc.borderPrimary}` }}>
+        {/* Primary Action Buttons: New Chat & Ingest */}
+        <div className={`p-3 space-y-2 ${isCollapsedOnDesktop ? 'px-2' : ''}`} style={{ borderBottom: `1px solid ${dc.borderPrimary}` }}>
           <button
             onClick={handleNewChat}
-            className={`w-full flex items-center ${isCollapsedOnDesktop ? 'justify-center' : 'gap-2'} px-3 py-2.5 rounded-lg transition-all duration-250 ease-in-out font-medium relative group cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#6C63FF]`}
+            className={`w-full flex items-center ${isCollapsedOnDesktop ? 'justify-center' : 'gap-2'} px-3 py-2.5 rounded-xl transition-all font-medium relative group cursor-pointer shadow-sm`}
             style={{
-              backgroundColor: '#8E84B8',
-              border: '1px solid #8E84B8',
+              backgroundColor: '#da7756',
               color: '#FFFFFF',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#7A70A8';
-              e.currentTarget.style.borderColor = '#7A70A8';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#8E84B8';
-              e.currentTarget.style.borderColor = '#8E84B8';
             }}
             aria-label={isCollapsedOnDesktop ? 'New Chat' : undefined}
           >
-            <Plus size={18} style={{ color: '#FFFFFF' }} />
-            {!isCollapsedOnDesktop && <span>New Chat</span>}
+            <Plus size={17} style={{ color: '#FFFFFF' }} />
+            {!isCollapsedOnDesktop && <span className="text-xs font-semibold">New Chat</span>}
             {isCollapsedOnDesktop && (
               <div className="absolute left-full ml-2 px-2 py-1 bg-slate-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
                 New Chat
               </div>
             )}
           </button>
+
+          {/* Claude Ingest Multiple Files / Folder */}
+          <button
+            onClick={() => setIsMultiUploadOpen(true)}
+            className={`w-full flex items-center ${isCollapsedOnDesktop ? 'justify-center' : 'gap-2'} px-3 py-2 rounded-xl transition-all border font-medium relative group cursor-pointer hover:bg-slate-500/5`}
+            style={{
+              borderColor: dc.borderPrimary,
+              color: dc.textPrimary,
+            }}
+            title="Upload multiple files or projects folder"
+          >
+            <UploadCloud size={16} className="text-amber-500 shrink-0" />
+            {!isCollapsedOnDesktop && <span className="text-xs font-medium">Ingest Files / Folder</span>}
+            {isCollapsedOnDesktop && (
+              <div className="absolute left-full ml-2 px-2 py-1 bg-slate-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
+                Ingest Files / Folder
+              </div>
+            )}
+          </button>
         </div>
+
+        {/* Projects Folders Section */}
+        {!isCollapsedOnDesktop && (
+          <div className="px-3 pt-3 pb-2" style={{ borderBottom: `1px solid ${dc.borderPrimary}` }}>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <Folder size={12} className="text-amber-500" /> Projects
+              </span>
+              <button
+                onClick={() => {
+                  setProjectToEdit(null);
+                  setIsProjectsModalOpen(true);
+                }}
+                className="p-1 rounded-md hover:bg-slate-500/10 text-slate-400 hover:text-amber-500 transition-colors"
+                title="Create project folder"
+              >
+                <FolderPlus size={14} />
+              </button>
+            </div>
+
+            {/* Project List */}
+            {projects.length === 0 ? (
+              <div 
+                onClick={() => {
+                  setProjectToEdit(null);
+                  setIsProjectsModalOpen(true);
+                }}
+                className="p-2 rounded-lg border border-dashed border-slate-300 dark:border-slate-800 text-center cursor-pointer hover:bg-slate-500/5 transition-colors"
+              >
+                <p className="text-[11px] text-slate-400 font-medium">+ Create Project Folder</p>
+              </div>
+            ) : (
+              <div className="space-y-1 max-h-32 overflow-y-auto">
+                {projects.map((proj) => {
+                  const isActive = activeProject?.id === proj.id;
+                  return (
+                    <div
+                      key={proj.id}
+                      onClick={() => setActiveProject(isActive ? null : proj)}
+                      className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition-colors ${
+                        isActive ? 'bg-amber-500/15 font-semibold text-amber-600 dark:text-amber-400' : 'hover:bg-slate-500/5 text-slate-600 dark:text-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0 pr-1">
+                        <span 
+                          className="w-2.5 h-2.5 rounded-full shrink-0" 
+                          style={{ backgroundColor: proj.color || '#da7756' }} 
+                        />
+                        <span className="truncate">{proj.name}</span>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-500/10 text-slate-400">
+                          {proj.document_count || 0}
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setProjectToEdit(proj);
+                            setIsProjectsModalOpen(true);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-0.5 hover:text-amber-500 text-slate-400 transition-opacity"
+                          title="Edit project"
+                        >
+                          <Edit2 size={11} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Conversation History Section */}
         {!isCollapsedOnDesktop && (
@@ -487,6 +587,43 @@ const Sidebar = () => {
             </div>
           )}
         </div>
+
+        {/* Live Token Usage & Personalization Quick Trigger */}
+        {!isCollapsedOnDesktop && (
+          <div className="p-2.5 border-t space-y-1.5" style={{ borderColor: dc.borderPrimary }}>
+            {/* Live Usage Pill */}
+            <button
+              onClick={() => setIsUsageModalOpen(true)}
+              className="w-full flex items-center justify-between p-2 rounded-xl text-xs border hover:bg-slate-500/5 transition-all text-left"
+              style={{
+                borderColor: dc.borderPrimary,
+                backgroundColor: 'rgba(218, 119, 86, 0.05)',
+              }}
+              title="View OCR Pages, Embedding Tokens & AI Tokens Consumption"
+            >
+              <div className="flex items-center gap-1.5">
+                <Cpu size={14} className="text-amber-500 shrink-0" />
+                <span className="font-semibold text-[11px] text-amber-600 dark:text-amber-400">Usage & Tokens</span>
+              </div>
+              <div className="flex items-center gap-1 text-[10px] font-mono text-slate-500">
+                <span>{usageSummary?.ocrPages ?? 0} pgs</span>
+                <span>•</span>
+                <span className="text-emerald-500 font-semibold">{Math.round((usageSummary?.aiTokens?.totalTokens ?? 0) / 1000)}k tkn</span>
+              </div>
+            </button>
+
+            {/* Quick Personalization Trigger */}
+            <button
+              onClick={() => setIsPersonalizationModalOpen(true)}
+              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs hover:bg-slate-500/5 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+            >
+              <span className="flex items-center gap-1.5 text-[11px] font-medium">
+                <Sliders size={13} className="text-indigo-400" /> Personalization
+              </span>
+              <span className="text-[10px] text-slate-400">Custom style</span>
+            </button>
+          </div>
+        )}
 
         {/* User Avatar Menu */}
         <div className="p-3 relative" ref={userMenuRef} style={{ borderTop: `1px solid ${dc.borderPrimary}` }}>

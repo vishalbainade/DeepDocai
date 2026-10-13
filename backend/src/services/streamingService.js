@@ -1,6 +1,7 @@
 import { query } from '../db/index.js';
 import { generateAnswerStream } from './rag_service.js';
 import { buildCitations } from './citationService.js';
+import { recordUsage } from './usageService.js';
 import logger from '../utils/logger.js';
 
 const writeSse = (res, { event, data }) => {
@@ -43,7 +44,19 @@ const persistAssistantMessage = async ({ chatId, documentId, finalResult, accumu
   );
 };
 
-export const streamRagResponse = async (req, res, { documentId, question, chatId, intent, model, requestId, chatHistory = [] }) => {
+export const streamRagResponse = async (req, res, { 
+  documentId, 
+  question, 
+  chatId, 
+  intent, 
+  model, 
+  requestId, 
+  chatHistory = [],
+  thinkingMode = false,
+  webMode = false,
+  personalization = null,
+  projectId = null,
+}) => {
   const requestLogger = logger.child({ requestId, chatId, documentId });
 
   res.setHeader('Content-Type', 'text/event-stream');
@@ -73,10 +86,15 @@ export const streamRagResponse = async (req, res, { documentId, question, chatId
 
   res.on('close', handleConnectionClosed);
 
-  requestLogger.info('LLM', 'Streaming started', { question });
+  requestLogger.info('LLM', 'Streaming started', { question, thinkingMode, webMode });
   writeSse(res, { event: 'chatId', data: { chatId } });
 
-  const generator = generateAnswerStream(question, documentId, intent, model, chatHistory);
+  const generator = generateAnswerStream(question, documentId, intent, model, chatHistory, {
+    thinkingMode,
+    webMode,
+    personalization,
+  });
+
   let accumulatedText = '';
   let finalResult = null;
   let tokenCount = 0;
@@ -107,6 +125,16 @@ export const streamRagResponse = async (req, res, { documentId, question, chatId
       return;
     }
 
+    // Emit live web sources if available
+    if (finalResult?.webSources?.length) {
+      writeSse(res, {
+        event: 'webSources',
+        data: {
+          webSources: finalResult.webSources,
+        },
+      });
+    }
+
     const citations = buildCitations(finalResult?.sources || []);
     writeSse(res, {
       event: 'citations',
@@ -124,6 +152,39 @@ export const streamRagResponse = async (req, res, { documentId, question, chatId
         table: finalResult?.table || null,
         citations,
         paragraphCitations: finalResult?.paragraphCitations || [],
+        webSources: finalResult?.webSources || [],
+        thinkingMode,
+      },
+    });
+
+    // Record token usage
+    const inputTokens = finalResult?.inputTokens || Math.round(question.length / 4) + 500;
+    const outputTokens = finalResult?.outputTokens || tokenCount;
+    const totalTokens = inputTokens + outputTokens;
+    const usedModel = finalResult?.modelUsed || model || 'default';
+
+    if (req.user?.id) {
+      await recordUsage({
+        userId: req.user.id,
+        chatId,
+        documentId,
+        projectId,
+        modelName: usedModel,
+        usageType: 'chat',
+        inputTokens,
+        outputTokens,
+        totalTokens,
+      });
+    }
+
+    // Emit usage stats event
+    writeSse(res, {
+      event: 'usage',
+      data: {
+        inputTokens,
+        outputTokens,
+        totalTokens,
+        modelUsed: usedModel,
       },
     });
 
@@ -133,8 +194,10 @@ export const streamRagResponse = async (req, res, { documentId, question, chatId
     requestLogger.info('STREAM COMPLETE', 'Streaming finished', {
       citationCount: citations.length,
       answerType: finalResult?.answer_type || 'text',
-      modelUsed: finalResult?.modelUsed || model || null,
+      modelUsed: usedModel,
       tokenCount,
+      inputTokens,
+      outputTokens,
       answerLength: (finalResult?.answer || accumulatedText || '').length,
     });
 

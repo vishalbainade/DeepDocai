@@ -5,6 +5,7 @@ import { streamRagResponse } from '../services/streamingService.js';
 import { buildCitations } from '../services/citationService.js';
 import logger from '../utils/logger.js';
 import { getAvailableTextModels } from '../config/modelRegistry.js';
+import { recordUsage } from '../services/usageService.js';
 
 const getChatPayload = (req) => {
   if (req.method === 'GET') {
@@ -38,7 +39,7 @@ const storeUserMessage = async ({ chatId, documentId, question }) => {
 };
 
 export const askQuestion = async (req, res) => {
-  const { documentId, question, chatId, intent, model } = getChatPayload(req);
+  const { documentId, question, chatId, intent, model, thinkingMode, webMode, projectId, personalization } = getChatPayload(req);
   const requestId = randomUUID();
   const requestLogger = logger.child({ requestId, documentId, chatId });
 
@@ -47,10 +48,30 @@ export const askQuestion = async (req, res) => {
       return res.status(400).json({ error: 'Document ID and question are required' });
     }
 
+    const isThinking = thinkingMode === true || thinkingMode === 'true';
+    const isWeb = webMode === true || webMode === 'true';
+
+    // Fetch user personalization preferences
+    const prefsResult = await query(
+      `SELECT custom_instructions, persona, tone, jurisdiction, output_format 
+       FROM user_preferences WHERE user_id = $1`,
+      [req.user.id]
+    );
+    const userPrefs = prefsResult.rows[0] || {};
+    const mergedPersonalization = {
+      customInstructions: personalization?.customInstructions || userPrefs.custom_instructions || '',
+      persona: personalization?.persona || userPrefs.persona || 'legal_counsel',
+      tone: personalization?.tone || userPrefs.tone || 'concise',
+      jurisdiction: personalization?.jurisdiction || userPrefs.jurisdiction || 'general',
+      outputFormat: personalization?.outputFormat || userPrefs.output_format || 'citations_tables',
+    };
+
     requestLogger.info('CHAT REQUEST', 'Query received', {
       question,
       requestedModel: model || 'default',
       intent: intent || 'auto',
+      thinkingMode: isThinking,
+      webMode: isWeb,
     });
 
     const currentChatId = await ensureChat({
@@ -72,13 +93,21 @@ export const askQuestion = async (req, res) => {
     }
 
     await storeUserMessage({ chatId: currentChatId, documentId, question });
-    const result = await generateAnswer(question, documentId, intent, model, chatHistory);
+
+    const result = await generateAnswer(question, documentId, intent, model, chatHistory, {
+      thinkingMode: isThinking,
+      webMode: isWeb,
+      personalization: mergedPersonalization,
+      projectId,
+    });
+
     const citations = buildCitations(result.sources || []);
     requestLogger.info('DATA FLOW', 'Answer generated', {
       answerType: result.answer_type || 'text',
       modelUsed: result.modelUsed || model || null,
       citationCount: citations.length,
       paragraphCitationCount: (result.paragraphCitations || []).length,
+      webSourcesCount: (result.webSources || []).length,
     });
 
     const aiContent =
@@ -97,12 +126,37 @@ export const askQuestion = async (req, res) => {
     );
     await query('UPDATE chats SET updated_at = CURRENT_TIMESTAMP WHERE id = $1', [currentChatId]);
 
+    // Record token usage
+    const inputTokens = result.inputTokens || Math.round(question.length / 4) + 500;
+    const outputTokens = result.outputTokens || Math.round((result.answer || '').length / 4);
+    const totalTokens = inputTokens + outputTokens;
+
+    await recordUsage({
+      userId: req.user.id,
+      chatId: currentChatId,
+      documentId,
+      projectId,
+      modelName: result.modelUsed || model || 'default',
+      usageType: 'chat',
+      inputTokens,
+      outputTokens,
+      totalTokens,
+    });
+
     return res.json({
       answer: result.answer || '',
       answer_type: result.answer_type || 'text',
       table: result.table || null,
       citations,
       paragraphCitations: result.paragraphCitations || [],
+      webSources: result.webSources || [],
+      thinkingMode: isThinking,
+      usage: {
+        inputTokens,
+        outputTokens,
+        totalTokens,
+        modelUsed: result.modelUsed || model || 'default',
+      },
       chatId: currentChatId,
     });
   } catch (error) {
@@ -118,7 +172,7 @@ export const askQuestion = async (req, res) => {
 };
 
 export const streamQuestion = async (req, res) => {
-  const { documentId, question, chatId, intent, model } = getChatPayload(req);
+  const { documentId, question, chatId, intent, model, thinkingMode, webMode, projectId, personalization } = getChatPayload(req);
   const requestId = randomUUID();
   const requestLogger = logger.child({ requestId, documentId, chatId });
 
@@ -133,10 +187,30 @@ export const streamQuestion = async (req, res) => {
       return;
     }
 
+    const isThinking = thinkingMode === true || thinkingMode === 'true';
+    const isWeb = webMode === true || webMode === 'true';
+
+    // Fetch user personalization preferences
+    const prefsResult = await query(
+      `SELECT custom_instructions, persona, tone, jurisdiction, output_format 
+       FROM user_preferences WHERE user_id = $1`,
+      [req.user.id]
+    );
+    const userPrefs = prefsResult.rows[0] || {};
+    const mergedPersonalization = {
+      customInstructions: personalization?.customInstructions || userPrefs.custom_instructions || '',
+      persona: personalization?.persona || userPrefs.persona || 'legal_counsel',
+      tone: personalization?.tone || userPrefs.tone || 'concise',
+      jurisdiction: personalization?.jurisdiction || userPrefs.jurisdiction || 'general',
+      outputFormat: personalization?.outputFormat || userPrefs.output_format || 'citations_tables',
+    };
+
     requestLogger.info('CHAT REQUEST', 'Query received', {
       question,
       requestedModel: model || 'default',
       intent: intent || 'auto',
+      thinkingMode: isThinking,
+      webMode: isWeb,
     });
 
     const currentChatId = await ensureChat({
@@ -167,6 +241,10 @@ export const streamQuestion = async (req, res) => {
       model,
       requestId,
       chatHistory,
+      thinkingMode: isThinking,
+      webMode: isWeb,
+      personalization: mergedPersonalization,
+      projectId,
     });
   } catch (error) {
     requestLogger.error('ERROR', 'Failed to initialize stream', {

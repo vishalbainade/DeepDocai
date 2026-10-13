@@ -74,9 +74,23 @@ export const routeTextRequest = async ({ modelIdentifier, prompt, config = {}, u
   }
 
   // ── Step 4: Fetch API Key ─────────────────────────────────────────────
-  const keyRow = await getApiKeyForProvider(model.providerId);
+  let keyRow = await getApiKeyForProvider(model.providerId);
   if (!keyRow) {
-    throw new Error(`No active API keys for provider: ${model.providerSlug}`);
+    routeLogger.warn('ROUTER', `No active API key for provider ${model.providerSlug}, finding available provider fallback`, {
+      originalModel: model.modelName,
+    });
+    const allActive = await getActiveModels();
+    for (const alt of allActive) {
+      const altKey = await getApiKeyForProvider(alt.providerId);
+      if (altKey) {
+        model = alt;
+        keyRow = altKey;
+        break;
+      }
+    }
+    if (!keyRow) {
+      throw new Error(`No active API keys for provider: ${model.providerSlug}`);
+    }
   }
 
   routeLogger.info('ROUTER', 'API key selected', {
@@ -307,9 +321,20 @@ export const routeStreamRequest = async function* ({ modelIdentifier, prompt, co
     throw new Error(`No provider implementation for: ${model.providerSlug}`);
   }
 
-  const keyRow = await getApiKeyForProvider(model.providerId);
+  let keyRow = await getApiKeyForProvider(model.providerId);
   if (!keyRow) {
-    throw new Error(`No active API keys for provider: ${model.providerSlug}`);
+    const allActive = await getActiveModels();
+    for (const alt of allActive) {
+      const altKey = await getApiKeyForProvider(alt.providerId);
+      if (altKey) {
+        model = alt;
+        keyRow = altKey;
+        break;
+      }
+    }
+    if (!keyRow) {
+      throw new Error(`No active API keys for provider: ${model.providerSlug}`);
+    }
   }
 
   routeLogger.info('ROUTER', 'Stream API key selected', {
