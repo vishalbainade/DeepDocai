@@ -664,13 +664,14 @@ export const removeDocumentFromProject = async (projectId, documentId) => {
 /**
  * Send interactive live audio dialog turn
  */
-export const sendLiveAudioDialog = async ({ transcript, documentId, modelName, thinkingMode, grounding }) => {
+export const sendLiveAudioDialog = async ({ transcript, documentId, modelName, thinkingMode, grounding, customPrompt }) => {
   const response = await api.post('/api/audio/dialog', {
     transcript,
     documentId,
     modelName,
     thinkingMode,
     grounding,
+    customPrompt,
   });
   return response.data;
 };

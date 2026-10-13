@@ -8,61 +8,12 @@ import {
   Brain, 
   Cpu, 
   Layers,
-  Mic,
-  Radio,
-  Headphones,
   Image as ImageIcon
 } from 'lucide-react';
 import { useDarkColors, useIsDark } from '../utils/darkMode';
 
 // Rich metadata for Google models from user quota list
 const GOOGLE_MODEL_METADATA = {
-  // ─── Live Audio & Dialog Models ────────────────────────────────
-  'gemini-3.8-live-extended-thinking': {
-    title: 'Gemini 3.8 Live Extended Thinking',
-    tag: 'Live Audio + Thinking',
-    tagColor: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30',
-    description: 'Real-time bidirectional voice dialog with extended deep chain-of-thought reasoning.',
-    context: '65k Live',
-    speed: 'Real-time',
-    icon: Headphones,
-    iconColor: 'text-amber-500',
-    isLiveAudio: true,
-  },
-  'gemini-3.8-live': {
-    title: 'Gemini 3.8 Live',
-    tag: 'Live Audio',
-    tagColor: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
-    description: 'Ultra-low latency live conversational voice and continuous speech dialog.',
-    context: '65k Live',
-    speed: 'Real-time',
-    icon: Mic,
-    iconColor: 'text-emerald-500',
-    isLiveAudio: true,
-  },
-  'gemini-3-flash-live': {
-    title: 'Gemini 3 Flash Live',
-    tag: 'Live Audio',
-    tagColor: 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border-cyan-500/30',
-    description: 'Next-generation low-latency real-time voice streaming with natural pauses and cadence.',
-    context: '65k Live',
-    speed: 'Instant',
-    icon: Radio,
-    iconColor: 'text-cyan-500',
-    isLiveAudio: true,
-  },
-  'gemini-2.5-flash-native-audio-dialog': {
-    title: 'Gemini 2.5 Flash Native Audio Dialog',
-    tag: 'Native Voice',
-    tagColor: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30',
-    description: 'Native audio in/out dialog with end-to-end emotional prosody and interruption handling.',
-    context: '1M Live',
-    speed: 'Real-time',
-    icon: Mic,
-    iconColor: 'text-blue-500',
-    isLiveAudio: true,
-  },
-
   // ─── Text & Reasoning Models ───────────────────────────────────
   'gemini-3.8-flash': {
     title: 'Gemini 3.8 Flash',
@@ -163,10 +114,18 @@ const ClaudeModelSelector = ({
   const dc = useDarkColors();
   const isDark = useIsDark();
 
-  // Find currently selected model object
-  const activeModelObj = availableModels.find(
+  // Filter out Live Audio models since they belong exclusively to Gemini Live mode
+  const textOnlyModels = availableModels.filter((m) => {
+    const key = (m.modelName || m.id || '').toLowerCase();
+    const family = (m.modelFamily || m.model_family || '').toLowerCase();
+    const isLive = m.capabilities?.live === true || m.capabilities?.audio === true || family === 'audio-dialog';
+    return !isLive && !key.includes('-live') && !key.includes('audio-dialog');
+  });
+
+  // Find currently selected model object from text-only models
+  const activeModelObj = textOnlyModels.find(
     (m) => m.id === selectedModel || m.modelName === selectedModel
-  ) || availableModels[0] || {
+  ) || textOnlyModels[0] || {
     id: 'gemini-3.8-flash',
     modelName: 'gemini-3.8-flash',
     displayName: 'Gemini 3.8 Flash',
@@ -212,8 +171,8 @@ const ClaudeModelSelector = ({
     }
   }, [isOpen]);
 
-  // Filtered models
-  const filteredModels = availableModels.filter((model) => {
+  // Filtered models for dropdown list
+  const filteredModels = textOnlyModels.filter((model) => {
     if (!searchQuery.trim()) return true;
     const name = (model.displayName || model.label || model.modelName || model.id || '').toLowerCase();
     const key = (model.modelName || model.id || '').toLowerCase();

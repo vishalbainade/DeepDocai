@@ -12,7 +12,7 @@ router.use(authenticateToken);
  */
 router.post('/dialog', async (req, res) => {
   try {
-    const { transcript, documentId, modelName, thinkingMode, grounding } = req.body;
+    const { transcript, documentId, modelName, thinkingMode, grounding, customPrompt } = req.body;
 
     if (!transcript || !transcript.trim()) {
       return res.status(400).json({ error: 'Transcript is required' });
@@ -24,6 +24,7 @@ router.post('/dialog', async (req, res) => {
       modelName: modelName || 'gemini-3.8-live-extended-thinking',
       thinkingMode: thinkingMode !== false,
       grounding: grounding !== false,
+      customPrompt: customPrompt || '',
     });
 
     return res.json({

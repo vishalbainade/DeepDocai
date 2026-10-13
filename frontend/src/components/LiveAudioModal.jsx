@@ -5,7 +5,6 @@ import {
   MicOff, 
   Volume2, 
   VolumeX, 
-  Radio, 
   Brain, 
   Globe, 
   Sparkles, 
@@ -16,16 +15,51 @@ import {
   ExternalLink,
   Send,
   AlertCircle,
-  PhoneOff
+  PhoneOff,
+  Sliders,
+  Play,
+  RotateCcw,
+  Check
 } from 'lucide-react';
 import { useChat } from '../contexts/ChatContext';
 import { sendLiveAudioDialog } from '../services/api';
 
 const LIVE_AUDIO_MODELS = [
-  { id: 'gemini-3.8-live-extended-thinking', name: 'Gemini 3.8 Live Extended Thinking', badge: 'Flagship Thinking', color: 'text-amber-400' },
+  { id: 'gemini-3.8-live-extended-thinking', name: 'Gemini 3.8 Live Extended Thinking', badge: 'Thinking', color: 'text-amber-400' },
   { id: 'gemini-3.8-live', name: 'Gemini 3.8 Live', badge: 'Ultra Fast', color: 'text-emerald-400' },
   { id: 'gemini-3-flash-live', name: 'Gemini 3 Flash Live', badge: 'Next-Gen', color: 'text-cyan-400' },
   { id: 'gemini-2.5-flash-native-audio-dialog', name: 'Gemini 2.5 Flash Native Audio Dialog', badge: 'Native Audio', color: 'text-blue-400' },
+];
+
+const GEMINI_VOICES = [
+  { id: 'puck', name: 'Puck', tone: 'Upbeat, friendly & engaging', pitch: 1.05, rate: 1.05, voiceGender: 'male' },
+  { id: 'charon', name: 'Charon', tone: 'Deep, authoritative & steady', pitch: 0.85, rate: 0.95, voiceGender: 'male' },
+  { id: 'aoede', name: 'Aoede', tone: 'Expressive, warm & articulate', pitch: 1.15, rate: 1.0, voiceGender: 'female' },
+  { id: 'fenrir', name: 'Fenrir', tone: 'Crisp, resonant & analytical', pitch: 0.9, rate: 1.0, voiceGender: 'male' },
+  { id: 'kore', name: 'Kore', tone: 'Calm, soothing & precise', pitch: 1.0, rate: 0.95, voiceGender: 'female' },
+];
+
+const PERSONA_PRESETS = [
+  {
+    id: 'counsel',
+    title: 'Senior Legal Counsel',
+    prompt: 'Act as an experienced senior corporate counsel. Provide sharp, statutory legal analysis, cite legal standards, and focus on contractual risk mitigation.',
+  },
+  {
+    id: 'plain',
+    title: 'Plain English Explainer',
+    prompt: 'Explain complex legal clauses and contracts in simple, direct, conversational language with no confusing legal jargon.',
+  },
+  {
+    id: 'negotiator',
+    title: 'Deal & Contract Negotiator',
+    prompt: 'Focus on commercial deal leverage, indemnities, liability caps, warranties, and practical negotiation strategies.',
+  },
+  {
+    id: 'auditor',
+    title: 'Strict Compliance Auditor',
+    prompt: 'Audit agreements for regulatory compliance, data protection liabilities, and non-standard risk exposures.',
+  },
 ];
 
 const QUICK_PROMPTS = [
@@ -48,6 +82,12 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [isSpeakerMuted, setIsSpeakerMuted] = useState(false);
 
+  // Voice Persona & Customization Prompt
+  const [selectedVoiceId, setSelectedVoiceId] = useState(() => localStorage.getItem('gemini_live_voice') || 'aoede');
+  const [customPrompt, setCustomPrompt] = useState(() => localStorage.getItem('gemini_live_custom_prompt') || '');
+  const [showSettingsDrawer, setShowSettingsDrawer] = useState(false);
+  const [voiceRate, setVoiceRate] = useState(1.0);
+
   const [userTranscript, setUserTranscript] = useState('');
   const [aiResponse, setAiResponse] = useState('');
   const [aiThought, setAiThought] = useState('');
@@ -66,9 +106,19 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
   const micStreamRef = useRef(null);
   const animationFrameRef = useRef(null);
   const silenceTimerRef = useRef(null);
-  const transcriptBufferRef = useRef('');
+  const activeTranscriptRef = useRef('');
+  const isRecognitionActiveRef = useRef(false);
 
-  // ─── Play Acoustic Sound Chimes ─────────────────────────────────
+  // Save customizations to localStorage
+  useEffect(() => {
+    localStorage.setItem('gemini_live_voice', selectedVoiceId);
+  }, [selectedVoiceId]);
+
+  useEffect(() => {
+    localStorage.setItem('gemini_live_custom_prompt', customPrompt);
+  }, [customPrompt]);
+
+  // ─── Play Acoustic Sound Feedback ───────────────────────────────
   const playAudioTone = (type = 'start') => {
     try {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -89,13 +139,13 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
       } else if (type === 'reply') {
         osc.frequency.setValueAtTime(523.25, ctx.currentTime);
         osc.frequency.exponentialRampToValueAtTime(783.99, ctx.currentTime + 0.18);
-        gain.gain.setValueAtTime(0.1, ctx.currentTime);
+        gain.gain.setValueAtTime(0.09, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
         osc.start();
         osc.stop(ctx.currentTime + 0.2);
       } else if (type === 'interrupt') {
-        osc.frequency.setValueAtTime(350, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.08);
+        osc.frequency.setValueAtTime(320, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(180, ctx.currentTime + 0.08);
         gain.gain.setValueAtTime(0.06, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
         osc.start();
@@ -106,7 +156,7 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
     }
   };
 
-  // ─── Setup Web Audio Analyser for Visual Waveform ───────────────
+  // ─── Setup Web Audio Analyser for Real-time Frequency Waveform ───
   const setupAudioAnalyser = async () => {
     try {
       if (micStreamRef.current) return true;
@@ -120,6 +170,7 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
         audioContextRef.current = audioCtx;
         const analyser = audioCtx.createAnalyser();
         analyser.fftSize = 64;
+        analyser.smoothingTimeConstant = 0.5;
         analyserRef.current = analyser;
 
         const source = audioCtx.createMediaStreamSource(stream);
@@ -134,15 +185,20 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
             sum += dataArray[i];
           }
           const avg = sum / dataArray.length;
-          setAudioLevel(avg / 255);
+          const normalized = Math.min(1, avg / 128);
+          setAudioLevel(normalized);
           animationFrameRef.current = requestAnimationFrame(updateLevel);
         };
         updateLevel();
       }
       return true;
     } catch (err) {
-      console.warn('Microphone permission or analyser error:', err.message);
-      setMicPermissionError(err.message.includes('Permission') ? 'Microphone permission denied. Click Orb or allow mic access in browser.' : 'Microphone unavailable.');
+      console.warn('Microphone permission / audio analyser error:', err.message);
+      setMicPermissionError(
+        err.message.includes('Permission') 
+          ? 'Microphone blocked. Please grant microphone permission in your browser.' 
+          : 'Microphone not detected.'
+      );
       return false;
     }
   };
@@ -163,10 +219,8 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
     setAudioLevel(0);
   };
 
-  // ─── Start / Stop Speech Recognition ────────────────────────────
-  const startListening = () => {
-    if (isMicMuted || isSpeakingRef.current) return;
-
+  // ─── Continuous, Resilient Speech Recognition ───────────────────
+  const initSpeechRecognition = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
       setStatus('ready');
@@ -184,13 +238,15 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
       recognition.lang = 'en-US';
 
       recognition.onstart = () => {
+        isRecognitionActiveRef.current = true;
+        setMicPermissionError(null);
         if (!isSpeakingRef.current) {
           setStatus('listening');
-          setMicPermissionError(null);
         }
       };
 
       recognition.onresult = (event) => {
+        // If Gemini is currently speaking, speech interrupts the AI
         if (isSpeakingRef.current) {
           handleInterrupt();
         }
@@ -208,14 +264,14 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
 
         const currentSpeech = (final || interim).trim();
         if (currentSpeech) {
-          transcriptBufferRef.current = currentSpeech;
+          activeTranscriptRef.current = currentSpeech;
           setUserTranscript(currentSpeech);
           setStatus('listening');
 
-          // Reset silence timer: when speaker pauses for 1.5s, auto-send turn!
+          // Auto-submit after 1.5 seconds of silence
           if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
           silenceTimerRef.current = setTimeout(() => {
-            const buffered = transcriptBufferRef.current.trim();
+            const buffered = activeTranscriptRef.current.trim();
             if (buffered && !isSpeakingRef.current) {
               handleSendTurn(buffered);
             }
@@ -230,35 +286,40 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
 
       recognition.onerror = (e) => {
         if (e.error === 'not-allowed') {
-          setMicPermissionError('Microphone permission blocked. Please allow mic access in your browser address bar.');
+          setMicPermissionError('Microphone permission blocked. Please click Allow in your browser.');
           setStatus('ready');
         } else if (e.error === 'no-speech') {
           // Normal silence, keep listening
         } else {
-          console.warn('SpeechRecognition status note:', e.error);
+          console.warn('SpeechRecognition warning:', e.error);
         }
       };
 
       recognition.onend = () => {
-        if (isOpen && !isMicMuted && !isSpeakingRef.current && status === 'listening') {
-          try {
-            recognition.start();
-          } catch {
-            // Already restarted
-          }
+        isRecognitionActiveRef.current = false;
+        // Auto-restart if modal is open, mic unmuted, and AI is not speaking
+        if (isOpen && !isMicMuted && !isSpeakingRef.current) {
+          setTimeout(() => {
+            try {
+              if (isOpen && !isMicMuted && !isRecognitionActiveRef.current) {
+                recognition.start();
+              }
+            } catch {
+              // Already started
+            }
+          }, 250);
         }
       };
 
       recognitionRef.current = recognition;
       recognition.start();
-      playAudioTone('start');
       setupAudioAnalyser();
     } catch (err) {
-      console.warn('Speech recognition start note:', err.message);
+      console.warn('Speech recognition init note:', err.message);
     }
   };
 
-  const stopListening = () => {
+  const stopAllVoice = () => {
     if (silenceTimerRef.current) {
       clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = null;
@@ -269,10 +330,7 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
       } catch {}
       recognitionRef.current = null;
     }
-  };
-
-  const stopAllVoice = () => {
-    stopListening();
+    isRecognitionActiveRef.current = false;
     if (window.speechSynthesis) {
       window.speechSynthesis.cancel();
     }
@@ -281,7 +339,7 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
     setStatus('ready');
   };
 
-  // Warm up voices and lifecycle on modal mount
+  // Mount / Unmount lifecycle
   useEffect(() => {
     if (!isOpen) {
       stopAllVoice();
@@ -295,22 +353,21 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
       window.speechSynthesis.getVoices();
     }
 
-    // Start listening on mount
-    startListening();
+    playAudioTone('start');
+    initSpeechRecognition();
 
     return () => {
       stopAllVoice();
     };
-  }, [isOpen, isMicMuted]);
+  }, [isOpen]);
 
   // ─── Handle Turn Submission ─────────────────────────────────────
   const handleSendTurn = async (spokenPrompt) => {
-    const textToSend = spokenPrompt || transcriptBufferRef.current || userTranscript;
+    const textToSend = spokenPrompt || activeTranscriptRef.current || userTranscript;
     if (!textToSend || !textToSend.trim()) return;
 
     if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-    transcriptBufferRef.current = '';
-    stopListening();
+    activeTranscriptRef.current = '';
 
     setStatus('thinking');
     setUserTranscript(textToSend);
@@ -322,6 +379,7 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
         modelName: selectedAudioModel,
         thinkingMode,
         grounding: groundingMode,
+        customPrompt,
       });
 
       if (data && data.spokenText) {
@@ -339,16 +397,16 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
           playSpeechResponse(data.spokenText);
         } else {
           setStatus('listening');
-          startListening();
+          setUserTranscript('');
         }
       } else {
         setStatus('listening');
-        startListening();
+        setUserTranscript('');
       }
     } catch (err) {
-      console.error('Audio dialog turn error:', err);
+      console.error('Gemini Live dialog error:', err);
       setStatus('listening');
-      startListening();
+      setUserTranscript('');
     }
   };
 
@@ -356,7 +414,7 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
   const playSpeechResponse = (text) => {
     if (!window.speechSynthesis) {
       setStatus('listening');
-      startListening();
+      setUserTranscript('');
       return;
     }
 
@@ -368,17 +426,30 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
     playAudioTone('reply');
 
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1.05;
-    utterance.pitch = 1.0;
+    const activeVoiceMeta = GEMINI_VOICES.find((v) => v.id === selectedVoiceId) || GEMINI_VOICES[0];
+    utterance.rate = voiceRate * (activeVoiceMeta.rate || 1.0);
+    utterance.pitch = activeVoiceMeta.pitch || 1.0;
 
     const voices = window.speechSynthesis.getVoices();
-    const naturalVoice = voices.find((v) => 
-      (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Jenny') || v.name.includes('Guy') || v.name.includes('Samantha')) && 
-      v.lang.startsWith('en')
-    ) || voices.find((v) => v.lang.startsWith('en')) || voices[0];
+    let selectedSysVoice = null;
+    if (activeVoiceMeta.voiceGender === 'female') {
+      selectedSysVoice = voices.find((v) => 
+        (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Jenny') || v.name.includes('Samantha') || v.name.includes('Zira')) && 
+        v.lang.startsWith('en')
+      );
+    } else {
+      selectedSysVoice = voices.find((v) => 
+        (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Guy') || v.name.includes('David')) && 
+        v.lang.startsWith('en')
+      );
+    }
 
-    if (naturalVoice) {
-      utterance.voice = naturalVoice;
+    if (!selectedSysVoice) {
+      selectedSysVoice = voices.find((v) => v.lang.startsWith('en')) || voices[0];
+    }
+
+    if (selectedSysVoice) {
+      utterance.voice = selectedSysVoice;
     }
 
     utterance.onstart = () => {
@@ -389,17 +460,17 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
     utterance.onend = () => {
       isSpeakingRef.current = false;
       setStatus('listening');
-      startListening();
+      setUserTranscript(''); // Clear for next turn
     };
 
     utterance.onerror = (e) => {
       console.warn('SpeechSynthesis error:', e);
       isSpeakingRef.current = false;
       setStatus('listening');
-      startListening();
+      setUserTranscript('');
     };
 
-    // Chromium pause bug prevention
+    // Chromium speech pause bug workaround
     const resumeWatch = setInterval(() => {
       if (!window.speechSynthesis.speaking) {
         clearInterval(resumeWatch);
@@ -412,6 +483,27 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
     window.speechSynthesis.speak(utterance);
   };
 
+  // ─── Voice Preview Test ─────────────────────────────────────────
+  const handlePreviewVoice = (voiceId) => {
+    const vMeta = GEMINI_VOICES.find((v) => v.id === voiceId) || GEMINI_VOICES[0];
+    if (!window.speechSynthesis) return;
+
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.resume();
+
+    const utterance = new SpeechSynthesisUtterance(`Hello! I am Gemini Live using the ${vMeta.name} voice.`);
+    utterance.pitch = vMeta.pitch;
+    utterance.rate = voiceRate * vMeta.rate;
+
+    const voices = window.speechSynthesis.getVoices();
+    const candidate = vMeta.voiceGender === 'female'
+      ? voices.find((v) => (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Jenny') || v.name.includes('Samantha')) && v.lang.startsWith('en'))
+      : voices.find((v) => (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Guy') || v.name.includes('David')) && v.lang.startsWith('en'));
+
+    if (candidate) utterance.voice = candidate;
+    window.speechSynthesis.speak(utterance);
+  };
+
   // ─── Interrupt AI Output ────────────────────────────────────────
   const handleInterrupt = () => {
     playAudioTone('interrupt');
@@ -420,7 +512,6 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
     }
     isSpeakingRef.current = false;
     setStatus('listening');
-    startListening();
   };
 
   // ─── Click Orb Handler ──────────────────────────────────────────
@@ -428,64 +519,68 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
     if (status === 'speaking') {
       handleInterrupt();
     } else if (status === 'thinking') {
-      // In progress
+      // Busy
     } else if (status === 'listening') {
       if (userTranscript.trim()) {
         handleSendTurn(userTranscript.trim());
       } else {
+        // Toggle mic mute
         setIsMicMuted(!isMicMuted);
       }
     } else {
-      // ready or stopped
       setIsMicMuted(false);
-      startListening();
+      initSpeechRecognition();
     }
   };
 
   if (!isOpen) return null;
 
   const activeModelMeta = LIVE_AUDIO_MODELS.find((m) => m.id === selectedAudioModel) || LIVE_AUDIO_MODELS[0];
+  const activeVoiceMeta = GEMINI_VOICES.find((v) => v.id === selectedVoiceId) || GEMINI_VOICES[0];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-xl animate-in fade-in duration-200">
       <div 
         className="relative w-full max-w-2xl h-[92vh] max-h-[840px] rounded-3xl border border-white/10 shadow-2xl flex flex-col overflow-hidden text-white"
         style={{
-          background: 'radial-gradient(ellipse at 50% 15%, #18182b 0%, #0d0d16 55%, #08080c 100%)',
-          boxShadow: '0 25px 70px -15px rgba(0, 0, 0, 0.95), 0 0 120px -30px rgba(99, 102, 241, 0.25)',
+          background: 'radial-gradient(ellipse at 50% 12%, #18151f 0%, #111015 50%, #0b0a0e 100%)',
+          boxShadow: '0 25px 70px -15px rgba(0, 0, 0, 0.95), 0 0 120px -30px rgba(218, 119, 86, 0.25)',
         }}
       >
-        {/* Top Header Bar - Gemini Live */}
+        {/* Top Header Bar - DeepDoc + Gemini Live */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-white/[0.02]">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
-              {/* Gemini 4-color sparkle */}
-              <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-blue-500 via-indigo-500 to-amber-400 flex items-center justify-center shadow-sm">
+              {/* Brand Terracotta & Amber Sparkle */}
+              <div 
+                className="w-7 h-7 rounded-full flex items-center justify-center shadow-sm"
+                style={{ background: 'linear-gradient(135deg, #da7756 0%, #f59e0b 60%, #8b5cf6 100%)' }}
+              >
                 <Sparkles size={15} className="text-white animate-pulse" />
               </div>
               <div>
-                <span className="text-sm font-bold tracking-tight bg-gradient-to-r from-white via-white/90 to-white/70 bg-clip-text text-transparent">
+                <span className="text-sm font-bold tracking-tight text-white">
                   Gemini Live
                 </span>
-                <span className="hidden sm:inline-block ml-2 text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/30">
-                  Real-time Audio
+                <span className="hidden sm:inline-block ml-2 text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                  {activeVoiceMeta.name} Voice
                 </span>
               </div>
             </div>
 
+            {/* Model Selector Pill */}
             <div className="relative ml-2">
-              {/* Live Audio Model Dropdown */}
               <button
                 type="button"
                 onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
                 className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors text-xs font-medium cursor-pointer"
               >
-                <span className="font-semibold text-[11px] truncate max-w-[150px]">{activeModelMeta.name}</span>
+                <span className="font-semibold text-[11px] truncate max-w-[140px]">{activeModelMeta.name}</span>
                 <ChevronDown size={11} className="text-white/50" />
               </button>
 
               {isModelDropdownOpen && (
-                <div className="absolute top-full mt-2 left-0 w-72 rounded-2xl bg-[#14141e] border border-white/10 shadow-2xl p-1.5 z-50">
+                <div className="absolute top-full mt-2 left-0 w-72 rounded-2xl bg-[#141418] border border-white/10 shadow-2xl p-1.5 z-50">
                   {LIVE_AUDIO_MODELS.map((m) => (
                     <button
                       key={m.id}
@@ -508,6 +603,19 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Persona & Voice Settings Button */}
+            <button
+              type="button"
+              onClick={() => setShowSettingsDrawer(!showSettingsDrawer)}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
+                showSettingsDrawer ? 'bg-amber-500/20 border-amber-500/40 text-amber-300' : 'bg-white/5 border-white/10 text-white/70 hover:text-white'
+              }`}
+              title="Voice Persona & Customization Prompt"
+            >
+              <Sliders size={12} className={showSettingsDrawer ? 'text-amber-400' : 'text-white/60'} />
+              <span>Persona</span>
+            </button>
+
             {/* Thinking Mode Pill */}
             <button
               type="button"
@@ -557,7 +665,7 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
             </div>
             <button
               type="button"
-              onClick={startListening}
+              onClick={initSpeechRecognition}
               className="px-2 py-0.5 rounded bg-rose-500/30 hover:bg-rose-500/50 text-[11px] font-semibold transition-colors cursor-pointer shrink-0"
             >
               Retry Mic
@@ -565,92 +673,119 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
           </div>
         )}
 
-        {/* Center Canvas / Pulsing Orb Visualizer */}
+        {/* Center Canvas / DeepDoc Terracotta & Amber Gemini Live Orb */}
         <div className="flex-1 flex flex-col items-center justify-center relative p-6 select-none overflow-hidden">
-          {/* Animated Atmospheric Glow */}
+          {/* Animated Atmospheric Glow matching DeepDoc Terracotta & Amber */}
           <div 
-            className="absolute w-80 h-80 rounded-full blur-3xl opacity-35 pointer-events-none transition-all duration-700"
+            className="absolute w-84 h-84 rounded-full blur-3xl opacity-35 pointer-events-none transition-all duration-700"
             style={{
               background: status === 'speaking' 
-                ? 'radial-gradient(circle, #6366f1 0%, #a855f7 60%, transparent 100%)' 
+                ? 'radial-gradient(circle, #8b5cf6 0%, #da7756 50%, transparent 100%)' 
                 : status === 'thinking'
-                ? 'radial-gradient(circle, #f59e0b 0%, #d97706 60%, transparent 100%)'
-                : 'radial-gradient(circle, #10b981 0%, #06b6d4 60%, transparent 100%)',
-              transform: `scale(${1 + audioLevel * 1.6})`,
+                ? 'radial-gradient(circle, #f59e0b 0%, #b45309 60%, transparent 100%)'
+                : 'radial-gradient(circle, #da7756 0%, #f59e0b 50%, transparent 100%)',
+              transform: `scale(${1 + audioLevel * 1.8})`,
             }}
           />
 
           {/* Central Interactive Voice Orb */}
-          <button
-            type="button"
-            onClick={handleOrbClick}
-            className="relative flex items-center justify-center cursor-pointer group focus:outline-none"
-            title={status === 'speaking' ? 'Click to interrupt' : status === 'listening' ? 'Click to send current speech' : 'Click to start speaking'}
-          >
-            {/* Outer pulsating ring */}
-            <div 
-              className="w-48 h-48 sm:w-56 sm:h-56 rounded-full border border-white/20 transition-all duration-300 flex items-center justify-center group-hover:scale-105"
-              style={{
-                transform: `scale(${1 + (status === 'speaking' ? 0.08 : audioLevel * 0.45)})`,
-                boxShadow: status === 'speaking'
-                  ? '0 0 60px rgba(99, 102, 241, 0.45), inset 0 0 35px rgba(168, 85, 247, 0.35)'
-                  : status === 'thinking'
-                  ? '0 0 60px rgba(245, 158, 11, 0.45), inset 0 0 35px rgba(245, 158, 11, 0.25)'
-                  : '0 0 50px rgba(16, 185, 129, 0.35), inset 0 0 25px rgba(6, 182, 212, 0.25)',
-                borderColor: status === 'speaking' ? '#818cf8' : status === 'thinking' ? '#f59e0b' : '#34d399',
-              }}
-            >
-              {/* Middle Orb */}
+          <div className="relative flex items-center justify-center">
+            {/* Live Audio Equalizer Frequency Waveform Bars */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div 
-                className="w-36 h-36 sm:w-44 sm:h-44 rounded-full flex items-center justify-center transition-all duration-500"
+                className="w-64 h-64 sm:w-72 sm:h-72 rounded-full border border-dashed transition-all duration-300"
                 style={{
-                  background: status === 'speaking'
-                    ? 'radial-gradient(circle, #6366f1 0%, #8b5cf6 65%, #ec4899 100%)'
+                  borderColor: status === 'speaking' ? 'rgba(139, 92, 246, 0.4)' : status === 'thinking' ? 'rgba(245, 158, 11, 0.4)' : 'rgba(218, 119, 86, 0.4)',
+                  transform: `scale(${1 + audioLevel * 0.35}) rotate(${audioLevel * 30}deg)`,
+                }}
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={handleOrbClick}
+              className="relative flex items-center justify-center cursor-pointer group focus:outline-none"
+              title={status === 'speaking' ? 'Click to interrupt' : status === 'listening' ? 'Click to send current speech' : 'Click to start speaking'}
+            >
+              {/* Outer pulsating ring */}
+              <div 
+                className="w-48 h-48 sm:w-56 sm:h-56 rounded-full border transition-all duration-300 flex items-center justify-center group-hover:scale-105"
+                style={{
+                  transform: `scale(${1 + (status === 'speaking' ? 0.08 : audioLevel * 0.45)})`,
+                  boxShadow: status === 'speaking'
+                    ? '0 0 60px rgba(139, 92, 246, 0.45), inset 0 0 35px rgba(218, 119, 86, 0.3)'
                     : status === 'thinking'
-                    ? 'radial-gradient(circle, #f59e0b 0%, #b45309 65%, #78350f 100%)'
-                    : 'radial-gradient(circle, #10b981 0%, #059669 65%, #064e3b 100%)',
-                  animation: status === 'thinking' ? 'pulse 1.5s infinite ease-in-out' : undefined,
+                    ? '0 0 60px rgba(245, 158, 11, 0.45), inset 0 0 35px rgba(245, 158, 11, 0.25)'
+                    : '0 0 60px rgba(218, 119, 86, 0.4), inset 0 0 30px rgba(245, 158, 11, 0.3)',
+                  borderColor: status === 'speaking' ? '#a78bfa' : status === 'thinking' ? '#f59e0b' : '#da7756',
                 }}
               >
-                {/* Core Icon */}
-                <div className="w-16 h-16 rounded-full bg-black/45 backdrop-blur-md flex items-center justify-center shadow-inner">
-                  {status === 'speaking' ? (
-                    <Volume2 size={30} className="text-white animate-pulse" />
-                  ) : status === 'thinking' ? (
-                    <Sparkles size={30} className="text-amber-300 animate-spin" />
-                  ) : (
-                    <Mic size={30} className={audioLevel > 0.05 ? 'text-white' : 'text-emerald-300'} />
-                  )}
+                {/* Middle Orb with Terracotta/Amber/Violet Gradient */}
+                <div 
+                  className="w-36 h-36 sm:w-44 sm:h-44 rounded-full flex items-center justify-center transition-all duration-500"
+                  style={{
+                    background: status === 'speaking'
+                      ? 'radial-gradient(circle, #8b5cf6 0%, #da7756 70%, #ec4899 100%)'
+                      : status === 'thinking'
+                      ? 'radial-gradient(circle, #f59e0b 0%, #b45309 65%, #78350f 100%)'
+                      : 'radial-gradient(circle, #da7756 0%, #e06847 45%, #b45309 85%, #78350f 100%)',
+                    animation: status === 'thinking' ? 'pulse 1.5s infinite ease-in-out' : undefined,
+                  }}
+                >
+                  {/* Core Icon */}
+                  <div className="w-16 h-16 rounded-full bg-black/45 backdrop-blur-md flex items-center justify-center shadow-inner">
+                    {status === 'speaking' ? (
+                      <Volume2 size={30} className="text-white animate-pulse" />
+                    ) : status === 'thinking' ? (
+                      <Sparkles size={30} className="text-amber-300 animate-spin" />
+                    ) : (
+                      <Mic size={30} className={audioLevel > 0.08 ? 'text-white scale-110 transition-transform' : 'text-amber-200'} />
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          </button>
+            </button>
+          </div>
+
+          {/* Real-time Mic Audio Wave Indicator */}
+          <div className="flex items-center gap-1.5 mt-5 h-4">
+            {[0.2, 0.5, 0.8, 1.0, 0.7, 0.4, 0.9, 0.6, 0.3].map((mult, i) => (
+              <span
+                key={i}
+                className="w-1 rounded-full transition-all duration-150"
+                style={{
+                  height: `${Math.max(4, audioLevel * 24 * mult)}px`,
+                  backgroundColor: audioLevel > 0.05 ? '#da7756' : 'rgba(255, 255, 255, 0.2)',
+                }}
+              />
+            ))}
+          </div>
 
           {/* Status Badge */}
-          <div className="mt-7 text-center z-10">
+          <div className="mt-4 text-center z-10">
             <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-xs font-semibold uppercase tracking-wider backdrop-blur-md border border-white/10">
               <span className={`w-2 h-2 rounded-full ${
-                status === 'speaking' ? 'bg-indigo-400 animate-pulse' : status === 'thinking' ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400 animate-ping'
+                status === 'speaking' ? 'bg-purple-400 animate-pulse' : status === 'thinking' ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400 animate-ping'
               }`} />
               {status === 'speaking' 
                 ? 'Gemini Speaking (Tap Orb to Interrupt)' 
                 : status === 'thinking' 
                 ? 'Thinking & Synthesizing...' 
-                : status === 'listening' 
-                ? 'Listening... Speak or Tap Orb to Send' 
-                : 'Ready (Tap Orb to Start)'}
+                : audioLevel > 0.08
+                ? 'Listening to your voice...'
+                : 'Listening... Speak or Tap Orb to Send'}
             </span>
           </div>
 
           {/* Current Live Transcription Preview */}
           <div className="w-full max-w-lg mt-3 px-4 text-center z-10 min-h-[44px]">
             {userTranscript ? (
-              <p className="text-sm font-medium text-white/95 leading-relaxed bg-black/45 px-4 py-2 rounded-2xl border border-white/10 backdrop-blur-md">
+              <p className="text-sm font-medium text-white/95 leading-relaxed bg-black/50 px-4 py-2 rounded-2xl border border-amber-500/30 backdrop-blur-md shadow-lg">
                 “{userTranscript}”
               </p>
             ) : (
               <p className="text-xs text-white/40 italic">
-                Speak your question naturally, or pick a quick topic below...
+                Speak your legal question naturally, or pick a starter topic below...
               </p>
             )}
           </div>
@@ -672,9 +807,9 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
           {/* Spoken AI Answer Card */}
           {aiResponse && (
             <div className="w-full max-w-lg mt-3 p-3.5 rounded-2xl bg-white/5 border border-white/10 text-left backdrop-blur-md z-10 max-h-36 overflow-y-auto">
-              <div className="flex items-center gap-1.5 text-xs text-indigo-400 font-semibold mb-1">
+              <div className="flex items-center gap-1.5 text-xs text-amber-400 font-semibold mb-1">
                 <Sparkles size={13} />
-                <span>Gemini Spoken Response:</span>
+                <span>Gemini Live ({activeVoiceMeta.name}):</span>
               </div>
               <p className="text-xs text-white/90 leading-relaxed">
                 {aiResponse}
@@ -775,10 +910,12 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
                 onClick={() => {
                   if (isMicMuted) {
                     setIsMicMuted(false);
-                    startListening();
+                    initSpeechRecognition();
                   } else {
                     setIsMicMuted(true);
-                    stopListening();
+                    if (recognitionRef.current) {
+                      try { recognitionRef.current.stop(); } catch {}
+                    }
                     setStatus('ready');
                   }
                 }}
@@ -827,9 +964,140 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
           </div>
         </div>
 
+        {/* Persona & Voice Customization Settings Drawer */}
+        {showSettingsDrawer && (
+          <div className="absolute inset-x-0 bottom-16 top-16 bg-[#121117]/98 backdrop-blur-2xl z-40 p-6 overflow-y-auto border-t border-white/10 animate-in fade-in slide-in-from-bottom-4 duration-200">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <Sliders size={15} className="text-amber-400" />
+                Gemini Live Voice & Persona Customization
+              </h3>
+              <button
+                onClick={() => setShowSettingsDrawer(false)}
+                className="text-xs text-white/50 hover:text-white cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+
+            {/* Voice Persona Selector */}
+            <div className="mb-6">
+              <label className="block text-xs font-semibold text-white/80 mb-2">
+                Select Gemini Voice Persona:
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {GEMINI_VOICES.map((v) => {
+                  const isSelected = selectedVoiceId === v.id;
+                  return (
+                    <div
+                      key={v.id}
+                      onClick={() => setSelectedVoiceId(v.id)}
+                      className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                        isSelected 
+                          ? 'border-amber-500 bg-amber-500/10 text-white' 
+                          : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold">{v.name}</span>
+                          {isSelected && <Check size={13} className="text-amber-400" />}
+                        </div>
+                        <p className="text-[10px] text-white/50 mt-0.5">{v.tone}</p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePreviewVoice(v.id);
+                        }}
+                        className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white/80 transition-colors"
+                        title={`Preview ${v.name} Voice`}
+                      >
+                        <Play size={12} fill="currentColor" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Speed rate control */}
+              <div className="mt-3 flex items-center gap-3 text-xs text-white/70">
+                <span>Speed:</span>
+                {[0.85, 1.0, 1.15].map((rate) => (
+                  <button
+                    key={rate}
+                    type="button"
+                    onClick={() => setVoiceRate(rate)}
+                    className={`px-2 py-0.5 rounded text-[11px] font-mono border ${
+                      voiceRate === rate 
+                        ? 'bg-amber-500/20 border-amber-500 text-amber-300' 
+                        : 'bg-white/5 border-white/10 text-white/60'
+                    }`}
+                  >
+                    {rate}x
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Customization Prompt Directives */}
+            <div className="mb-4">
+              <label className="block text-xs font-semibold text-white/80 mb-1.5">
+                Custom Persona & Behavior Prompt:
+              </label>
+              <p className="text-[11px] text-white/50 mb-2">
+                Choose a preset role or write custom instructions for how Gemini Live should speak and analyze.
+              </p>
+
+              {/* Presets */}
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                {PERSONA_PRESETS.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setCustomPrompt(p.prompt)}
+                    className="p-2 text-left rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] transition-all cursor-pointer"
+                  >
+                    <span className="font-semibold block text-amber-300">{p.title}</span>
+                    <span className="text-[10px] text-white/50 line-clamp-1 mt-0.5">{p.prompt}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Textarea */}
+              <textarea
+                value={customPrompt}
+                onChange={(e) => setCustomPrompt(e.target.value)}
+                placeholder="e.g. Act as a senior partner. Keep spoken answers under 3 sentences. Highlight high-risk indemnities immediately."
+                rows={3}
+                className="w-full p-2.5 rounded-xl bg-black/40 border border-white/10 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-amber-500/50"
+              />
+
+              <div className="flex items-center justify-between mt-2">
+                <button
+                  type="button"
+                  onClick={() => setCustomPrompt('')}
+                  className="text-[10px] text-white/40 hover:text-white flex items-center gap-1 cursor-pointer"
+                >
+                  <RotateCcw size={10} /> Reset to Default
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowSettingsDrawer(false)}
+                  className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-black text-xs font-semibold cursor-pointer"
+                >
+                  Save & Apply
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Collapsible History Drawer */}
         {showHistoryDrawer && (
-          <div className="absolute inset-x-0 bottom-16 top-16 bg-[#0d0d14]/95 backdrop-blur-2xl z-40 p-6 overflow-y-auto border-t border-white/10">
+          <div className="absolute inset-x-0 bottom-16 top-16 bg-[#121117]/98 backdrop-blur-2xl z-40 p-6 overflow-y-auto border-t border-white/10">
             <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <MessageSquare size={15} />
@@ -855,11 +1123,11 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
                     className={`p-3 rounded-2xl border text-xs leading-relaxed ${
                       item.role === 'user'
                         ? 'bg-white/5 border-white/10 text-white/90'
-                        : 'bg-indigo-950/40 border-indigo-500/20 text-indigo-100'
+                        : 'bg-amber-950/20 border-amber-500/20 text-amber-100'
                     }`}
                   >
                     <div className="flex items-center justify-between font-semibold text-[10px] mb-1 opacity-70">
-                      <span>{item.role === 'user' ? 'You (Spoken)' : 'Gemini Voice'}</span>
+                      <span>{item.role === 'user' ? 'You (Spoken)' : `Gemini Live (${activeVoiceMeta.name})`}</span>
                       <span>{item.time}</span>
                     </div>
                     <p>{item.text}</p>
