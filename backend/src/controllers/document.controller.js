@@ -30,7 +30,8 @@ export const processDocument = async (req, res) => {
   try {
     logger.info('INGESTION', 'Document processing started', { documentId, fileName });
 
-    const initialStorageUrl = `${process.env.SUPABASE_URL}/storage/v1/object/${process.env.SUPABASE_INPUT_BUCKET || 'file-inputs'}/original/${storageFileName}`;
+    const baseUrl = process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+    const initialStorageUrl = `${baseUrl}/api/upload/file/${encodeURIComponent(storageFileName)}`;
     const docCheckResult = await query('SELECT id FROM documents WHERE id = $1', [documentId]);
 
     if (!docCheckResult.rows.length) {
@@ -39,7 +40,7 @@ export const processDocument = async (req, res) => {
         [documentId, fileName, initialStorageUrl, 'processing']
       );
     } else {
-      await updateDocumentStatus(documentId, 'processing');
+      await updateDocumentStatus(documentId, 'processing', initialStorageUrl);
     }
 
     logger.info('INGESTION', 'Downloading original PDF', { documentId, stage: 'download' });
@@ -69,7 +70,7 @@ export const processDocument = async (req, res) => {
     const ocrStorageFileName = `ocr-${storageFileName}`;
     await uploadToInputBucket(Buffer.from(ocrPdfBytes), ocrStorageFileName);
 
-    const ocrStorageUrl = `${process.env.SUPABASE_URL}/storage/v1/object/public/${process.env.SUPABASE_INPUT_BUCKET || 'file-inputs'}/${ocrStorageFileName}`;
+    const ocrStorageUrl = `${baseUrl}/api/upload/file/${encodeURIComponent(ocrStorageFileName)}`;
     await updateDocumentStatus(documentId, 'ocr_complete', ocrStorageUrl);
 
     // ─── RENAMED: Persist Layout-rich OCR JSON and text-only JSON ────────────

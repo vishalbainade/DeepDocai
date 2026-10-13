@@ -126,6 +126,9 @@ export const getSignedUploadUrl = async (fileName) => {
 export const uploadToGCS = async (file, uploadUrl, onProgress) => {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
+    const finalUrl = uploadUrl.startsWith('http')
+      ? uploadUrl
+      : `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${uploadUrl}`;
 
     xhr.upload.addEventListener('progress', (e) => {
       if (e.lengthComputable && onProgress) {
@@ -138,20 +141,20 @@ export const uploadToGCS = async (file, uploadUrl, onProgress) => {
       if (xhr.status >= 200 && xhr.status < 300) {
         resolve();
       } else {
-        reject(new Error(`Failed to upload to GCS: ${xhr.statusText}`));
+        reject(new Error(`Failed to upload file (HTTP ${xhr.status}): ${xhr.statusText || 'Upload Error'}`));
       }
     });
 
     xhr.addEventListener('error', () => {
-      reject(new Error('Network error during upload'));
+      reject(new Error('Network error during file upload'));
     });
 
     xhr.addEventListener('abort', () => {
       reject(new Error('Upload aborted'));
     });
 
-    xhr.open('PUT', uploadUrl);
-    xhr.setRequestHeader('Content-Type', 'application/pdf');
+    xhr.open('PUT', finalUrl);
+    xhr.setRequestHeader('Content-Type', file.type || 'application/pdf');
     xhr.send(file);
   });
 };

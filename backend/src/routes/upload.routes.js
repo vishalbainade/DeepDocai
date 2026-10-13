@@ -15,9 +15,63 @@ import { query } from '../db/index.js';
 import { authenticateToken } from '../middleware/auth.middleware.js';
 import { processDocument } from '../controllers/document.controller.js';
 
-const router = express.Router();
+// Public local upload and file delivery routes (bypasses auth for XHR and embed viewers)
+router.put('/local-upload', express.raw({ type: '*/*', limit: '100mb' }), async (req, res) => {
+  try {
+    const fileName = req.query.fileName;
+    if (!fileName) {
+      return res.status(400).json({ error: 'fileName query parameter is required' });
+    }
+    const cleanName = path.basename(fileName);
+    const uploadsDir = path.join(__dirname, '../../uploads/file-inputs');
+    await fs.mkdir(uploadsDir, { recursive: true });
+    const targetPath = path.join(uploadsDir, cleanName);
 
-// All routes require authentication
+    await fs.writeFile(targetPath, req.body);
+    console.log(`✅ [Local Upload] File written to ${targetPath} (${req.body?.length || 0} bytes)`);
+
+    return res.status(200).json({
+      success: true,
+      fileName: cleanName,
+      size: req.body?.length || 0,
+    });
+  } catch (err) {
+    console.error('Local upload error:', err);
+    return res.status(500).json({ error: 'Failed to write local file', message: err.message });
+  }
+});
+
+router.post('/local-upload', express.raw({ type: '*/*', limit: '100mb' }), async (req, res) => {
+  try {
+    const fileName = req.query.fileName;
+    if (!fileName) {
+      return res.status(400).json({ error: 'fileName query parameter is required' });
+    }
+    const cleanName = path.basename(fileName);
+    const uploadsDir = path.join(__dirname, '../../uploads/file-inputs');
+    await fs.mkdir(uploadsDir, { recursive: true });
+    const targetPath = path.join(uploadsDir, cleanName);
+
+    await fs.writeFile(targetPath, req.body);
+    return res.status(200).json({ success: true, fileName: cleanName, size: req.body?.length || 0 });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to write local file', message: err.message });
+  }
+});
+
+router.get('/file/:fileName', async (req, res) => {
+  try {
+    const fileName = path.basename(req.params.fileName);
+    const filePath = path.join(__dirname, '../../uploads/file-inputs', fileName);
+    await fs.access(filePath);
+    res.setHeader('Content-Type', 'application/pdf');
+    return res.sendFile(filePath);
+  } catch {
+    return res.status(404).json({ error: 'File not found' });
+  }
+});
+
+// All following routes require authentication
 router.use(authenticateToken);
 
 /**
