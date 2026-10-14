@@ -21,7 +21,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { uploadDocument, getUser, getAvailableModels } from '../services/api';
-import ClaudeModelSelector from './ClaudeModelSelector';
+import ClaudeModelSelector, { DEFAULT_TEXT_MODELS } from './ClaudeModelSelector';
 import ReconstructedOCRModal from './ReconstructedOCRModal';
 import { useChat } from '../contexts/ChatContext';
 import { useDarkColors, useIsDark } from '../utils/darkMode';
@@ -60,12 +60,8 @@ const HomePage = () => {
   const [promptInput, setPromptInput] = useState('');
   const [selectedDocId, setSelectedDocId] = useState(null);
   const [viewingOCRDoc, setViewingOCRDoc] = useState(null);
-  const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
-  const [availableModels, setAvailableModels] = useState([
-    { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-    { id: 'gemini-3-flash', label: 'Gemini 3 Flash' },
-    { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite' },
-  ]);
+  const [selectedModel, setSelectedModel] = useState('gemini-3.8-flash');
+  const [availableModels, setAvailableModels] = useState(DEFAULT_TEXT_MODELS);
   const [user, setUser] = useState(null);
   const dc = useDarkColors();
   const isDark = useIsDark();
@@ -76,7 +72,9 @@ const HomePage = () => {
       if (res?.models?.length) {
         setAvailableModels(res.models);
       }
-    }).catch(() => {});
+    }).catch(() => {
+      setAvailableModels(DEFAULT_TEXT_MODELS);
+    });
   }, []);
 
   // Sync selectedDocId when documents load

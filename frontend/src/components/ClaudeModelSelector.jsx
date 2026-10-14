@@ -99,6 +99,17 @@ const GOOGLE_MODEL_METADATA = {
   },
 };
 
+export const DEFAULT_TEXT_MODELS = [
+  { id: 'gemini-3.8-flash', modelName: 'gemini-3.8-flash', displayName: 'Gemini 3.8 Flash', label: 'Gemini 3.8 Flash', modelFamily: 'text' },
+  { id: 'gemini-3.7-flash', modelName: 'gemini-3.7-flash', displayName: 'Gemini 3.7 Flash', label: 'Gemini 3.7 Flash', modelFamily: 'text' },
+  { id: 'gemini-3.6-flash', modelName: 'gemini-3.6-flash', displayName: 'Gemini 3.6 Flash', label: 'Gemini 3.6 Flash', modelFamily: 'text' },
+  { id: 'gemini-3.5-flash-lite', modelName: 'gemini-3.5-flash-lite', displayName: 'Gemini 3.5 Flash Lite', label: 'Gemini 3.5 Flash Lite', modelFamily: 'text' },
+  { id: 'gemini-3.1-flash-lite', modelName: 'gemini-3.1-flash-lite', displayName: 'Gemini 3.1 Flash Lite', label: 'Gemini 3.1 Flash Lite', modelFamily: 'text' },
+  { id: 'nano-banana-2-lite', modelName: 'nano-banana-2-lite', displayName: 'Nano Banana 2 Lite (Gemini 3.1 Flash Lite Image)', label: 'Nano Banana 2 Lite', modelFamily: 'multimodal-image' },
+  { id: 'gemma-4-31b', modelName: 'gemma-4-31b', displayName: 'Gemma 4 31B', label: 'Gemma 4 31B', modelFamily: 'text' },
+  { id: 'gemma-4-26b', modelName: 'gemma-4-26b', displayName: 'Gemma 4 26B', label: 'Gemma 4 26B', modelFamily: 'text' },
+];
+
 const ClaudeModelSelector = ({
   selectedModel,
   onModelChange,
@@ -114,18 +125,22 @@ const ClaudeModelSelector = ({
   const dc = useDarkColors();
   const isDark = useIsDark();
 
+  const modelsPool = (availableModels && availableModels.length > 3) ? availableModels : DEFAULT_TEXT_MODELS;
+
   // Filter out Live Audio models since they belong exclusively to Gemini Live mode
-  const textOnlyModels = availableModels.filter((m) => {
+  const textOnlyModels = modelsPool.filter((m) => {
     const key = (m.modelName || m.id || '').toLowerCase();
     const family = (m.modelFamily || m.model_family || '').toLowerCase();
     const isLive = m.capabilities?.live === true || m.capabilities?.audio === true || family === 'audio-dialog';
     return !isLive && !key.includes('-live') && !key.includes('audio-dialog');
   });
 
+  const finalModels = textOnlyModels.length > 0 ? textOnlyModels : DEFAULT_TEXT_MODELS;
+
   // Find currently selected model object from text-only models
-  const activeModelObj = textOnlyModels.find(
+  const activeModelObj = finalModels.find(
     (m) => m.id === selectedModel || m.modelName === selectedModel
-  ) || textOnlyModels[0] || {
+  ) || finalModels[0] || {
     id: 'gemini-3.8-flash',
     modelName: 'gemini-3.8-flash',
     displayName: 'Gemini 3.8 Flash',
