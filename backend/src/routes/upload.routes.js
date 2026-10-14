@@ -15,6 +15,8 @@ import { query } from '../db/index.js';
 import { authenticateToken } from '../middleware/auth.middleware.js';
 import { processDocument } from '../controllers/document.controller.js';
 
+const router = express.Router();
+
 // Public local upload and file delivery routes (bypasses auth for XHR and embed viewers)
 router.put('/local-upload', express.raw({ type: '*/*', limit: '100mb' }), async (req, res) => {
   try {
