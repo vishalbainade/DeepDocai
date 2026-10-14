@@ -65,9 +65,13 @@ CREATE INDEX IF NOT EXISTS idx_token_usage_user_id ON token_usage(user_id);
 CREATE INDEX IF NOT EXISTS idx_token_usage_created_at ON token_usage(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_token_usage_type ON token_usage(usage_type);
 
--- 6. Enhance user_preferences with Claude-style personalization
+-- 6. Enhance user_preferences with Claude-style personalization & Memory
 ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS custom_instructions TEXT;
 ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS persona VARCHAR(100) DEFAULT 'legal_counsel';
 ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS tone VARCHAR(100) DEFAULT 'concise';
 ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS jurisdiction VARCHAR(100) DEFAULT 'general';
 ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS output_format VARCHAR(100) DEFAULT 'citations_tables';
+ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS memories JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS memory_enabled BOOLEAN DEFAULT true;
+ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS history_limit INTEGER DEFAULT 10;
+

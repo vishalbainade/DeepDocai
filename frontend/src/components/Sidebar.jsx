@@ -22,7 +22,8 @@ import {
   Zap,
   Sliders,
   Cpu,
-  Mic
+  Mic,
+  Brain
 } from 'lucide-react';
 import { useChat } from '../contexts/ChatContext';
 import { renameChat, deleteChat, logout, getUser } from '../services/api';
@@ -241,14 +242,24 @@ const Sidebar = () => {
     logout();
   };
 
-  const handleSettings = () => {
+  const handleSettings = (tab = 'profile') => {
     setUserMenuOpen(false);
-    navigate('/settings');
+    navigate(`/settings?tab=${tab}`);
   };
 
   const handlePersonalization = () => {
     setUserMenuOpen(false);
-    navigate('/settings');
+    navigate('/settings?tab=personalization');
+  };
+
+  const handleMemory = () => {
+    setUserMenuOpen(false);
+    navigate('/settings?tab=memory');
+  };
+
+  const handleUsage = () => {
+    setUserMenuOpen(false);
+    navigate('/settings?tab=usage');
   };
 
   const handleHelp = () => {
@@ -591,15 +602,15 @@ const Sidebar = () => {
         {/* Live Token Usage & Personalization Quick Trigger */}
         {!isCollapsedOnDesktop && (
           <div className="p-2.5 border-t space-y-1.5" style={{ borderColor: dc.borderPrimary }}>
-            {/* Live Usage Pill */}
+            {/* Live Usage Pill -> Settings Usage */}
             <button
-              onClick={() => setIsUsageModalOpen(true)}
-              className="w-full flex items-center justify-between p-2 rounded-xl text-xs border hover:bg-slate-500/5 transition-all text-left"
+              onClick={handleUsage}
+              className="w-full flex items-center justify-between p-2 rounded-xl text-xs border hover:bg-slate-500/5 transition-all text-left cursor-pointer"
               style={{
                 borderColor: dc.borderPrimary,
                 backgroundColor: 'rgba(218, 119, 86, 0.05)',
               }}
-              title="View OCR Pages, Embedding Tokens & AI Tokens Consumption"
+              title="View OCR Pages, Embedding Tokens & AI Tokens in Settings"
             >
               <div className="flex items-center gap-1.5">
                 <Cpu size={14} className="text-amber-500 shrink-0" />
@@ -612,15 +623,15 @@ const Sidebar = () => {
               </div>
             </button>
 
-            {/* Quick Personalization Trigger */}
+            {/* Quick Personalization Trigger -> Settings Personalization */}
             <button
-              onClick={() => setIsPersonalizationModalOpen(true)}
-              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs hover:bg-slate-500/5 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+              onClick={handlePersonalization}
+              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs hover:bg-slate-500/5 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
             >
               <span className="flex items-center gap-1.5 text-[11px] font-medium">
                 <Sliders size={13} className="text-indigo-400" /> Personalization
               </span>
-              <span className="text-[10px] text-slate-400">Custom style</span>
+              <span className="text-[10px] text-slate-400">Directives</span>
             </button>
           </div>
         )}
@@ -667,8 +678,8 @@ const Sidebar = () => {
               )}
               <div className="py-1">
                 <button
-                  onClick={handleSettings}
-                  className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 transition-colors"
+                  onClick={() => handleSettings('profile')}
+                  className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 transition-colors cursor-pointer"
                   style={{ color: dc.textSecondary }}
                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = dc.bgHover}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
@@ -678,17 +689,37 @@ const Sidebar = () => {
                 </button>
                 <button
                   onClick={handlePersonalization}
-                  className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 transition-colors"
+                  className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 transition-colors cursor-pointer"
                   style={{ color: dc.textSecondary }}
                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = dc.bgHover}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                 >
-                  <Palette size={16} />
+                  <Sliders size={16} className="text-amber-500" />
                   Personalization
                 </button>
                 <button
+                  onClick={handleMemory}
+                  className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 transition-colors cursor-pointer"
+                  style={{ color: dc.textSecondary }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = dc.bgHover}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                  <Brain size={16} className="text-indigo-400" />
+                  AI Memory
+                </button>
+                <button
+                  onClick={handleUsage}
+                  className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 transition-colors cursor-pointer"
+                  style={{ color: dc.textSecondary }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = dc.bgHover}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                  <Cpu size={16} className="text-emerald-500" />
+                  Usage & Limits
+                </button>
+                <button
                   onClick={handleHelp}
-                  className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 transition-colors"
+                  className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 transition-colors cursor-pointer"
                   style={{ color: dc.textSecondary }}
                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = dc.bgHover}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
@@ -699,7 +730,7 @@ const Sidebar = () => {
                 <div className="my-1" style={{ borderTop: `1px solid ${dc.borderPrimary}` }}></div>
                 <button
                   onClick={handleLogout}
-                  className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                  className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 cursor-pointer"
                 >
                   <LogOut size={16} />
                   Logout

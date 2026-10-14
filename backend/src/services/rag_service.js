@@ -162,6 +162,14 @@ const buildPromptContext = ({ question, chunks, chatHistory = [], personalizatio
   if (personalization?.customInstructions?.trim()) {
     systemDirectives += `\nUser Custom Instructions: ${personalization.customInstructions.trim()}`;
   }
+  if (personalization?.memories && Array.isArray(personalization.memories) && personalization.memories.length > 0) {
+    const memoryItems = personalization.memories
+      .map(m => typeof m === 'string' ? m : m?.content)
+      .filter(Boolean);
+    if (memoryItems.length > 0) {
+      systemDirectives += `\n\nUSER PERSISTENT MEMORY & LEARNED FACTS (Learned from previous chats):\n${memoryItems.map(m => `- ${m}`).join('\n')}\nIncorporate these user attributes, work domain, and preferences seamlessly into your reasoning and legal framing.`;
+    }
+  }
 
   let thinkingDirective = '';
   if (thinkingMode) {

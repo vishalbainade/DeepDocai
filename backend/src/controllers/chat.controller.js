@@ -51,19 +51,23 @@ export const askQuestion = async (req, res) => {
     const isThinking = thinkingMode === true || thinkingMode === 'true';
     const isWeb = webMode === true || webMode === 'true';
 
-    // Fetch user personalization preferences
+    // Fetch user personalization preferences & learned memories
     const prefsResult = await query(
-      `SELECT custom_instructions, persona, tone, jurisdiction, output_format 
+      `SELECT custom_instructions, persona, tone, jurisdiction, output_format, memories, memory_enabled, history_limit 
        FROM user_preferences WHERE user_id = $1`,
       [req.user.id]
     );
     const userPrefs = prefsResult.rows[0] || {};
+    const interactionLimit = Math.min(Math.max(Number(userPrefs.history_limit) || 10, 2), 30);
+    const activeMemories = userPrefs.memory_enabled !== false ? (userPrefs.memories || []) : [];
+
     const mergedPersonalization = {
       customInstructions: personalization?.customInstructions || userPrefs.custom_instructions || '',
       persona: personalization?.persona || userPrefs.persona || 'legal_counsel',
       tone: personalization?.tone || userPrefs.tone || 'concise',
       jurisdiction: personalization?.jurisdiction || userPrefs.jurisdiction || 'general',
       outputFormat: personalization?.outputFormat || userPrefs.output_format || 'citations_tables',
+      memories: activeMemories,
     };
 
     requestLogger.info('CHAT REQUEST', 'Query received', {
@@ -72,6 +76,8 @@ export const askQuestion = async (req, res) => {
       intent: intent || 'auto',
       thinkingMode: isThinking,
       webMode: isWeb,
+      memoriesCount: activeMemories.length,
+      interactionLimit,
     });
 
     const currentChatId = await ensureChat({
@@ -86,8 +92,8 @@ export const askQuestion = async (req, res) => {
       const historyResult = await query(
         `SELECT role, content FROM chat_history 
          WHERE chat_id = $1 
-         ORDER BY created_at DESC LIMIT 10`,
-        [currentChatId]
+         ORDER BY created_at DESC LIMIT $2`,
+        [currentChatId, interactionLimit]
       );
       chatHistory = historyResult.rows.reverse();
     }
@@ -190,19 +196,23 @@ export const streamQuestion = async (req, res) => {
     const isThinking = thinkingMode === true || thinkingMode === 'true';
     const isWeb = webMode === true || webMode === 'true';
 
-    // Fetch user personalization preferences
+    // Fetch user personalization preferences & learned memories
     const prefsResult = await query(
-      `SELECT custom_instructions, persona, tone, jurisdiction, output_format 
+      `SELECT custom_instructions, persona, tone, jurisdiction, output_format, memories, memory_enabled, history_limit 
        FROM user_preferences WHERE user_id = $1`,
       [req.user.id]
     );
     const userPrefs = prefsResult.rows[0] || {};
+    const interactionLimit = Math.min(Math.max(Number(userPrefs.history_limit) || 10, 2), 30);
+    const activeMemories = userPrefs.memory_enabled !== false ? (userPrefs.memories || []) : [];
+
     const mergedPersonalization = {
       customInstructions: personalization?.customInstructions || userPrefs.custom_instructions || '',
       persona: personalization?.persona || userPrefs.persona || 'legal_counsel',
       tone: personalization?.tone || userPrefs.tone || 'concise',
       jurisdiction: personalization?.jurisdiction || userPrefs.jurisdiction || 'general',
       outputFormat: personalization?.outputFormat || userPrefs.output_format || 'citations_tables',
+      memories: activeMemories,
     };
 
     requestLogger.info('CHAT REQUEST', 'Query received', {
@@ -211,6 +221,8 @@ export const streamQuestion = async (req, res) => {
       intent: intent || 'auto',
       thinkingMode: isThinking,
       webMode: isWeb,
+      memoriesCount: activeMemories.length,
+      interactionLimit,
     });
 
     const currentChatId = await ensureChat({
@@ -225,8 +237,8 @@ export const streamQuestion = async (req, res) => {
       const historyResult = await query(
         `SELECT role, content FROM chat_history 
          WHERE chat_id = $1 
-         ORDER BY created_at DESC LIMIT 10`,
-        [currentChatId]
+         ORDER BY created_at DESC LIMIT $2`,
+        [currentChatId, interactionLimit]
       );
       chatHistory = historyResult.rows.reverse();
     }

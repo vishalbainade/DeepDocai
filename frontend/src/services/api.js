@@ -601,6 +601,46 @@ export const updateUserPreferences = async (prefs) => {
 };
 
 /**
+ * Fetch Claude-style persistent memories
+ */
+export const getUserMemories = async () => {
+  const response = await api.get('/api/user/memories');
+  return response.data;
+};
+
+/**
+ * Add a new manual memory
+ */
+export const addUserMemory = async (content) => {
+  const response = await api.post('/api/user/memories', { content });
+  return response.data;
+};
+
+/**
+ * Delete a specific memory item
+ */
+export const deleteUserMemory = async (id) => {
+  const response = await api.delete(`/api/user/memories/${id}`);
+  return response.data;
+};
+
+/**
+ * Clear all learned memories
+ */
+export const clearUserMemories = async () => {
+  const response = await api.delete('/api/user/memories');
+  return response.data;
+};
+
+/**
+ * Auto-extract memories from recent chat interactions using Gemini
+ */
+export const extractUserMemories = async () => {
+  const response = await api.post('/api/user/memories/extract');
+  return response.data;
+};
+
+/**
  * Fetch comprehensive usage metrics (OCR pages, embedding tokens, AI tokens)
  */
 export const getUsageSummary = async () => {
