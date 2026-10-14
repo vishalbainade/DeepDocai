@@ -7,12 +7,21 @@ import logger from '../../utils/logger.js';
  */
 export const PROVIDER_SLUG = 'google';
 
-// Model aliases fallback for experimental preview names
-const FALLBACK_CANDIDATES = ['gemini-2.5-flash', 'gemini-3-flash-preview', 'gemini-2.0-flash'];
+// Model aliases fallback for stable Google AI endpoints
+const FALLBACK_CANDIDATES = ['gemini-2.5-flash', 'gemini-2.5-pro'];
+
+const resolveModelName = (name) => {
+  if (!name) return 'gemini-2.5-flash';
+  const clean = name.trim().toLowerCase();
+  if (clean === 'gemini-2.5-pro' || clean.includes('2.5-pro')) return 'gemini-2.5-pro';
+  if (clean.includes('gemini') || clean.includes('flash') || clean.includes('gemma')) return 'gemini-2.5-flash';
+  return name;
+};
 
 export const generateText = async ({ apiKey, modelName, prompt, config = {} }) => {
   const startTime = Date.now();
-  const providerLogger = logger.child({ provider: PROVIDER_SLUG, model: modelName });
+  const primaryModel = resolveModelName(modelName);
+  const providerLogger = logger.child({ provider: PROVIDER_SLUG, model: primaryModel });
 
   const isThinking = config.thinkingMode === true || config.thinkingMode === 'true';
   const isWeb = config.webMode === true || config.webMode === 'true' || config.grounding === true;
@@ -20,7 +29,7 @@ export const generateText = async ({ apiKey, modelName, prompt, config = {} }) =
   providerLogger.info('PROVIDER', 'Gemini request initiated', {
     event: 'EXTERNAL_API_CALL_START',
     endpoint: 'generativelanguage.googleapis.com',
-    modelName,
+    modelName: primaryModel,
     promptLength: prompt.length,
     thinkingMode: isThinking,
     grounding: isWeb,
@@ -37,8 +46,8 @@ export const generateText = async ({ apiKey, modelName, prompt, config = {} }) =
 
   const tools = isWeb ? [{ googleSearch: {} }] : undefined;
 
-  // Attempt with requested modelName, fall back if 404
-  const modelsToTry = [modelName, ...FALLBACK_CANDIDATES.filter((m) => m !== modelName)];
+  // Attempt with resolved primary model, fallback if error
+  const modelsToTry = [primaryModel, ...FALLBACK_CANDIDATES.filter((m) => m !== primaryModel)];
   let lastError = null;
 
   for (const currentModel of modelsToTry) {
@@ -106,7 +115,8 @@ export const generateText = async ({ apiKey, modelName, prompt, config = {} }) =
 
 export const generateTextStream = async function* ({ apiKey, modelName, prompt, config = {} }) {
   const startTime = Date.now();
-  const providerLogger = logger.child({ provider: PROVIDER_SLUG, model: modelName });
+  const primaryModel = resolveModelName(modelName);
+  const providerLogger = logger.child({ provider: PROVIDER_SLUG, model: primaryModel });
 
   const isThinking = config.thinkingMode === true || config.thinkingMode === 'true';
   const isWeb = config.webMode === true || config.webMode === 'true' || config.grounding === true;
@@ -114,7 +124,7 @@ export const generateTextStream = async function* ({ apiKey, modelName, prompt, 
   providerLogger.info('PROVIDER', 'Gemini streaming request initiated', {
     event: 'EXTERNAL_API_STREAM_START',
     endpoint: 'generativelanguage.googleapis.com',
-    modelName,
+    modelName: primaryModel,
     thinkingMode: isThinking,
     grounding: isWeb,
   });
@@ -129,8 +139,8 @@ export const generateTextStream = async function* ({ apiKey, modelName, prompt, 
 
   const tools = isWeb ? [{ googleSearch: {} }] : undefined;
 
-  const modelsToTry = [modelName, ...FALLBACK_CANDIDATES.filter((m) => m !== modelName)];
-  let activeModelUsed = modelName;
+  const modelsToTry = [primaryModel, ...FALLBACK_CANDIDATES.filter((m) => m !== primaryModel)];
+  let activeModelUsed = primaryModel;
   let result = null;
 
   for (const currentModel of modelsToTry) {
@@ -145,8 +155,20 @@ export const generateTextStream = async function* ({ apiKey, modelName, prompt, 
       activeModelUsed = currentModel;
       break;
     } catch (initError) {
-      if (initError.message?.includes('404') || initError.message?.includes('not found') || initError.message?.includes('bidiGenerateContent') || initError.message?.includes('WebSocket') || initError.status === 404 || initError.status === 400) {
-        providerLogger.warn('PROVIDER', `Stream model ${currentModel} requires WebSocket or not found, trying candidate...`);
+      const isRetryable =
+        initError.message?.includes('404') ||
+        initError.message?.includes('503') ||
+        initError.message?.includes('500') ||
+        initError.message?.includes('not found') ||
+        initError.message?.includes('demand') ||
+        initError.message?.includes('Unavailable') ||
+        initError.message?.includes('bidiGenerateContent') ||
+        initError.message?.includes('WebSocket') ||
+        initError.status === 404 ||
+        initError.status === 503;
+
+      if (isRetryable) {
+        providerLogger.warn('PROVIDER', `Stream model ${currentModel} error (${initError.message}), trying candidate...`);
         continue;
       }
       providerLogger.error('PROVIDER', 'Gemini stream initialization failed', {

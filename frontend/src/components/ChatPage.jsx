@@ -10,7 +10,7 @@ import UploadZone from './UploadZone';
 import ChatStream from './ChatStream';
 import { getAvailableModels, getDocumentPreview, uploadDocument } from '../services/api';
 import { detectQueryIntent } from '../utils/intentDetection';
-import { useDarkColors } from '../utils/darkMode';
+import { useDarkColors, useIsDark } from '../utils/darkMode';
 
 const FALLBACK_MODELS = [
   { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash' },
@@ -76,6 +76,7 @@ const ChatPage = () => {
   const { preferences, updatePreference } = useTheme();
   const [selectedModel, setSelectedModel] = useState(preferences?.defaultModelId || FALLBACK_MODELS[0].id);
   const dc = useDarkColors();
+  const isDark = useIsDark();
   const [activeHighlight, setActiveHighlight] = useState(null);
   const [activeStream, setActiveStream] = useState(null);
   const activeStreamIdRef = useRef(null);

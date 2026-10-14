@@ -78,7 +78,7 @@ export const getUserUsageSummary = async (userId) => {
          COALESCE(SUM(page_count), 0)::integer as doc_pages,
          COALESCE(SUM(embedding_tokens), 0)::bigint as doc_embedding_tokens
        FROM documents
-       WHERE user_id = $1 OR user_id IS NULL`,
+       WHERE user_id = $1`,
       [userId]
     );
 

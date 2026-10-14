@@ -1,14 +1,19 @@
 import express from 'express';
 import { query } from '../db/index.js';
+import { authenticateToken } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
 
+// Require authentication for all history routes
+router.use(authenticateToken);
+
 /**
  * GET /api/history/documents
- * Get all uploaded documents with their metadata
+ * Get all uploaded documents belonging to the authenticated user
  */
 router.get('/documents', async (req, res) => {
   try {
+    const userId = req.user.id;
     const result = await query(
       `SELECT 
         id,
@@ -17,9 +22,10 @@ router.get('/documents', async (req, res) => {
         created_at,
         (SELECT COUNT(*) FROM chat_history WHERE document_id = documents.id) as message_count
        FROM documents
+       WHERE user_id = $1
        ORDER BY created_at DESC
        LIMIT 100`,
-      []
+      [userId]
     );
 
     res.json({
@@ -48,11 +54,12 @@ router.get('/documents', async (req, res) => {
 router.get('/chat/:documentId', async (req, res) => {
   try {
     const { documentId } = req.params;
+    const userId = req.user.id;
 
-    // Verify document exists
+    // Verify document exists and belongs to user
     const docResult = await query(
-      'SELECT id, file_name FROM documents WHERE id = $1',
-      [documentId]
+      'SELECT id, file_name FROM documents WHERE id = $1 AND user_id = $2',
+      [documentId, userId]
     );
 
     if (docResult.rows.length === 0) {
@@ -95,4 +102,3 @@ router.get('/chat/:documentId', async (req, res) => {
 });
 
 export default router;
-

@@ -32,12 +32,13 @@ export const processDocument = async (req, res) => {
 
     const baseUrl = process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
     const initialStorageUrl = `${baseUrl}/api/upload/file/${encodeURIComponent(storageFileName)}`;
+    const userId = req.user?.id || null;
     const docCheckResult = await query('SELECT id FROM documents WHERE id = $1', [documentId]);
 
     if (!docCheckResult.rows.length) {
       await query(
-        'INSERT INTO documents (id, file_name, storage_url, status) VALUES ($1, $2, $3, $4)',
-        [documentId, fileName, initialStorageUrl, 'processing']
+        'INSERT INTO documents (id, file_name, storage_url, status, user_id) VALUES ($1, $2, $3, $4, $5)',
+        [documentId, fileName, initialStorageUrl, 'processing', userId]
       );
     } else {
       await updateDocumentStatus(documentId, 'processing', initialStorageUrl);
@@ -120,7 +121,6 @@ export const processDocument = async (req, res) => {
 
     const embeddingTokens = chunkTexts.reduce((acc, text) => acc + estimateTokens(text), 0);
     const pageCount = ocrMetadataPages.length;
-    const userId = req.user?.id || null;
 
     // Update document with page count, embedding tokens, and user ID
     if (userId) {

@@ -53,7 +53,7 @@ const ChatStream = ({
   }, [onToken, onChatId, onCitations, onComplete, onError, onDone]);
 
   useEffect(() => {
-    if (!request?.documentId || !request?.question) {
+    if (!request?.question) {
       return undefined;
     }
 
@@ -74,8 +74,8 @@ const ChatStream = ({
       const token = getToken();
       const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
       const params = new URLSearchParams({
-        documentId: request.documentId,
         question: request.question,
+        ...(request.documentId ? { documentId: request.documentId } : {}),
         ...(request.chatId ? { chatId: request.chatId } : {}),
         ...(request.intent ? { intent: request.intent } : {}),
         ...(request.model ? { model: request.model } : {}),
