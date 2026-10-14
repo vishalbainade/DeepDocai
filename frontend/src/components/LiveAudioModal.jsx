@@ -11,18 +11,19 @@ import {
   ChevronDown, 
   Square, 
   MessageSquare, 
-  ChevronRight,
-  ExternalLink,
-  Send,
-  AlertCircle,
-  PhoneOff,
-  Sliders,
-  Play,
-  RotateCcw,
-  Check
+  ChevronRight, 
+  ExternalLink, 
+  Send, 
+  AlertCircle, 
+  PhoneOff, 
+  Sliders, 
+  Play, 
+  RotateCcw, 
+  Check 
 } from 'lucide-react';
 import { useChat } from '../contexts/ChatContext';
 import { sendLiveAudioDialog } from '../services/api';
+import { useDarkColors, useIsDark } from '../utils/darkMode';
 
 const LIVE_AUDIO_MODELS = [
   { id: 'gemini-3.8-live-extended-thinking', name: 'Gemini 3.8 Live Extended Thinking', badge: 'Thinking', color: 'text-amber-400' },
@@ -71,6 +72,8 @@ const QUICK_PROMPTS = [
 
 const LiveAudioModal = ({ isOpen, onClose }) => {
   const { currentDocumentId } = useChat();
+  const dc = useDarkColors();
+  const isDark = useIsDark();
 
   const [selectedAudioModel, setSelectedAudioModel] = useState('gemini-3.8-live-extended-thinking');
   const [thinkingMode, setThinkingMode] = useState(true);
@@ -539,48 +542,78 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
   const activeVoiceMeta = GEMINI_VOICES.find((v) => v.id === selectedVoiceId) || GEMINI_VOICES[0];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-xl animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/60 dark:bg-black/75 backdrop-blur-md animate-in fade-in duration-200">
       <div 
-        className="relative w-full max-w-2xl h-[92vh] max-h-[840px] rounded-3xl border border-white/10 shadow-2xl flex flex-col overflow-hidden text-white"
+        className="relative w-full max-w-2xl h-[92vh] max-h-[840px] rounded-3xl border shadow-2xl flex flex-col overflow-hidden transition-colors"
         style={{
-          background: 'radial-gradient(ellipse at 50% 12%, #18151f 0%, #111015 50%, #0b0a0e 100%)',
-          boxShadow: '0 25px 70px -15px rgba(0, 0, 0, 0.95), 0 0 120px -30px rgba(218, 119, 86, 0.25)',
+          backgroundColor: isDark ? '#131316' : '#ffffff',
+          borderColor: isDark ? '#27272a' : '#e4e4e7',
+          color: dc.textPrimary,
+          boxShadow: isDark 
+            ? '0 25px 70px -15px rgba(0, 0, 0, 0.95), 0 0 80px -20px rgba(218, 119, 86, 0.22)' 
+            : '0 25px 70px -15px rgba(0, 0, 0, 0.12), 0 0 60px -20px rgba(218, 119, 86, 0.15)',
         }}
       >
-        {/* Top Header Bar - DeepDoc + Gemini Live */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-white/[0.02]">
+        {/* Top Header Bar - DeepDoc AI + Gemini Live */}
+        <div 
+          className="flex items-center justify-between px-6 py-4 border-b transition-colors"
+          style={{ borderColor: isDark ? '#27272a' : '#f4f4f5' }}
+        >
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              {/* Brand Terracotta & Amber Sparkle */}
+            <div className="flex items-center gap-2.5">
+              {/* Brand Terracotta & Amber Sparkle Icon */}
               <div 
-                className="w-7 h-7 rounded-full flex items-center justify-center shadow-sm"
-                style={{ background: 'linear-gradient(135deg, #da7756 0%, #f59e0b 60%, #8b5cf6 100%)' }}
+                className="w-9 h-9 rounded-xl flex items-center justify-center shadow-sm"
+                style={{ backgroundColor: 'rgba(218, 119, 86, 0.15)', color: '#da7756' }}
               >
-                <Sparkles size={15} className="text-white animate-pulse" />
+                <Sparkles size={18} className="animate-pulse" />
               </div>
               <div>
-                <span className="text-sm font-bold tracking-tight text-white">
-                  Gemini Live
-                </span>
-                <span className="hidden sm:inline-block ml-2 text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30">
-                  {activeVoiceMeta.name} Voice
-                </span>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-bold tracking-tight" style={{ color: dc.textPrimary }}>
+                    Gemini Live
+                  </h2>
+                  <span 
+                    className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full"
+                    style={{ 
+                      backgroundColor: 'rgba(218, 119, 86, 0.12)', 
+                      color: '#da7756', 
+                      border: '1px solid rgba(218, 119, 86, 0.25)' 
+                    }}
+                  >
+                    {activeVoiceMeta.name} Voice
+                  </span>
+                </div>
+                <p className="text-[11px]" style={{ color: dc.textSecondary }}>
+                  DeepDoc AI Conversational Assistant
+                </p>
               </div>
             </div>
 
             {/* Model Selector Pill */}
-            <div className="relative ml-2">
+            <div className="relative ml-1">
               <button
                 type="button"
                 onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors text-xs font-medium cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium cursor-pointer transition-colors"
+                style={{
+                  backgroundColor: isDark ? '#1e1e24' : '#f1f5f9',
+                  borderColor: isDark ? '#2e2e34' : '#e2e8f0',
+                  color: dc.textPrimary,
+                }}
               >
-                <span className="font-semibold text-[11px] truncate max-w-[140px]">{activeModelMeta.name}</span>
-                <ChevronDown size={11} className="text-white/50" />
+                <span className="font-semibold text-[11px] truncate max-w-[130px]">{activeModelMeta.name}</span>
+                <ChevronDown size={11} style={{ color: dc.textSecondary }} />
               </button>
 
               {isModelDropdownOpen && (
-                <div className="absolute top-full mt-2 left-0 w-72 rounded-2xl bg-[#141418] border border-white/10 shadow-2xl p-1.5 z-50">
+                <div 
+                  className="absolute top-full mt-2 left-0 w-72 rounded-2xl border shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-150"
+                  style={{
+                    backgroundColor: isDark ? '#18181b' : '#ffffff',
+                    borderColor: isDark ? '#27272a' : '#e4e4e7',
+                  }}
+                >
                   {LIVE_AUDIO_MODELS.map((m) => (
                     <button
                       key={m.id}
@@ -589,9 +622,11 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
                         setSelectedAudioModel(m.id);
                         setIsModelDropdownOpen(false);
                       }}
-                      className={`w-full text-left p-2.5 rounded-xl text-xs flex items-center justify-between gap-2 hover:bg-white/10 transition-colors cursor-pointer ${
-                        selectedAudioModel === m.id ? 'bg-white/10 text-white' : 'text-white/70'
-                      }`}
+                      className="w-full text-left p-2.5 rounded-xl text-xs flex items-center justify-between gap-2 transition-colors cursor-pointer hover:opacity-90"
+                      style={{
+                        backgroundColor: selectedAudioModel === m.id ? (isDark ? '#27272a' : '#f1f5f9') : 'transparent',
+                        color: dc.textPrimary,
+                      }}
                     >
                       <span className="font-semibold">{m.name}</span>
                       <span className={`text-[10px] font-mono ${m.color}`}>{m.badge}</span>
@@ -607,12 +642,15 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
             <button
               type="button"
               onClick={() => setShowSettingsDrawer(!showSettingsDrawer)}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
-                showSettingsDrawer ? 'bg-amber-500/20 border-amber-500/40 text-amber-300' : 'bg-white/5 border-white/10 text-white/70 hover:text-white'
-              }`}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors cursor-pointer"
+              style={{
+                backgroundColor: showSettingsDrawer ? 'rgba(218, 119, 86, 0.15)' : (isDark ? '#1e1e24' : '#f1f5f9'),
+                borderColor: showSettingsDrawer ? '#da7756' : (isDark ? '#2e2e34' : '#e2e8f0'),
+                color: showSettingsDrawer ? '#da7756' : dc.textSecondary,
+              }}
               title="Voice Persona & Customization Prompt"
             >
-              <Sliders size={12} className={showSettingsDrawer ? 'text-amber-400' : 'text-white/60'} />
+              <Sliders size={12} className={showSettingsDrawer ? 'text-[#da7756]' : ''} />
               <span>Persona</span>
             </button>
 
@@ -620,12 +658,15 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
             <button
               type="button"
               onClick={() => setThinkingMode(!thinkingMode)}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
-                thinkingMode ? 'bg-amber-500/20 border-amber-500/40 text-amber-300' : 'bg-white/5 border-white/10 text-white/50'
-              }`}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors cursor-pointer"
+              style={{
+                backgroundColor: thinkingMode ? 'rgba(245, 158, 11, 0.15)' : (isDark ? '#1e1e24' : '#f1f5f9'),
+                borderColor: thinkingMode ? '#f59e0b' : (isDark ? '#2e2e34' : '#e2e8f0'),
+                color: thinkingMode ? '#d97706' : dc.textSecondary,
+              }}
               title="Extended Deep Thinking in Gemini Live dialog"
             >
-              <Brain size={12} className={thinkingMode ? 'text-amber-400' : 'text-white/40'} />
+              <Brain size={12} className={thinkingMode ? 'text-amber-500' : ''} />
               <span>Thinking: {thinkingMode ? 'ON' : 'OFF'}</span>
             </button>
 
@@ -633,12 +674,15 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
             <button
               type="button"
               onClick={() => setGroundingMode(!groundingMode)}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
-                groundingMode ? 'bg-blue-500/20 border-blue-500/40 text-blue-300' : 'bg-white/5 border-white/10 text-white/50'
-              }`}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors cursor-pointer"
+              style={{
+                backgroundColor: groundingMode ? 'rgba(59, 130, 246, 0.15)' : (isDark ? '#1e1e24' : '#f1f5f9'),
+                borderColor: groundingMode ? '#3b82f6' : (isDark ? '#2e2e34' : '#e2e8f0'),
+                color: groundingMode ? '#2563eb' : dc.textSecondary,
+              }}
               title="Real-time Google Search Grounding"
             >
-              <Globe size={12} className={groundingMode ? 'text-blue-400' : 'text-white/40'} />
+              <Globe size={12} className={groundingMode ? 'text-blue-500' : ''} />
               <span>Search: {groundingMode ? 'ON' : 'OFF'}</span>
             </button>
 
@@ -648,7 +692,8 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
                 stopAllVoice();
                 onClose();
               }}
-              className="p-1.5 rounded-full hover:bg-white/10 transition-colors text-white/60 hover:text-white ml-2 cursor-pointer"
+              className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer ml-1"
+              style={{ color: dc.textSecondary }}
               title="End Gemini Live Session"
             >
               <X size={18} />
@@ -658,7 +703,7 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
 
         {/* Mic Permission Warning Banner if blocked */}
         {micPermissionError && (
-          <div className="mx-6 mt-3 px-3.5 py-2 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center justify-between gap-2">
+          <div className="mx-6 mt-3 px-3.5 py-2 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-500 text-xs flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <AlertCircle size={14} className="shrink-0" />
               <span>{micPermissionError}</span>
@@ -666,21 +711,22 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
             <button
               type="button"
               onClick={initSpeechRecognition}
-              className="px-2 py-0.5 rounded bg-rose-500/30 hover:bg-rose-500/50 text-[11px] font-semibold transition-colors cursor-pointer shrink-0"
+              className="px-2.5 py-1 rounded bg-rose-500 text-white hover:bg-rose-600 text-[11px] font-semibold transition-colors cursor-pointer shrink-0"
             >
               Retry Mic
             </button>
           </div>
         )}
 
-        {/* Center Canvas / DeepDoc Terracotta & Amber Gemini Live Orb */}
+        {/* Center Canvas / DeepDoc Signature Terracotta & Amber Interactive Orb */}
         <div className="flex-1 flex flex-col items-center justify-center relative p-6 select-none overflow-hidden">
-          {/* Animated Atmospheric Glow matching DeepDoc Terracotta & Amber */}
+          {/* Animated Atmospheric Background Glow */}
           <div 
-            className="absolute w-84 h-84 rounded-full blur-3xl opacity-35 pointer-events-none transition-all duration-700"
+            className="absolute w-84 h-84 rounded-full blur-3xl pointer-events-none transition-all duration-700"
             style={{
+              opacity: isDark ? 0.35 : 0.2,
               background: status === 'speaking' 
-                ? 'radial-gradient(circle, #8b5cf6 0%, #da7756 50%, transparent 100%)' 
+                ? 'radial-gradient(circle, #da7756 0%, #8E84B8 55%, transparent 100%)' 
                 : status === 'thinking'
                 ? 'radial-gradient(circle, #f59e0b 0%, #b45309 60%, transparent 100%)'
                 : 'radial-gradient(circle, #da7756 0%, #f59e0b 50%, transparent 100%)',
@@ -688,14 +734,18 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
             }}
           />
 
-          {/* Central Interactive Voice Orb */}
+          {/* Central Interactive Voice Orb Container */}
           <div className="relative flex items-center justify-center">
-            {/* Live Audio Equalizer Frequency Waveform Bars */}
+            {/* Rotating Dashed Orbital Ring */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div 
                 className="w-64 h-64 sm:w-72 sm:h-72 rounded-full border border-dashed transition-all duration-300"
                 style={{
-                  borderColor: status === 'speaking' ? 'rgba(139, 92, 246, 0.4)' : status === 'thinking' ? 'rgba(245, 158, 11, 0.4)' : 'rgba(218, 119, 86, 0.4)',
+                  borderColor: status === 'speaking' 
+                    ? 'rgba(218, 119, 86, 0.55)' 
+                    : status === 'thinking' 
+                    ? 'rgba(245, 158, 11, 0.55)' 
+                    : (isDark ? 'rgba(218, 119, 86, 0.4)' : 'rgba(218, 119, 86, 0.5)'),
                   transform: `scale(${1 + audioLevel * 0.35}) rotate(${audioLevel * 30}deg)`,
                 }}
               />
@@ -707,39 +757,45 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
               className="relative flex items-center justify-center cursor-pointer group focus:outline-none"
               title={status === 'speaking' ? 'Click to interrupt' : status === 'listening' ? 'Click to send current speech' : 'Click to start speaking'}
             >
-              {/* Outer pulsating ring */}
+              {/* Outer Pulsating Ring */}
               <div 
                 className="w-48 h-48 sm:w-56 sm:h-56 rounded-full border transition-all duration-300 flex items-center justify-center group-hover:scale-105"
                 style={{
                   transform: `scale(${1 + (status === 'speaking' ? 0.08 : audioLevel * 0.45)})`,
                   boxShadow: status === 'speaking'
-                    ? '0 0 60px rgba(139, 92, 246, 0.45), inset 0 0 35px rgba(218, 119, 86, 0.3)'
+                    ? '0 0 60px rgba(218, 119, 86, 0.45), inset 0 0 35px rgba(245, 158, 11, 0.3)'
                     : status === 'thinking'
                     ? '0 0 60px rgba(245, 158, 11, 0.45), inset 0 0 35px rgba(245, 158, 11, 0.25)'
-                    : '0 0 60px rgba(218, 119, 86, 0.4), inset 0 0 30px rgba(245, 158, 11, 0.3)',
-                  borderColor: status === 'speaking' ? '#a78bfa' : status === 'thinking' ? '#f59e0b' : '#da7756',
+                    : '0 0 60px rgba(218, 119, 86, 0.35), inset 0 0 30px rgba(245, 158, 11, 0.25)',
+                  borderColor: status === 'speaking' ? '#da7756' : status === 'thinking' ? '#f59e0b' : '#da7756',
                 }}
               >
-                {/* Middle Orb with Terracotta/Amber/Violet Gradient */}
+                {/* Middle Orb with DeepDoc Terracotta & Amber Gradient */}
                 <div 
-                  className="w-36 h-36 sm:w-44 sm:h-44 rounded-full flex items-center justify-center transition-all duration-500"
+                  className="w-36 h-36 sm:w-44 sm:h-44 rounded-full flex items-center justify-center transition-all duration-500 shadow-xl"
                   style={{
                     background: status === 'speaking'
-                      ? 'radial-gradient(circle, #8b5cf6 0%, #da7756 70%, #ec4899 100%)'
+                      ? 'radial-gradient(circle, #da7756 0%, #e06847 45%, #8E84B8 90%)'
                       : status === 'thinking'
                       ? 'radial-gradient(circle, #f59e0b 0%, #b45309 65%, #78350f 100%)'
                       : 'radial-gradient(circle, #da7756 0%, #e06847 45%, #b45309 85%, #78350f 100%)',
                     animation: status === 'thinking' ? 'pulse 1.5s infinite ease-in-out' : undefined,
                   }}
                 >
-                  {/* Core Icon */}
-                  <div className="w-16 h-16 rounded-full bg-black/45 backdrop-blur-md flex items-center justify-center shadow-inner">
+                  {/* Frosted Glass Core */}
+                  <div 
+                    className="w-16 h-16 rounded-full flex items-center justify-center shadow-inner transition-transform group-hover:scale-110"
+                    style={{
+                      backgroundColor: isDark ? 'rgba(0, 0, 0, 0.45)' : 'rgba(255, 255, 255, 0.45)',
+                      backdropFilter: 'blur(8px)',
+                    }}
+                  >
                     {status === 'speaking' ? (
                       <Volume2 size={30} className="text-white animate-pulse" />
                     ) : status === 'thinking' ? (
-                      <Sparkles size={30} className="text-amber-300 animate-spin" />
+                      <Sparkles size={30} className="text-amber-200 animate-spin" />
                     ) : (
-                      <Mic size={30} className={audioLevel > 0.08 ? 'text-white scale-110 transition-transform' : 'text-amber-200'} />
+                      <Mic size={30} className={audioLevel > 0.08 ? 'text-white scale-110 transition-transform' : 'text-amber-100'} />
                     )}
                   </div>
                 </div>
@@ -747,7 +803,7 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
             </button>
           </div>
 
-          {/* Real-time Mic Audio Wave Indicator */}
+          {/* Real-time Mic Equalizer Indicator */}
           <div className="flex items-center gap-1.5 mt-5 h-4">
             {[0.2, 0.5, 0.8, 1.0, 0.7, 0.4, 0.9, 0.6, 0.3].map((mult, i) => (
               <span
@@ -755,36 +811,50 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
                 className="w-1 rounded-full transition-all duration-150"
                 style={{
                   height: `${Math.max(4, audioLevel * 24 * mult)}px`,
-                  backgroundColor: audioLevel > 0.05 ? '#da7756' : 'rgba(255, 255, 255, 0.2)',
+                  backgroundColor: audioLevel > 0.05 ? '#da7756' : (isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.15)'),
                 }}
               />
             ))}
           </div>
 
-          {/* Status Badge */}
+          {/* Status Badge Pill */}
           <div className="mt-4 text-center z-10">
-            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-xs font-semibold uppercase tracking-wider backdrop-blur-md border border-white/10">
+            <span 
+              className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-semibold tracking-wide border shadow-sm"
+              style={{
+                backgroundColor: isDark ? '#1e1e24' : '#f1f5f9',
+                borderColor: isDark ? '#2e2e34' : '#e2e8f0',
+                color: dc.textPrimary,
+              }}
+            >
               <span className={`w-2 h-2 rounded-full ${
-                status === 'speaking' ? 'bg-purple-400 animate-pulse' : status === 'thinking' ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400 animate-ping'
+                status === 'speaking' ? 'bg-[#da7756] animate-pulse' : status === 'thinking' ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500 animate-ping'
               }`} />
               {status === 'speaking' 
-                ? 'Gemini Speaking (Tap Orb to Interrupt)' 
+                ? 'DeepDoc Speaking (Tap Orb to Interrupt)' 
                 : status === 'thinking' 
-                ? 'Thinking & Synthesizing...' 
+                ? 'Reasoning & Synthesizing...' 
                 : audioLevel > 0.08
                 ? 'Listening to your voice...'
-                : 'Listening... Speak or Tap Orb to Send'}
+                : 'Listening... Speak Freely'}
             </span>
           </div>
 
           {/* Current Live Transcription Preview */}
           <div className="w-full max-w-lg mt-3 px-4 text-center z-10 min-h-[44px]">
             {userTranscript ? (
-              <p className="text-sm font-medium text-white/95 leading-relaxed bg-black/50 px-4 py-2 rounded-2xl border border-amber-500/30 backdrop-blur-md shadow-lg">
+              <p 
+                className="text-sm font-medium leading-relaxed px-4 py-2 rounded-2xl border shadow-sm"
+                style={{
+                  backgroundColor: isDark ? '#18181b' : '#f8fafc',
+                  borderColor: isDark ? '#27272a' : '#e2e8f0',
+                  color: dc.textPrimary,
+                }}
+              >
                 “{userTranscript}”
               </p>
             ) : (
-              <p className="text-xs text-white/40 italic">
+              <p className="text-xs italic" style={{ color: dc.textSecondary }}>
                 Speak your legal question naturally, or pick a starter topic below...
               </p>
             )}
@@ -797,7 +867,20 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
                 key={idx}
                 type="button"
                 onClick={() => handleSendTurn(prompt)}
-                className="px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] text-white/70 hover:text-white transition-all cursor-pointer"
+                className="px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all cursor-pointer"
+                style={{
+                  backgroundColor: isDark ? '#1e1e24' : '#ffffff',
+                  borderColor: isDark ? '#2e2e34' : '#e2e8f0',
+                  color: dc.textSecondary,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = '#da7756';
+                  e.currentTarget.style.color = '#da7756';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = isDark ? '#2e2e34' : '#e2e8f0';
+                  e.currentTarget.style.color = dc.textSecondary;
+                }}
               >
                 {prompt}
               </button>
@@ -806,22 +889,28 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
 
           {/* Spoken AI Answer Card */}
           {aiResponse && (
-            <div className="w-full max-w-lg mt-3 p-3.5 rounded-2xl bg-white/5 border border-white/10 text-left backdrop-blur-md z-10 max-h-36 overflow-y-auto">
-              <div className="flex items-center gap-1.5 text-xs text-amber-400 font-semibold mb-1">
+            <div 
+              className="w-full max-w-lg mt-3 p-3.5 rounded-2xl border text-left shadow-sm z-10 max-h-36 overflow-y-auto"
+              style={{
+                backgroundColor: isDark ? '#18181b' : '#f8fafc',
+                borderColor: isDark ? '#27272a' : '#e2e8f0',
+              }}
+            >
+              <div className="flex items-center gap-1.5 text-xs font-semibold mb-1" style={{ color: '#da7756' }}>
                 <Sparkles size={13} />
                 <span>Gemini Live ({activeVoiceMeta.name}):</span>
               </div>
-              <p className="text-xs text-white/90 leading-relaxed">
+              <p className="text-xs leading-relaxed" style={{ color: dc.textPrimary }}>
                 {aiResponse}
               </p>
 
-              {/* Collapsible Thought if available */}
+              {/* Collapsible Thought trace if available */}
               {aiThought && (
-                <div className="mt-2 pt-2 border-t border-white/10">
-                  <span className="text-[10px] font-mono uppercase text-amber-400 flex items-center gap-1">
+                <div className="mt-2 pt-2 border-t" style={{ borderColor: isDark ? '#27272a' : '#e2e8f0' }}>
+                  <span className="text-[10px] font-mono uppercase text-amber-500 flex items-center gap-1">
                     <Brain size={10} /> Thought Trace:
                   </span>
-                  <p className="text-[11px] font-mono text-white/60 leading-relaxed line-clamp-2 mt-0.5">
+                  <p className="text-[11px] font-mono leading-relaxed line-clamp-2 mt-0.5" style={{ color: dc.textSecondary }}>
                     {aiThought}
                   </p>
                 </div>
@@ -829,8 +918,8 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
 
               {/* Web Sources Chips if available */}
               {webSources.length > 0 && (
-                <div className="mt-2 pt-2 border-t border-white/10 flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[10px] text-blue-400 flex items-center gap-1">
+                <div className="mt-2 pt-2 border-t flex items-center gap-1.5 flex-wrap" style={{ borderColor: isDark ? '#27272a' : '#e2e8f0' }}>
+                  <span className="text-[10px] text-blue-500 flex items-center gap-1">
                     <Globe size={10} /> Grounded:
                   </span>
                   {webSources.slice(0, 3).map((s, idx) => (
@@ -839,7 +928,7 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
                       href={s.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-blue-500/10 border border-blue-500/20 text-blue-300 hover:underline"
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 hover:underline"
                     >
                       <span className="truncate max-w-[100px]">{s.title}</span>
                       <ExternalLink size={8} />
@@ -852,7 +941,13 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
         </div>
 
         {/* Text Input Fallback Bar */}
-        <div className="px-6 py-2 border-t border-white/5 bg-white/[0.01]">
+        <div 
+          className="px-6 py-2.5 border-t transition-colors"
+          style={{ 
+            borderColor: isDark ? '#27272a' : '#f4f4f5',
+            backgroundColor: isDark ? '#151518' : '#fafafa',
+          }}
+        >
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -861,19 +956,25 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
                 setTextInput('');
               }
             }}
-            className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-2xl px-3 py-1.5"
+            className="flex items-center gap-2 rounded-2xl px-3 py-1.5 border shadow-sm"
+            style={{
+              backgroundColor: isDark ? '#18181b' : '#ffffff',
+              borderColor: isDark ? '#2e2e34' : '#e4e4e7',
+            }}
           >
             <input
               type="text"
               value={textInput}
               onChange={(e) => setTextInput(e.target.value)}
               placeholder="Or type a question to speak back..."
-              className="w-full bg-transparent outline-none text-xs text-white placeholder:text-white/40"
+              className="w-full bg-transparent outline-none text-xs"
+              style={{ color: dc.textPrimary }}
             />
             <button
               type="submit"
               disabled={!textInput.trim() || status === 'thinking'}
-              className="p-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-30 text-black cursor-pointer transition-colors"
+              className="p-1.5 rounded-xl disabled:opacity-30 text-white cursor-pointer transition-colors shadow-sm"
+              style={{ backgroundColor: '#da7756' }}
             >
               <Send size={13} />
             </button>
@@ -881,15 +982,26 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
         </div>
 
         {/* Bottom Audio Controls Bar */}
-        <div className="flex items-center justify-between px-6 py-3.5 border-t border-white/10 bg-white/[0.02]">
+        <div 
+          className="flex items-center justify-between px-6 py-3.5 border-t transition-colors"
+          style={{ 
+            borderColor: isDark ? '#27272a' : '#f4f4f5',
+            backgroundColor: isDark ? '#131316' : '#ffffff',
+          }}
+        >
           {/* History drawer toggle */}
           <button
             type="button"
             onClick={() => setShowHistoryDrawer(!showHistoryDrawer)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors text-xs text-white/70 hover:text-white cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-colors text-xs cursor-pointer font-medium"
+            style={{
+              backgroundColor: isDark ? '#1e1e24' : '#f1f5f9',
+              borderColor: isDark ? '#2e2e34' : '#e2e8f0',
+              color: dc.textPrimary,
+            }}
           >
-            <MessageSquare size={13} />
-            <span>Dialog History ({dialogHistory.length / 2})</span>
+            <MessageSquare size={13} style={{ color: '#da7756' }} />
+            <span>Dialog History ({Math.floor(dialogHistory.length / 2)})</span>
             {showHistoryDrawer ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
           </button>
 
@@ -899,7 +1011,8 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
               <button
                 type="button"
                 onClick={handleInterrupt}
-                className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs shadow-lg transition-all cursor-pointer"
+                className="flex items-center gap-2 px-4 py-2 rounded-2xl text-white font-semibold text-xs shadow-md transition-all cursor-pointer hover:opacity-90"
+                style={{ backgroundColor: '#da7756' }}
               >
                 <Square size={13} fill="currentColor" />
                 <span>Tap to Interrupt</span>
@@ -919,9 +1032,9 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
                     setStatus('ready');
                   }
                 }}
-                className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all cursor-pointer shadow-lg ${
+                className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all cursor-pointer shadow-md ${
                   isMicMuted
-                    ? 'bg-rose-500/20 border border-rose-500/40 text-rose-400'
+                    ? 'bg-rose-500/15 border border-rose-500/30 text-rose-500 hover:bg-rose-500/25'
                     : 'bg-emerald-500 hover:bg-emerald-600 text-white'
                 }`}
                 title={isMicMuted ? 'Unmute microphone' : 'Mute microphone'}
@@ -939,7 +1052,12 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
                 }
                 setIsSpeakerMuted(!isSpeakerMuted);
               }}
-              className="p-2.5 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors text-white/70 hover:text-white cursor-pointer"
+              className="p-2.5 rounded-2xl border transition-colors cursor-pointer"
+              style={{
+                backgroundColor: isDark ? '#1e1e24' : '#f1f5f9',
+                borderColor: isDark ? '#2e2e34' : '#e2e8f0',
+                color: dc.textPrimary,
+              }}
               title={isSpeakerMuted ? 'Unmute speaker output' : 'Mute speaker output'}
             >
               {isSpeakerMuted ? <VolumeX size={17} /> : <Volume2 size={17} />}
@@ -952,29 +1070,39 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
                 stopAllVoice();
                 onClose();
               }}
-              className="w-11 h-11 rounded-2xl flex items-center justify-center bg-red-600/90 hover:bg-red-600 text-white shadow-lg transition-all cursor-pointer"
+              className="w-11 h-11 rounded-2xl flex items-center justify-center bg-rose-600 hover:bg-rose-700 text-white shadow-md transition-all cursor-pointer"
               title="End Gemini Live Voice Session"
             >
               <PhoneOff size={18} />
             </button>
           </div>
 
-          <div className="text-[11px] font-mono text-white/40">
+          <div className="text-[11px] font-medium" style={{ color: dc.textSecondary }}>
             Bidirectional Voice
           </div>
         </div>
 
         {/* Persona & Voice Customization Settings Drawer */}
         {showSettingsDrawer && (
-          <div className="absolute inset-x-0 bottom-16 top-16 bg-[#121117]/98 backdrop-blur-2xl z-40 p-6 overflow-y-auto border-t border-white/10 animate-in fade-in slide-in-from-bottom-4 duration-200">
-            <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Sliders size={15} className="text-amber-400" />
+          <div 
+            className="absolute inset-x-0 bottom-16 top-16 z-40 p-6 overflow-y-auto border-t animate-in fade-in slide-in-from-bottom-4 duration-200"
+            style={{
+              backgroundColor: isDark ? '#131316' : '#ffffff',
+              borderColor: isDark ? '#27272a' : '#e4e4e7',
+            }}
+          >
+            <div 
+              className="flex items-center justify-between pb-3 border-b mb-4"
+              style={{ borderColor: isDark ? '#27272a' : '#f4f4f5' }}
+            >
+              <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: dc.textPrimary }}>
+                <Sliders size={15} style={{ color: '#da7756' }} />
                 Gemini Live Voice & Persona Customization
               </h3>
               <button
                 onClick={() => setShowSettingsDrawer(false)}
-                className="text-xs text-white/50 hover:text-white cursor-pointer"
+                className="text-xs hover:opacity-80 cursor-pointer font-medium"
+                style={{ color: dc.textSecondary }}
               >
                 Close
               </button>
@@ -982,7 +1110,7 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
 
             {/* Voice Persona Selector */}
             <div className="mb-6">
-              <label className="block text-xs font-semibold text-white/80 mb-2">
+              <label className="block text-xs font-semibold mb-2" style={{ color: dc.textPrimary }}>
                 Select Gemini Voice Persona:
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -992,18 +1120,21 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
                     <div
                       key={v.id}
                       onClick={() => setSelectedVoiceId(v.id)}
-                      className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                        isSelected 
-                          ? 'border-amber-500 bg-amber-500/10 text-white' 
-                          : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'
-                      }`}
+                      className="p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3"
+                      style={{
+                        backgroundColor: isSelected 
+                          ? 'rgba(218, 119, 86, 0.12)' 
+                          : (isDark ? '#18181b' : '#f8fafc'),
+                        borderColor: isSelected ? '#da7756' : (isDark ? '#27272a' : '#e2e8f0'),
+                        color: dc.textPrimary,
+                      }}
                     >
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold">{v.name}</span>
-                          {isSelected && <Check size={13} className="text-amber-400" />}
+                          {isSelected && <Check size={13} style={{ color: '#da7756' }} />}
                         </div>
-                        <p className="text-[10px] text-white/50 mt-0.5">{v.tone}</p>
+                        <p className="text-[10px] mt-0.5" style={{ color: dc.textSecondary }}>{v.tone}</p>
                       </div>
 
                       <button
@@ -1012,7 +1143,12 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
                           e.stopPropagation();
                           handlePreviewVoice(v.id);
                         }}
-                        className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white/80 transition-colors"
+                        className="p-1.5 rounded-lg border transition-colors hover:opacity-80"
+                        style={{
+                          backgroundColor: isDark ? '#27272a' : '#ffffff',
+                          borderColor: isDark ? '#334155' : '#e2e8f0',
+                          color: dc.textPrimary,
+                        }}
                         title={`Preview ${v.name} Voice`}
                       >
                         <Play size={12} fill="currentColor" />
@@ -1023,18 +1159,19 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
               </div>
 
               {/* Speed rate control */}
-              <div className="mt-3 flex items-center gap-3 text-xs text-white/70">
-                <span>Speed:</span>
+              <div className="mt-3 flex items-center gap-3 text-xs" style={{ color: dc.textSecondary }}>
+                <span className="font-medium">Speed:</span>
                 {[0.85, 1.0, 1.15].map((rate) => (
                   <button
                     key={rate}
                     type="button"
                     onClick={() => setVoiceRate(rate)}
-                    className={`px-2 py-0.5 rounded text-[11px] font-mono border ${
-                      voiceRate === rate 
-                        ? 'bg-amber-500/20 border-amber-500 text-amber-300' 
-                        : 'bg-white/5 border-white/10 text-white/60'
-                    }`}
+                    className="px-2.5 py-0.5 rounded text-[11px] font-mono border transition-colors"
+                    style={{
+                      backgroundColor: voiceRate === rate ? 'rgba(218, 119, 86, 0.15)' : (isDark ? '#1e1e24' : '#f1f5f9'),
+                      borderColor: voiceRate === rate ? '#da7756' : (isDark ? '#2e2e34' : '#e2e8f0'),
+                      color: voiceRate === rate ? '#da7756' : dc.textSecondary,
+                    }}
                   >
                     {rate}x
                   </button>
@@ -1044,10 +1181,10 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
 
             {/* Customization Prompt Directives */}
             <div className="mb-4">
-              <label className="block text-xs font-semibold text-white/80 mb-1.5">
+              <label className="block text-xs font-semibold mb-1.5" style={{ color: dc.textPrimary }}>
                 Custom Persona & Behavior Prompt:
               </label>
-              <p className="text-[11px] text-white/50 mb-2">
+              <p className="text-[11px] mb-2" style={{ color: dc.textSecondary }}>
                 Choose a preset role or write custom instructions for how Gemini Live should speak and analyze.
               </p>
 
@@ -1058,10 +1195,14 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
                     key={p.id}
                     type="button"
                     onClick={() => setCustomPrompt(p.prompt)}
-                    className="p-2 text-left rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] transition-all cursor-pointer"
+                    className="p-2 text-left rounded-xl border text-[11px] transition-all cursor-pointer hover:border-amber-500"
+                    style={{
+                      backgroundColor: isDark ? '#18181b' : '#f8fafc',
+                      borderColor: isDark ? '#27272a' : '#e2e8f0',
+                    }}
                   >
-                    <span className="font-semibold block text-amber-300">{p.title}</span>
-                    <span className="text-[10px] text-white/50 line-clamp-1 mt-0.5">{p.prompt}</span>
+                    <span className="font-semibold block" style={{ color: '#da7756' }}>{p.title}</span>
+                    <span className="text-[10px] line-clamp-1 mt-0.5" style={{ color: dc.textSecondary }}>{p.prompt}</span>
                   </button>
                 ))}
               </div>
@@ -1072,21 +1213,28 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
                 onChange={(e) => setCustomPrompt(e.target.value)}
                 placeholder="e.g. Act as a senior partner. Keep spoken answers under 3 sentences. Highlight high-risk indemnities immediately."
                 rows={3}
-                className="w-full p-2.5 rounded-xl bg-black/40 border border-white/10 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-amber-500/50"
+                className="w-full p-2.5 rounded-xl border text-xs focus:outline-none transition-colors"
+                style={{
+                  backgroundColor: isDark ? '#18181b' : '#ffffff',
+                  borderColor: isDark ? '#2e2e34' : '#e4e4e7',
+                  color: dc.textPrimary,
+                }}
               />
 
-              <div className="flex items-center justify-between mt-2">
+              <div className="flex items-center justify-between mt-3">
                 <button
                   type="button"
                   onClick={() => setCustomPrompt('')}
-                  className="text-[10px] text-white/40 hover:text-white flex items-center gap-1 cursor-pointer"
+                  className="text-[11px] flex items-center gap-1 cursor-pointer hover:opacity-80"
+                  style={{ color: dc.textSecondary }}
                 >
-                  <RotateCcw size={10} /> Reset to Default
+                  <RotateCcw size={11} /> Reset to Default
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowSettingsDrawer(false)}
-                  className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-black text-xs font-semibold cursor-pointer"
+                  className="px-4 py-1.5 rounded-xl text-white text-xs font-semibold cursor-pointer shadow-md hover:opacity-90"
+                  style={{ backgroundColor: '#da7756' }}
                 >
                   Save & Apply
                 </button>
@@ -1097,22 +1245,32 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
 
         {/* Collapsible History Drawer */}
         {showHistoryDrawer && (
-          <div className="absolute inset-x-0 bottom-16 top-16 bg-[#121117]/98 backdrop-blur-2xl z-40 p-6 overflow-y-auto border-t border-white/10">
-            <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <MessageSquare size={15} />
+          <div 
+            className="absolute inset-x-0 bottom-16 top-16 z-40 p-6 overflow-y-auto border-t"
+            style={{
+              backgroundColor: isDark ? '#131316' : '#ffffff',
+              borderColor: isDark ? '#27272a' : '#e4e4e7',
+            }}
+          >
+            <div 
+              className="flex items-center justify-between pb-3 border-b mb-4"
+              style={{ borderColor: isDark ? '#27272a' : '#f4f4f5' }}
+            >
+              <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: dc.textPrimary }}>
+                <MessageSquare size={15} style={{ color: '#da7756' }} />
                 Live Audio Transcript History
               </h3>
               <button
                 onClick={() => setShowHistoryDrawer(false)}
-                className="text-xs text-white/50 hover:text-white cursor-pointer"
+                className="text-xs hover:opacity-80 cursor-pointer font-medium"
+                style={{ color: dc.textSecondary }}
               >
                 Close
               </button>
             </div>
 
             {dialogHistory.length === 0 ? (
-              <p className="text-xs text-white/40 text-center py-8">
+              <p className="text-xs text-center py-8" style={{ color: dc.textSecondary }}>
                 No voice turns recorded yet. Speak into the microphone or use a prompt above to begin.
               </p>
             ) : (
@@ -1120,19 +1278,24 @@ const LiveAudioModal = ({ isOpen, onClose }) => {
                 {dialogHistory.map((item, idx) => (
                   <div
                     key={idx}
-                    className={`p-3 rounded-2xl border text-xs leading-relaxed ${
-                      item.role === 'user'
-                        ? 'bg-white/5 border-white/10 text-white/90'
-                        : 'bg-amber-950/20 border-amber-500/20 text-amber-100'
-                    }`}
+                    className="p-3 rounded-2xl border text-xs leading-relaxed"
+                    style={{
+                      backgroundColor: item.role === 'user' 
+                        ? (isDark ? '#18181b' : '#f8fafc') 
+                        : 'rgba(218, 119, 86, 0.08)',
+                      borderColor: item.role === 'user' 
+                        ? (isDark ? '#27272a' : '#e2e8f0') 
+                        : 'rgba(218, 119, 86, 0.25)',
+                      color: dc.textPrimary,
+                    }}
                   >
-                    <div className="flex items-center justify-between font-semibold text-[10px] mb-1 opacity-70">
+                    <div className="flex items-center justify-between font-semibold text-[10px] mb-1" style={{ color: dc.textSecondary }}>
                       <span>{item.role === 'user' ? 'You (Spoken)' : `Gemini Live (${activeVoiceMeta.name})`}</span>
                       <span>{item.time}</span>
                     </div>
                     <p>{item.text}</p>
                     {item.thought && (
-                      <div className="mt-1 pt-1 border-t border-white/10 text-[10px] text-amber-400 font-mono">
+                      <div className="mt-1.5 pt-1.5 border-t text-[10px] font-mono text-amber-500" style={{ borderColor: isDark ? '#27272a' : '#e2e8f0' }}>
                         Thought: {item.thought}
                       </div>
                     )}
