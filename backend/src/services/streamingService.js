@@ -26,7 +26,7 @@ const persistAssistantMessage = async ({ chatId, documentId, finalResult, accumu
        VALUES ($1, $2, 'ai', $3)`,
       [
         chatId,
-        documentId,
+        documentId || null,
         JSON.stringify({
           answer_type: 'table',
           answer: finalResult.answer || '',
@@ -40,7 +40,7 @@ const persistAssistantMessage = async ({ chatId, documentId, finalResult, accumu
   await query(
     `INSERT INTO chat_history (chat_id, document_id, role, content)
      VALUES ($1, $2, 'ai', $3)`,
-    [chatId, documentId, finalResult?.answer || accumulatedText || '']
+    [chatId, documentId || null, finalResult?.answer || accumulatedText || '']
   );
 };
 

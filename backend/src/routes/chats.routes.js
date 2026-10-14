@@ -17,34 +17,34 @@ const getUserId = (req) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { documentId } = req.body;
+    const { documentId, projectId } = req.body;
     const userId = getUserId(req);
 
     const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    if (!documentId || !UUID_REGEX.test(documentId)) {
-      return res.status(400).json({
-        error: 'Valid documentId UUID is required to create a document chat',
-      });
+    let validDocumentId = null;
+
+    if (documentId && UUID_REGEX.test(documentId)) {
+      // Verify document exists
+      const docResult = await query(
+        'SELECT id FROM documents WHERE id = $1',
+        [documentId]
+      );
+      if (docResult.rows.length > 0) {
+        validDocumentId = documentId;
+      }
     }
 
-    // Verify document exists
-    const docResult = await query(
-      'SELECT id FROM documents WHERE id = $1',
-      [documentId]
-    );
-
-    if (docResult.rows.length === 0) {
-      return res.status(404).json({
-        error: 'Document not found',
-      });
+    let validProjectId = null;
+    if (projectId && UUID_REGEX.test(projectId)) {
+      validProjectId = projectId;
     }
 
     // Create new chat
     const newChatResult = await query(
-      `INSERT INTO chats (user_id, document_id, title) 
-       VALUES ($1, $2, 'New Chat') 
-       RETURNING id, title, document_id, created_at, updated_at`,
-      [userId, documentId]
+      `INSERT INTO chats (user_id, document_id, project_id, title) 
+       VALUES ($1, $2, $3, 'New Chat') 
+       RETURNING id, title, document_id, project_id, created_at, updated_at`,
+      [userId, validDocumentId, validProjectId]
     );
 
     const chat = newChatResult.rows[0];
@@ -55,6 +55,7 @@ router.post('/', async (req, res) => {
         id: chat.id,
         title: chat.title,
         documentId: chat.document_id,
+        projectId: chat.project_id,
         createdAt: chat.created_at,
         updatedAt: chat.updated_at,
       },

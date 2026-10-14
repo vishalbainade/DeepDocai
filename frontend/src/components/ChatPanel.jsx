@@ -110,7 +110,7 @@ const ChatPanel = ({
   const handleSubmit = (event) => {
     if (event) event.preventDefault();
     runSingleSubmit(() => {
-      if (!input.trim() || !currentDocumentId || isThinking) {
+      if (!input.trim() || isThinking) {
         return false;
       }
 
@@ -357,12 +357,21 @@ const ChatPanel = ({
               borderColor: isDark ? '#2e2e34' : '#e4e4e7',
             }}
           >
+            {/* Claude-style Active Document Attachment Pill */}
+            {currentFileName && (
+              <div className="flex items-center gap-1.5 mb-2 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-medium w-fit">
+                <FileText size={12} className="text-amber-500" />
+                <span className="truncate max-w-[220px] font-semibold">{currentFileName}</span>
+                <span className="text-[10px] text-emerald-500 font-bold">• Reconstructed OCR Active</span>
+              </div>
+            )}
+
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              disabled={!currentDocumentId || isThinking}
-              placeholder={currentDocumentId ? 'Ask anything about this document (Shift+Enter for new line)...' : 'Upload a document first...'}
+              disabled={isThinking}
+              placeholder={currentFileName ? `Ask anything about ${currentFileName} (Shift+Enter for new line)...` : 'Ask anything about your documents, contracts, or legal questions...'}
               rows={2}
               className="w-full bg-transparent resize-none text-sm outline-none leading-relaxed placeholder:text-slate-400"
               style={{ color: dc.textPrimary }}
@@ -469,7 +478,7 @@ const ChatPanel = ({
                 <button
                   type="button"
                   onClick={handleSubmit}
-                  disabled={!currentDocumentId || !input.trim() || isThinking}
+                  disabled={!input.trim() || isThinking}
                   className="w-8 h-8 rounded-xl flex items-center justify-center text-white transition-all disabled:opacity-40 cursor-pointer shadow-sm"
                   style={{ backgroundColor: '#da7756' }}
                 >

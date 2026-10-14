@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { FileText, Upload, Sparkles, Eye } from 'lucide-react';
 import { useChat } from '../contexts/ChatContext';
 import { useTheme } from '../contexts/ThemeContext';
 import ChatPanel from './ChatPanel';
@@ -47,6 +48,8 @@ const ChatPage = () => {
   const {
     currentChatId,
     currentDocumentId,
+    userDocuments = [],
+    loadUserDocuments,
     chatHistory,
     loading,
     loadChatMessages,
@@ -59,6 +62,7 @@ const ChatPage = () => {
     webMode,
     activeProject,
     loadUsageSummary,
+    setIsMultiUploadOpen,
   } = useChat();
 
   const [pdfUrl, setPdfUrl] = useState(null);
@@ -137,6 +141,10 @@ const ChatPage = () => {
 
   useEffect(() => {
     if (!currentDocumentId) {
+      if (userDocuments && userDocuments.length > 0) {
+        setCurrentDocumentId(userDocuments[0].id);
+        return;
+      }
       setPdfUrl(null);
       setShowUploadZone(true);
       return;
@@ -156,7 +164,19 @@ const ChatPage = () => {
     };
 
     loadDocumentPreview();
-  }, [currentDocumentId]);
+  }, [currentDocumentId, userDocuments]);
+
+  // Automatically submit initial prompt from HomePage
+  useEffect(() => {
+    const initialPrompt = sessionStorage.getItem('initial_user_prompt');
+    if (initialPrompt && chatId && !isThinking && !activeStream && !submissionLockRef.current) {
+      sessionStorage.removeItem('initial_user_prompt');
+      const timer = setTimeout(() => {
+        handleSendMessage(initialPrompt);
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [chatId, currentDocumentId, isThinking, activeStream]);
 
   useEffect(() => {
     const handleMouseMove = (event) => {
@@ -216,8 +236,13 @@ const ChatPage = () => {
   };
 
   const handleSendMessage = (message) => {
-    if (!currentDocumentId || isThinking || submissionLockRef.current) {
+    if (!message || !message.trim() || isThinking || submissionLockRef.current) {
       return false;
+    }
+
+    const docToUse = currentDocumentId || userDocuments?.[0]?.id || null;
+    if (!currentDocumentId && docToUse) {
+      setCurrentDocumentId(docToUse);
     }
 
     submissionLockRef.current = true;
@@ -248,7 +273,7 @@ const ChatPage = () => {
     setActiveStream({
       id: `stream-${Date.now()}-${Math.random()}`,
       messageId: aiMessageId,
-      documentId: currentDocumentId,
+      documentId: docToUse,
       question: message,
       chatId: currentChatId || chatId || null,
       intent,
@@ -262,9 +287,6 @@ const ChatPage = () => {
   };
 
   const handleSummarize = () => {
-    if (!currentDocumentId) {
-      return false;
-    }
     return handleSendMessage('Please provide a comprehensive summary of this document.');
   };
 
@@ -393,22 +415,69 @@ const ChatPage = () => {
         />
       ) : null}
 
-      <div className="flex-shrink-0 overflow-hidden" style={{ width: `${leftPanelWidth}%`, borderRight: `1px solid ${dc.borderPrimary}` }}>
-        {showUploadZone ? (
-          <UploadZone onUpload={handleUpload} isUploading={isUploading} />
-        ) : pdfUrl && currentDocumentId ? (
-          <OCRViewer 
-            documentId={currentDocumentId} 
-            pdfUrl={pdfUrl} 
-            activeHighlight={activeHighlight} 
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center" style={{ backgroundColor: dc.bgSecondary }}>
-            <div className="text-center">
-              <div className="animate-pulse" style={{ color: dc.textMuted }}>Loading document...</div>
-            </div>
+      <div className="flex-shrink-0 overflow-hidden flex flex-col" style={{ width: `${leftPanelWidth}%`, borderRight: `1px solid ${dc.borderPrimary}` }}>
+        {/* Document Switcher Header if documents exist */}
+        {userDocuments.length > 0 && (
+          <div 
+            className="flex items-center gap-1.5 px-3 py-2 border-b overflow-x-auto scrollbar-thin shrink-0 text-xs"
+            style={{
+              backgroundColor: isDark ? '#141417' : '#f8fafc',
+              borderColor: dc.borderPrimary,
+            }}
+          >
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1 flex items-center gap-1 shrink-0">
+              <FileText size={11} className="text-amber-500" />
+              <span>Files:</span>
+            </span>
+
+            {userDocuments.map((doc) => {
+              const isActive = doc.id === currentDocumentId;
+              return (
+                <button
+                  key={doc.id}
+                  onClick={() => {
+                    setCurrentDocumentId(doc.id);
+                  }}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all cursor-pointer truncate max-w-[170px] shrink-0 text-xs ${
+                    isActive
+                      ? 'bg-amber-500/15 border border-amber-500/80 text-amber-600 dark:text-amber-400 font-semibold shadow-xs'
+                      : 'border border-transparent hover:bg-slate-500/10 text-slate-600 dark:text-slate-300'
+                  }`}
+                  title={doc.fileName || doc.file_name}
+                >
+                  <FileText size={11} className={isActive ? 'text-amber-500' : 'text-slate-400'} />
+                  <span className="truncate">{doc.fileName || doc.file_name}</span>
+                </button>
+              );
+            })}
+
+            <button
+              onClick={() => setIsMultiUploadOpen(true)}
+              className="p-1 rounded-lg hover:bg-slate-500/10 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors shrink-0"
+              title="Upload another document"
+            >
+              <Upload size={13} />
+            </button>
           </div>
         )}
+
+        <div className="flex-1 overflow-hidden relative">
+          {showUploadZone ? (
+            <UploadZone onUpload={handleUpload} isUploading={isUploading} />
+          ) : pdfUrl && currentDocumentId ? (
+            <OCRViewer 
+              documentId={currentDocumentId} 
+              pdfUrl={pdfUrl} 
+              activeHighlight={activeHighlight} 
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center" style={{ backgroundColor: dc.bgSecondary }}>
+              <div className="text-center">
+                <div className="animate-pulse" style={{ color: dc.textMuted }}>Loading document OCR...</div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       <div

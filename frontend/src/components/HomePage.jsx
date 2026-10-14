@@ -16,10 +16,13 @@ import {
   Zap, 
   ChevronRight,
   Plus,
-  Mic
+  Mic,
+  Eye,
+  CheckCircle2
 } from 'lucide-react';
 import { uploadDocument, getUser, getAvailableModels } from '../services/api';
 import ClaudeModelSelector from './ClaudeModelSelector';
+import ReconstructedOCRModal from './ReconstructedOCRModal';
 import { useChat } from '../contexts/ChatContext';
 import { useDarkColors, useIsDark } from '../utils/darkMode';
 
@@ -35,6 +38,9 @@ const HomePage = () => {
   const { 
     createNewChat, 
     setCurrentDocumentId,
+    currentDocumentId,
+    userDocuments = [],
+    loadUserDocuments,
     projects,
     activeProject,
     setActiveProject,
@@ -52,6 +58,8 @@ const HomePage = () => {
   } = useChat();
 
   const [promptInput, setPromptInput] = useState('');
+  const [selectedDocId, setSelectedDocId] = useState(null);
+  const [viewingOCRDoc, setViewingOCRDoc] = useState(null);
   const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
   const [availableModels, setAvailableModels] = useState([
     { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
@@ -71,25 +79,38 @@ const HomePage = () => {
     }).catch(() => {});
   }, []);
 
+  // Sync selectedDocId when documents load
+  useEffect(() => {
+    if (!selectedDocId && userDocuments.length > 0) {
+      setSelectedDocId(userDocuments[0].id);
+    }
+  }, [userDocuments, selectedDocId]);
+
   const handleStartPrompt = async (textToSend) => {
     const q = textToSend || promptInput;
     if (!q.trim()) return;
 
-    // If we have an active project or documents, route into chat
+    // Save prompt & model into session storage so ChatPage automatically executes it
     sessionStorage.setItem('initial_user_prompt', q.trim());
     sessionStorage.setItem('initial_model', selectedModel);
 
-    // If documents exist in active project, pick first or create general chat
-    const docId = activeProject?.documents?.[0]?.id || 'global-workspace';
+    // Pick target document: explicitly selected -> activeProject document -> first uploaded doc -> null
+    const docId = selectedDocId || activeProject?.documents?.[0]?.id || userDocuments?.[0]?.id || null;
+    if (docId) {
+      setCurrentDocumentId(docId);
+    }
+
     try {
-      const newChat = await createNewChat(docId);
+      const newChat = await createNewChat(docId, activeProject?.id || null);
       if (newChat) {
         navigate(`/chat/${newChat.id}`);
       } else {
         navigate('/chat');
       }
-    } catch {
-      setIsMultiUploadOpen(true);
+    } catch (err) {
+      console.error('Failed to create chat:', err);
+      // Navigate to chat anyway rather than opening upload popup
+      navigate('/chat');
     }
   };
 
@@ -174,6 +195,88 @@ const HomePage = () => {
           </p>
         </div>
 
+        {/* Claude-style Uploaded Documents & Knowledge Pills */}
+        {userDocuments.length > 0 && (
+          <div className="w-full mb-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5" style={{ color: dc.textSecondary }}>
+                <FileText size={13} className="text-amber-500" />
+                <span>Uploaded Files & OCR Knowledge ({userDocuments.length})</span>
+              </span>
+              <span className="text-[10px] text-amber-500/90 font-medium">
+                Click any file to open Reconstructed OCR View
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 overflow-x-auto pb-1.5 scrollbar-thin">
+              {userDocuments.map((doc) => {
+                const isSelected = selectedDocId === doc.id || (!selectedDocId && userDocuments[0]?.id === doc.id);
+                return (
+                  <div
+                    key={doc.id}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all cursor-pointer group shrink-0 ${
+                      isSelected 
+                        ? 'border-amber-500/80 bg-amber-500/10 shadow-sm' 
+                        : 'hover:border-slate-400 bg-white dark:bg-[#18181b]'
+                    }`}
+                    style={{
+                      borderColor: isSelected ? '#da7756' : (isDark ? '#2e2e34' : '#e4e4e7'),
+                    }}
+                    onClick={() => {
+                      setViewingOCRDoc(doc);
+                    }}
+                    title="Click to open Reconstructed OCR View"
+                  >
+                    <div className="w-6 h-6 rounded-lg bg-amber-500/15 text-amber-500 flex items-center justify-center shrink-0">
+                      <FileText size={12} />
+                    </div>
+
+                    <div className="flex flex-col min-w-0 max-w-[170px]">
+                      <span className="text-xs font-semibold truncate group-hover:text-amber-500 transition-colors" style={{ color: dc.textPrimary }}>
+                        {doc.fileName || doc.file_name}
+                      </span>
+                      <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
+                        <span className="text-emerald-500 font-medium">OCR Ready</span>
+                        <span>•</span>
+                        <span className="text-amber-600 dark:text-amber-400 flex items-center gap-0.5">
+                          <Eye size={10} /> View OCR
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedDocId(doc.id);
+                        setCurrentDocumentId(doc.id);
+                      }}
+                      className={`ml-1 text-[10px] px-1.5 py-0.5 rounded font-medium transition-all ${
+                        isSelected 
+                          ? 'bg-amber-500 text-white' 
+                          : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                      }`}
+                      title="Target this document for analysis"
+                    >
+                      {isSelected ? 'Active' : 'Target'}
+                    </button>
+                  </div>
+                );
+              })}
+
+              <button
+                type="button"
+                onClick={() => setIsMultiUploadOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-dashed text-xs font-medium hover:bg-slate-500/5 transition-colors shrink-0 cursor-pointer"
+                style={{ borderColor: isDark ? '#2e2e34' : '#cbd5e1', color: dc.textSecondary }}
+              >
+                <Upload size={12} className="text-amber-500" />
+                <span>+ Upload More</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Claude-style Centered Prompt Box */}
         <div 
           className="w-full rounded-2xl border shadow-xl p-3.5 mb-8 transition-all relative focus-within:ring-2 focus-within:ring-amber-500/40"
@@ -213,6 +316,24 @@ const HomePage = () => {
                 <Upload size={13} className="text-amber-500" />
                 <span>Upload Files</span>
               </button>
+
+              {/* Target Document Indicator Pill */}
+              {selectedDocId && (
+                <div 
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border bg-amber-500/10 border-amber-500/40 text-amber-600 dark:text-amber-400 cursor-pointer"
+                  onClick={() => {
+                    const doc = userDocuments.find(d => d.id === selectedDocId);
+                    if (doc) setViewingOCRDoc(doc);
+                  }}
+                  title="Click to view reconstructed OCR for targeted document"
+                >
+                  <FileText size={12} className="text-amber-500" />
+                  <span className="truncate max-w-[130px]">
+                    {userDocuments.find(d => d.id === selectedDocId)?.fileName || userDocuments.find(d => d.id === selectedDocId)?.file_name || 'Active Document'}
+                  </span>
+                  <Eye size={11} className="opacity-70" />
+                </div>
+              )}
 
               {/* Thinking Mode Toggle */}
               <button
@@ -422,6 +543,26 @@ const HomePage = () => {
             <Upload size={14} /> Ingest Files / Folder
           </button>
         </div>
+
+        {/* Reconstructed OCR View Modal */}
+        <ReconstructedOCRModal
+          isOpen={!!viewingOCRDoc}
+          documentId={viewingOCRDoc?.id}
+          fileName={viewingOCRDoc?.fileName || viewingOCRDoc?.file_name}
+          onClose={() => setViewingOCRDoc(null)}
+          onSelectForChat={async (docId) => {
+            setSelectedDocId(docId);
+            setCurrentDocumentId(docId);
+            try {
+              const newChat = await createNewChat(docId, activeProject?.id || null);
+              if (newChat) {
+                navigate(`/chat/${newChat.id}`);
+              }
+            } catch (err) {
+              console.error('Failed to create chat from OCR modal:', err);
+            }
+          }}
+        />
 
       </div>
     </div>

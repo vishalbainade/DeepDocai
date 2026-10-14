@@ -276,6 +276,21 @@ const generateTextAnswerInternal = async (question, chunks, preferredModel, chat
 
 export const generateAnswer = async (question, documentId, intent = null, preferredModel = null, chatHistory = [], options = {}) => {
   try {
+    if (!documentId) {
+      const textResult = await generateTextAnswerInternal(question, [], preferredModel, chatHistory, options);
+      return {
+        answer_type: 'text',
+        answer: textResult.answer,
+        sources: [],
+        paragraphCitations: [],
+        modelUsed: textResult.modelUsed,
+        inputTokens: textResult.inputTokens,
+        outputTokens: textResult.outputTokens,
+        totalTokens: textResult.totalTokens,
+        webSources: textResult.webSources || [],
+      };
+    }
+
     const retrieval = await retrieveRelevantChunks({ question, documentId, intent });
     logger.table('INFO', 'DATA FLOW', 'RAG chunk context', summarizeChunksForFlow(retrieval.chunks), {
       documentId,
@@ -332,6 +347,42 @@ export const generateAnswerStream = async function* (question, documentId, inten
     } catch (e) {
       logger.warn('RAG', 'Web search failed in generateAnswerStream', { error: e.message });
     }
+  }
+
+  if (!documentId) {
+    const prompt = buildPromptContext({
+      question,
+      chunks: [],
+      chatHistory,
+      personalization,
+      thinkingMode,
+      webResults,
+    });
+    const generator = routeStreamRequest({
+      modelIdentifier: preferredModel,
+      prompt,
+      config: { 
+        temperature: 0.4, 
+        top_p: 0.95,
+        thinkingMode,
+        webMode,
+        grounding: webMode,
+        thinkingBudget: thinkingMode ? 24576 : 0,
+      },
+    });
+
+    let fullAnswer = '';
+    for await (const chunk of generator) {
+      fullAnswer += chunk;
+      yield chunk;
+    }
+    return {
+      answer_type: 'text',
+      answer: fullAnswer.trim(),
+      sources: [],
+      paragraphCitations: [],
+      webSources: webResults,
+    };
   }
 
   const retrieval = await retrieveRelevantChunks({ question, documentId, intent });

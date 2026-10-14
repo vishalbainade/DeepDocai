@@ -523,8 +523,8 @@ export const getChatHistory = async (documentId) => {
  * @param {string} documentId - Document ID
  * @returns {Promise<{chat: Object}>}
  */
-export const createChat = async (documentId) => {
-  const response = await api.post('/api/chats', { documentId });
+export const createChat = async (documentId = null, projectId = null) => {
+  const response = await api.post('/api/chats', { documentId, projectId });
   return response.data;
 };
 

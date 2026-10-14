@@ -75,3 +75,6 @@ ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS memories JSONB DEFAULT '[]
 ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS memory_enabled BOOLEAN DEFAULT true;
 ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS history_limit INTEGER DEFAULT 10;
 
+-- 7. Allow general / workspace chats without a mandatory single document
+ALTER TABLE chats ALTER COLUMN document_id DROP NOT NULL;
+ALTER TABLE chat_history ALTER COLUMN document_id DROP NOT NULL;

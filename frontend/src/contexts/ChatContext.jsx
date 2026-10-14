@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { getChats, getChatMessages, createChat, getProjects, getUsageSummary } from '../services/api';
+import { getChats, getChatMessages, createChat, getProjects, getUsageSummary, getDocuments } from '../services/api';
 
 const ChatContext = createContext(null);
 
@@ -17,6 +17,7 @@ export function ChatProvider({ children }) {
   const [chats, setChats] = useState([]);
   const [currentChatId, setCurrentChatId] = useState(null);
   const [currentDocumentId, setCurrentDocumentId] = useState(null);
+  const [userDocuments, setUserDocuments] = useState([]);
   const [chatHistory, setChatHistory] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -123,11 +124,26 @@ export function ChatProvider({ children }) {
     }
   }, []);
 
-  // Create new chat
-  const createNewChat = useCallback(async (documentId, projectId = null) => {
+  // Load user documents list
+  const loadUserDocuments = useCallback(async () => {
     try {
-      const result = await createChat(documentId);
+      const res = await getDocuments();
+      if (res?.documents) {
+        setUserDocuments(res.documents);
+      }
+    } catch (err) {
+      console.error('Error loading documents:', err);
+    }
+  }, []);
+
+  // Create new chat
+  const createNewChat = useCallback(async (documentId = null, projectId = null) => {
+    try {
+      const result = await createChat(documentId, projectId);
       if (result?.chat) {
+        if (result.chat.documentId) {
+          setCurrentDocumentId(result.chat.documentId);
+        }
         // Reload chats list
         await loadChats();
         return result.chat;
@@ -179,6 +195,9 @@ export function ChatProvider({ children }) {
 
       setChatHistory(formattedMessages);
       setCurrentChatId(chatId);
+      if (result?.chat?.documentId) {
+        setCurrentDocumentId(result.chat.documentId);
+      }
     } catch (error) {
       console.error('Error loading chat messages:', error);
       setChatHistory([]);
@@ -219,13 +238,16 @@ export function ChatProvider({ children }) {
       loadChats();
       loadProjects();
       loadUsageSummary();
+      loadUserDocuments();
     }
-  }, [loadChats, loadProjects, loadUsageSummary]);
+  }, [loadChats, loadProjects, loadUsageSummary, loadUserDocuments]);
 
   const value = {
     chats,
     currentChatId,
     currentDocumentId,
+    userDocuments,
+    loadUserDocuments,
     chatHistory,
     loading,
     sidebarCollapsed,

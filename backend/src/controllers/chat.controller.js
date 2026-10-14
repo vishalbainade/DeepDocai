@@ -41,11 +41,13 @@ const storeUserMessage = async ({ chatId, documentId, question }) => {
 export const askQuestion = async (req, res) => {
   const { documentId, question, chatId, intent, model, thinkingMode, webMode, projectId, personalization } = getChatPayload(req);
   const requestId = randomUUID();
-  const requestLogger = logger.child({ requestId, documentId, chatId });
+  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const validDocumentId = (documentId && UUID_REGEX.test(documentId)) ? documentId : null;
+  const requestLogger = logger.child({ requestId, documentId: validDocumentId, chatId });
 
   try {
-    if (!documentId || !question) {
-      return res.status(400).json({ error: 'Document ID and question are required' });
+    if (!question || !question.trim()) {
+      return res.status(400).json({ error: 'Question is required' });
     }
 
     const isThinking = thinkingMode === true || thinkingMode === 'true';
@@ -78,12 +80,13 @@ export const askQuestion = async (req, res) => {
       webMode: isWeb,
       memoriesCount: activeMemories.length,
       interactionLimit,
+      hasDocument: !!validDocumentId,
     });
 
     const currentChatId = await ensureChat({
       chatId,
       userId: req.user.id,
-      documentId,
+      documentId: validDocumentId,
       question,
     });
 
@@ -98,9 +101,9 @@ export const askQuestion = async (req, res) => {
       chatHistory = historyResult.rows.reverse();
     }
 
-    await storeUserMessage({ chatId: currentChatId, documentId, question });
+    await storeUserMessage({ chatId: currentChatId, documentId: validDocumentId, question });
 
-    const result = await generateAnswer(question, documentId, intent, model, chatHistory, {
+    const result = await generateAnswer(question, validDocumentId, intent, model, chatHistory, {
       thinkingMode: isThinking,
       webMode: isWeb,
       personalization: mergedPersonalization,
@@ -128,7 +131,7 @@ export const askQuestion = async (req, res) => {
     await query(
       `INSERT INTO chat_history (chat_id, document_id, role, content)
        VALUES ($1, $2, 'ai', $3)`,
-      [currentChatId, documentId, aiContent || '']
+      [currentChatId, validDocumentId, aiContent || '']
     );
     await query('UPDATE chats SET updated_at = CURRENT_TIMESTAMP WHERE id = $1', [currentChatId]);
 
@@ -140,7 +143,7 @@ export const askQuestion = async (req, res) => {
     await recordUsage({
       userId: req.user.id,
       chatId: currentChatId,
-      documentId,
+      documentId: validDocumentId,
       projectId,
       modelName: result.modelUsed || model || 'default',
       usageType: 'chat',
@@ -180,15 +183,17 @@ export const askQuestion = async (req, res) => {
 export const streamQuestion = async (req, res) => {
   const { documentId, question, chatId, intent, model, thinkingMode, webMode, projectId, personalization } = getChatPayload(req);
   const requestId = randomUUID();
-  const requestLogger = logger.child({ requestId, documentId, chatId });
+  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const validDocumentId = (documentId && UUID_REGEX.test(documentId)) ? documentId : null;
+  const requestLogger = logger.child({ requestId, documentId: validDocumentId, chatId });
 
   try {
-    if (!documentId || !question) {
+    if (!question || !question.trim()) {
       if (!res.headersSent) {
-        return res.status(400).json({ error: 'Document ID and question are required' });
+        return res.status(400).json({ error: 'Question is required' });
       }
 
-      res.write(`event: error\ndata: ${JSON.stringify({ error: 'Document ID and question are required' })}\n\n`);
+      res.write(`event: error\ndata: ${JSON.stringify({ error: 'Question is required' })}\n\n`);
       res.end();
       return;
     }
@@ -223,12 +228,13 @@ export const streamQuestion = async (req, res) => {
       webMode: isWeb,
       memoriesCount: activeMemories.length,
       interactionLimit,
+      hasDocument: !!validDocumentId,
     });
 
     const currentChatId = await ensureChat({
       chatId,
       userId: req.user.id,
-      documentId,
+      documentId: validDocumentId,
       question,
     });
 
@@ -243,10 +249,10 @@ export const streamQuestion = async (req, res) => {
       chatHistory = historyResult.rows.reverse();
     }
 
-    await storeUserMessage({ chatId: currentChatId, documentId, question });
+    await storeUserMessage({ chatId: currentChatId, documentId: validDocumentId, question });
 
     await streamRagResponse(req, res, {
-      documentId,
+      documentId: validDocumentId,
       question,
       chatId: currentChatId,
       intent,
