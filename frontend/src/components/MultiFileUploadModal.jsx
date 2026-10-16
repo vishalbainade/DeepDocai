@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { 
   X, 
   Upload, 
@@ -31,6 +31,16 @@ const MultiFileUploadModal = ({
   const folderInputRef = useRef(null);
   const dc = useDarkColors();
   const isDark = useIsDark();
+
+  // The modal remains mounted while closed, so refresh its destination whenever
+  // it is opened from a different project.
+  useEffect(() => {
+    if (isOpen) {
+      setTargetProjectId(selectedProjectId || '');
+      setFilesQueue([]);
+      setOverallProgress(0);
+    }
+  }, [isOpen, selectedProjectId]);
 
   if (!isOpen) return null;
 

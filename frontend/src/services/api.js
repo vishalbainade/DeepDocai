@@ -547,6 +547,12 @@ export const getChatMessages = async (chatId) => {
   return response.data;
 };
 
+/** Attach or replace the one document scoped to a chat session. */
+export const setChatDocument = async (chatId, documentId) => {
+  const response = await api.patch(`/api/chats/${chatId}/document`, { documentId });
+  return response.data;
+};
+
 /**
  * Rename a chat conversation
  * @param {string} chatId - Chat ID

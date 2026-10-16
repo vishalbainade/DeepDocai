@@ -3,60 +3,66 @@
 
 const lightColors = {
   // Backgrounds
-  bgPrimary: '#FFFFFF',
-  bgSecondary: '#F8FAFC',
-  bgHover: 'rgba(142, 132, 184, 0.08)',
-  bgActiveItem: 'rgba(142, 132, 184, 0.08)',
-  bgInput: '#F8FAFC',
-  bgDropdown: '#FFFFFF',
-  bgOverlay: 'rgba(0, 0, 0, 0.5)',
-  bgChat: '#F8FAFC',
+  bgCanvas: '#faf9f5',
+  bgSidebar: '#f5f4ef',
+  bgPrimary: '#ffffff',
+  bgSecondary: '#faf9f5',
+  bgHover: 'rgba(0, 0, 0, 0.04)',
+  bgActiveItem: 'rgba(218, 119, 86, 0.08)',
+  bgInput: '#ffffff',
+  bgDropdown: '#ffffff',
+  bgOverlay: 'rgba(0, 0, 0, 0.45)',
+  bgChat: '#faf9f5',
 
   // Borders
-  borderPrimary: '#EAF0F6',
-  borderInput: '#EAF0F6',
-  borderAccent: '#8E84B8',
+  borderPrimary: '#e5e5df',
+  borderInput: '#e2e0d8',
+  borderAccent: '#da7756',
 
   // Text
-  textPrimary: '#1E293B',
-  textSecondary: '#334155',
-  textMuted: '#64748B',
-  textFaint: '#94A3B8',
-  textAccent: '#8E84B8',
+  textPrimary: '#2d2b28',
+  textSecondary: '#6b6863',
+  textMuted: '#9e9b94',
+  textFaint: '#b8b5ad',
+  textAccent: '#da7756',
+  brandClay: '#da7756',
 
   // Shadows
-  shadowCard: '0 2px 12px rgba(142, 132, 184, 0.08)',
-  shadowDropdown: '0 4px 16px rgba(0, 0, 0, 0.1)',
-  shadowActive: '0 0 6px rgba(142, 132, 184, 0.1)',
+  shadowCard: '0 2px 10px rgba(0, 0, 0, 0.04)',
+  shadowDropdown: '0 8px 24px -4px rgba(0, 0, 0, 0.12)',
+  shadowActive: '0 0 0 2px rgba(218, 119, 86, 0.2)',
 };
 
 const darkColors = {
   // Backgrounds
-  bgPrimary: '#1e293b',
-  bgSecondary: '#0f172a',
-  bgHover: 'rgba(142, 132, 184, 0.12)',
-  bgActiveItem: 'rgba(142, 132, 184, 0.15)',
-  bgInput: '#0f172a',
-  bgDropdown: '#1e293b',
-  bgOverlay: 'rgba(0, 0, 0, 0.7)',
-  bgChat: '#0f172a',
+  bgCanvas: '#1f1e1d',
+  bgSidebar: '#171715',
+  bgPrimary: '#262522',
+  bgSecondary: '#1f1e1d',
+  bgHover: 'rgba(255, 255, 255, 0.05)',
+  bgActiveItem: 'rgba(218, 119, 86, 0.14)',
+  bgInput: '#262522',
+  bgDropdown: '#262522',
+  bgOverlay: 'rgba(0, 0, 0, 0.65)',
+  bgChat: '#1f1e1d',
 
   // Borders
-  borderPrimary: '#334155',
-  borderInput: '#475569',
-  borderAccent: '#8E84B8',
+  borderPrimary: '#383733',
+  borderInput: '#3d3c37',
+  borderAccent: '#da7756',
 
   // Text
-  textPrimary: '#f1f5f9',
-  textSecondary: '#cbd5e1',
-  textMuted: '#94a3b8',
-  textFaint: '#64748b',
-  textAccent: '#a89cd6',
+  textPrimary: '#f3f1ec',
+  textSecondary: '#a6a39b',
+  textMuted: '#78756e',
+  textFaint: '#5a5751',
+  textAccent: '#da7756',
+  brandClay: '#da7756',
 
   // Shadows
-  shadowCard: '0 2px 12px rgba(0, 0, 0, 0.4)',
-  shadowDropdown: '0 4px 16px rgba(0, 0, 0, 0.5)',
-  shadowActive: '0 0 6px rgba(142, 132, 184, 0.25)',
+  shadowCard: '0 2px 10px rgba(0, 0, 0, 0.4)',
+  shadowDropdown: '0 8px 24px -4px rgba(0, 0, 0, 0.55)',
+  shadowActive: '0 0 0 2px rgba(218, 119, 86, 0.25)',
 };
 
 /**

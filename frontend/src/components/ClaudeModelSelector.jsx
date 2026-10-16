@@ -158,7 +158,7 @@ const ClaudeModelSelector = ({
     iconColor: 'text-amber-500',
   };
 
-  const ActiveIcon = activeMeta.icon;
+  const ActiveIcon = activeMeta?.icon || Sparkles;
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -309,7 +309,7 @@ const ClaudeModelSelector = ({
                   iconColor: 'text-amber-500',
                 };
 
-                const IconComponent = meta.icon;
+                const IconComponent = meta?.icon || Sparkles;
                 const isSelected = activeModelObj.id === model.id || activeModelObj.modelName === model.modelName;
 
                 return (

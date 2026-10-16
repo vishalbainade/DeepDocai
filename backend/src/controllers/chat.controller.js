@@ -15,19 +15,83 @@ const getChatPayload = (req) => {
   return req.body || {};
 };
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const createHttpError = (message, statusCode) => {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+};
+
+const resolveOwnedDocumentId = async ({ documentId, userId }) => {
+  if (!documentId || !UUID_REGEX.test(documentId)) {
+    return null;
+  }
+
+  const documentResult = await query(
+    'SELECT id FROM documents WHERE id = $1 AND user_id = $2',
+    [documentId, userId]
+  );
+
+  if (documentResult.rows.length === 0) {
+    throw createHttpError('Document not found', 404);
+  }
+
+  return documentResult.rows[0].id;
+};
+
 const ensureChat = async ({ chatId, userId, documentId, question }) => {
   if (chatId) {
-    return chatId;
+    const chatResult = await query(
+      `SELECT id, document_id
+       FROM chats
+       WHERE id = $1 AND user_id = $2`,
+      [chatId, userId]
+    );
+
+    if (chatResult.rows.length === 0) {
+      throw createHttpError('Chat not found', 404);
+    }
+
+    const chat = chatResult.rows[0];
+    if (documentId && chat.document_id && documentId !== chat.document_id) {
+      throw createHttpError('This document does not belong to the current chat', 409);
+    }
+
+    return {
+      id: chat.id,
+      documentId: chat.document_id,
+    };
   }
 
   const chatResult = await query(
     `INSERT INTO chats (user_id, document_id, title)
      VALUES ($1, $2, $3)
-     RETURNING id`,
+     RETURNING id, document_id`,
     [userId, documentId, `${question.substring(0, 50)}${question.length > 50 ? '...' : ''}`]
   );
 
-  return chatResult.rows[0].id;
+  return {
+    id: chatResult.rows[0].id,
+    documentId: chatResult.rows[0].document_id,
+  };
+};
+
+const titleNewChatFromFirstMessage = async ({ chatId, userId, question }) => {
+  const title = `${question.trim().substring(0, 50)}${question.trim().length > 50 ? '...' : ''}`;
+  if (!title) return;
+
+  await query(
+    `UPDATE chats
+     SET title = $1, updated_at = CURRENT_TIMESTAMP
+     WHERE id = $2
+       AND user_id = $3
+       AND title = 'New Chat'
+       AND NOT EXISTS (
+         SELECT 1 FROM chat_history WHERE chat_id = $2
+       )`,
+    [title, chatId, userId]
+  );
 };
 
 const storeUserMessage = async ({ chatId, documentId, question }) => {
@@ -38,12 +102,38 @@ const storeUserMessage = async ({ chatId, documentId, question }) => {
   );
 };
 
+// Projects carry their own working instructions. Resolve them server-side so a
+// client cannot accidentally apply another user's project configuration.
+const getProjectInstructions = async ({ projectId, userId }) => {
+  if (!projectId) return '';
+
+  const result = await query(
+    `SELECT custom_instructions
+     FROM projects
+     WHERE id = $1 AND user_id = $2`,
+    [projectId, userId]
+  );
+
+  return result.rows[0]?.custom_instructions || '';
+};
+
+const applyProjectInstructions = async ({ personalization, projectId, userId }) => {
+  const projectInstructions = await getProjectInstructions({ projectId, userId });
+  if (!projectInstructions.trim()) return personalization;
+
+  return {
+    ...personalization,
+    customInstructions: [
+      `Project instructions: ${projectInstructions.trim()}`,
+      personalization?.customInstructions?.trim(),
+    ].filter(Boolean).join('\n\n'),
+  };
+};
+
 export const askQuestion = async (req, res) => {
   const { documentId, question, chatId, intent, model, thinkingMode, webMode, projectId, personalization } = getChatPayload(req);
   const requestId = randomUUID();
-  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  const validDocumentId = (documentId && UUID_REGEX.test(documentId)) ? documentId : null;
-  const requestLogger = logger.child({ requestId, documentId: validDocumentId, chatId });
+  const requestLogger = logger.child({ requestId, documentId, chatId });
 
   try {
     if (!question || !question.trim()) {
@@ -52,6 +142,7 @@ export const askQuestion = async (req, res) => {
 
     const isThinking = thinkingMode === true || thinkingMode === 'true';
     const isWeb = webMode === true || webMode === 'true';
+    const validDocumentId = await resolveOwnedDocumentId({ documentId, userId: req.user.id });
 
     // Fetch user personalization preferences & learned memories
     const prefsResult = await query(
@@ -63,7 +154,7 @@ export const askQuestion = async (req, res) => {
     const interactionLimit = Math.min(Math.max(Number(userPrefs.history_limit) || 10, 2), 30);
     const activeMemories = userPrefs.memory_enabled !== false ? (userPrefs.memories || []) : [];
 
-    const mergedPersonalization = {
+    let mergedPersonalization = {
       customInstructions: personalization?.customInstructions || userPrefs.custom_instructions || '',
       persona: personalization?.persona || userPrefs.persona || 'legal_counsel',
       tone: personalization?.tone || userPrefs.tone || 'concise',
@@ -71,6 +162,11 @@ export const askQuestion = async (req, res) => {
       outputFormat: personalization?.outputFormat || userPrefs.output_format || 'citations_tables',
       memories: activeMemories,
     };
+    mergedPersonalization = await applyProjectInstructions({
+      personalization: mergedPersonalization,
+      projectId,
+      userId: req.user.id,
+    });
 
     requestLogger.info('CHAT REQUEST', 'Query received', {
       question,
@@ -83,12 +179,14 @@ export const askQuestion = async (req, res) => {
       hasDocument: !!validDocumentId,
     });
 
-    const currentChatId = await ensureChat({
+    const currentChat = await ensureChat({
       chatId,
       userId: req.user.id,
       documentId: validDocumentId,
       question,
     });
+    const currentChatId = currentChat.id;
+    const chatDocumentId = currentChat.documentId;
 
     let chatHistory = [];
     if (chatId) {
@@ -101,9 +199,10 @@ export const askQuestion = async (req, res) => {
       chatHistory = historyResult.rows.reverse();
     }
 
-    await storeUserMessage({ chatId: currentChatId, documentId: validDocumentId, question });
+    await titleNewChatFromFirstMessage({ chatId: currentChatId, userId: req.user.id, question });
+    await storeUserMessage({ chatId: currentChatId, documentId: chatDocumentId, question });
 
-    const result = await generateAnswer(question, validDocumentId, intent, model, chatHistory, {
+    const result = await generateAnswer(question, chatDocumentId, intent, model, chatHistory, {
       thinkingMode: isThinking,
       webMode: isWeb,
       personalization: mergedPersonalization,
@@ -131,7 +230,7 @@ export const askQuestion = async (req, res) => {
     await query(
       `INSERT INTO chat_history (chat_id, document_id, role, content)
        VALUES ($1, $2, 'ai', $3)`,
-      [currentChatId, validDocumentId, aiContent || '']
+      [currentChatId, chatDocumentId, aiContent || '']
     );
     await query('UPDATE chats SET updated_at = CURRENT_TIMESTAMP WHERE id = $1', [currentChatId]);
 
@@ -143,7 +242,7 @@ export const askQuestion = async (req, res) => {
     await recordUsage({
       userId: req.user.id,
       chatId: currentChatId,
-      documentId: validDocumentId,
+      documentId: chatDocumentId,
       projectId,
       modelName: result.modelUsed || model || 'default',
       usageType: 'chat',
@@ -173,19 +272,19 @@ export const askQuestion = async (req, res) => {
       area: 'CHAT CONTROLLER',
       error: error.message,
     });
-    return res.status(500).json({
-      error: 'Failed to process question',
+    return res.status(error.statusCode || 500).json({
+      error: error.statusCode ? error.message : 'Failed to process question',
       message: error.message,
     });
   }
 };
 
+const recentStreamRequests = new Map();
+
 export const streamQuestion = async (req, res) => {
   const { documentId, question, chatId, intent, model, thinkingMode, webMode, projectId, personalization } = getChatPayload(req);
   const requestId = randomUUID();
-  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  const validDocumentId = (documentId && UUID_REGEX.test(documentId)) ? documentId : null;
-  const requestLogger = logger.child({ requestId, documentId: validDocumentId, chatId });
+  const requestLogger = logger.child({ requestId, documentId, chatId });
 
   try {
     if (!question || !question.trim()) {
@@ -198,8 +297,27 @@ export const streamQuestion = async (req, res) => {
       return;
     }
 
+    // Deduplicate rapid identical stream requests (e.g. rapid double clicks or StrictMode)
+    const dedupKey = `${req.user.id}:${chatId || 'new'}:${question.trim()}`;
+    const now = Date.now();
+    const lastRequestTime = recentStreamRequests.get(dedupKey);
+    if (lastRequestTime && now - lastRequestTime < 1500) {
+      requestLogger.info('DEDUPLICATION', 'Ignoring duplicate rapid stream request', { dedupKey });
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.write(': duplicate ignored\n\n');
+      res.end();
+      return;
+    }
+    recentStreamRequests.set(dedupKey, now);
+    if (recentStreamRequests.size > 200) {
+      for (const [k, t] of recentStreamRequests.entries()) {
+        if (now - t > 10000) recentStreamRequests.delete(k);
+      }
+    }
+
     const isThinking = thinkingMode === true || thinkingMode === 'true';
     const isWeb = webMode === true || webMode === 'true';
+    const validDocumentId = await resolveOwnedDocumentId({ documentId, userId: req.user.id });
 
     // Fetch user personalization preferences & learned memories
     const prefsResult = await query(
@@ -211,7 +329,7 @@ export const streamQuestion = async (req, res) => {
     const interactionLimit = Math.min(Math.max(Number(userPrefs.history_limit) || 10, 2), 30);
     const activeMemories = userPrefs.memory_enabled !== false ? (userPrefs.memories || []) : [];
 
-    const mergedPersonalization = {
+    let mergedPersonalization = {
       customInstructions: personalization?.customInstructions || userPrefs.custom_instructions || '',
       persona: personalization?.persona || userPrefs.persona || 'legal_counsel',
       tone: personalization?.tone || userPrefs.tone || 'concise',
@@ -219,6 +337,11 @@ export const streamQuestion = async (req, res) => {
       outputFormat: personalization?.outputFormat || userPrefs.output_format || 'citations_tables',
       memories: activeMemories,
     };
+    mergedPersonalization = await applyProjectInstructions({
+      personalization: mergedPersonalization,
+      projectId,
+      userId: req.user.id,
+    });
 
     requestLogger.info('CHAT REQUEST', 'Query received', {
       question,
@@ -231,12 +354,14 @@ export const streamQuestion = async (req, res) => {
       hasDocument: !!validDocumentId,
     });
 
-    const currentChatId = await ensureChat({
+    const currentChat = await ensureChat({
       chatId,
       userId: req.user.id,
       documentId: validDocumentId,
       question,
     });
+    const currentChatId = currentChat.id;
+    const chatDocumentId = currentChat.documentId;
 
     let chatHistory = [];
     if (chatId) {
@@ -249,10 +374,11 @@ export const streamQuestion = async (req, res) => {
       chatHistory = historyResult.rows.reverse();
     }
 
-    await storeUserMessage({ chatId: currentChatId, documentId: validDocumentId, question });
+    await titleNewChatFromFirstMessage({ chatId: currentChatId, userId: req.user.id, question });
+    await storeUserMessage({ chatId: currentChatId, documentId: chatDocumentId, question });
 
     await streamRagResponse(req, res, {
-      documentId: validDocumentId,
+      documentId: chatDocumentId,
       question,
       chatId: currentChatId,
       intent,
@@ -271,7 +397,10 @@ export const streamQuestion = async (req, res) => {
     });
 
     if (!res.headersSent) {
-      return res.status(500).json({ error: 'Failed to initialize stream', message: error.message });
+      return res.status(error.statusCode || 500).json({
+        error: error.statusCode ? error.message : 'Failed to initialize stream',
+        message: error.message,
+      });
     }
 
     res.write(`event: error\ndata: ${JSON.stringify({ error: error.message })}\n\n`);

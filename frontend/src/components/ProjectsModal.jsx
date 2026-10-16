@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, FolderPlus, Folder, Check, FileText, Sparkles, Loader2, Trash2 } from 'lucide-react';
-import { createProject, updateProject, deleteProject, addDocumentToProject } from '../services/api';
+import { createProject, updateProject, deleteProject, addDocumentToProject, removeDocumentFromProject } from '../services/api';
 import { useDarkColors, useIsDark } from '../utils/darkMode';
 
 const COLOR_OPTIONS = [
@@ -54,12 +54,13 @@ const ProjectsModal = ({ isOpen, onClose, projectToEdit = null, onProjectSaved, 
     try {
       let savedProj = null;
       if (projectToEdit?.id) {
-        savedProj = await updateProject(projectToEdit.id, {
+        const res = await updateProject(projectToEdit.id, {
           name: name.trim(),
           description: description.trim(),
           customInstructions: customInstructions.trim(),
           color,
         });
+        savedProj = res?.project || res;
       } else {
         const res = await createProject({
           name: name.trim(),
@@ -81,6 +82,21 @@ const ProjectsModal = ({ isOpen, onClose, projectToEdit = null, onProjectSaved, 
         }
       }
 
+      // Editing a project must also remove files that were explicitly deselected.
+      // This keeps its document drawer and its upload destination in sync.
+      if (savedProj?.id && projectToEdit?.documents) {
+        const previouslyAttached = projectToEdit.documents.map((doc) => doc.id);
+        for (const docId of previouslyAttached) {
+          if (!selectedDocIds.includes(docId)) {
+            try {
+              await removeDocumentFromProject(savedProj.id, docId);
+            } catch (e) {
+              console.error('Failed to remove document from project:', e);
+            }
+          }
+        }
+      }
+
       onProjectSaved?.(savedProj);
       onClose();
     } catch (err) {
@@ -98,7 +114,7 @@ const ProjectsModal = ({ isOpen, onClose, projectToEdit = null, onProjectSaved, 
     setSaving(true);
     try {
       await deleteProject(projectToEdit.id);
-      onProjectSaved?.(null);
+      onProjectSaved?.({ id: projectToEdit.id, deleted: true });
       onClose();
     } catch (err) {
       alert('Failed to delete project: ' + err.message);

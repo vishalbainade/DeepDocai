@@ -47,23 +47,48 @@ const AnswerCard = ({ message, onCitationClick, onRegenerate }) => {
 
   // If the parsed JSON provides dynamic text sources, use those. Otherwise fallback to the backend properties.
   const parsedResponse = cleanContent ? formatAIResponse(cleanContent) : { sources: [] };
+  const normalizeCitationList = (input) => {
+    if (!input) return [];
+    if (Array.isArray(input)) return input.filter((item) => item && typeof item === 'object');
+    if (typeof input === 'object') {
+      if ('page' in input || 'text' in input || 'chunkId' in input) return [input];
+      try {
+        const flattened = Object.values(input).flat();
+        return Array.isArray(flattened) ? flattened.filter((item) => item && typeof item === 'object') : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  };
+
   const getUniqueCitations = (citationsArray) => {
-    if (!citationsArray || !citationsArray.length) return [];
+    if (!Array.isArray(citationsArray) || !citationsArray.length) return [];
     const seen = new Set();
     const unique = [];
     citationsArray.forEach((cit) => {
-      const key = `${cit.page}-${cit.chunkId}`;
+      if (!cit || typeof cit !== 'object') return;
+      const key = `${cit.page || 1}-${cit.chunkId || ''}`;
       if (!seen.has(key)) {
         seen.add(key);
         unique.push(cit);
       }
     });
-    return unique.sort((a, b) => a.page - b.page);
+    return unique.sort((a, b) => (Number(a.page) || 0) - (Number(b.page) || 0));
   };
 
   // Natively mapped deduplicated sources from either backend or dynamically parsed LLM tokens
-  const backendCitations = getUniqueCitations(message.citations || (message.paragraphCitations || []).flatMap((p) => p.citations || []));
-  const dynamicSources = parsedResponse.sources.map(pg => ({ page: pg }));
+  const safeMessageCitations = normalizeCitationList(message.citations);
+  const safeParagraphCitations = Array.isArray(message.paragraphCitations)
+    ? message.paragraphCitations.flatMap((p) => normalizeCitationList(p?.citations || p))
+    : [];
+
+  const backendCitations = getUniqueCitations(
+    safeMessageCitations.length > 0 ? safeMessageCitations : safeParagraphCitations
+  );
+  const dynamicSources = Array.isArray(parsedResponse?.sources)
+    ? parsedResponse.sources.map((pg) => ({ page: pg }))
+    : [];
   const uniqueCitations = dynamicSources.length > 0 ? dynamicSources : backendCitations;
 
   const webSources = message.webSources || [];
@@ -87,6 +112,20 @@ const AnswerCard = ({ message, onCitationClick, onRegenerate }) => {
 
       {/* Dynamic structured content */}
       <div className="transition-colors duration-300" style={{ color: dc.textPrimary }}>
+        {/* Real-time Streaming Processing Indicator (before first token) */}
+        {message.isStreaming && !cleanContent && !thoughtContent && (
+          <div className="flex items-center gap-2 py-3 px-1 animate-in fade-in duration-200">
+            <div className="flex items-center gap-1.5">
+              <span className="inline-block w-2 h-2 rounded-full bg-[#da7756] animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="inline-block w-2 h-2 rounded-full bg-[#da7756] animate-bounce" style={{ animationDelay: '150ms' }} />
+              <span className="inline-block w-2 h-2 rounded-full bg-[#da7756] animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+            <span className="text-xs font-serif italic text-neutral-400 dark:text-neutral-500 animate-pulse">
+              Thinking...
+            </span>
+          </div>
+        )}
+
         {message.answer_type === 'table' && message.table ? (
           <div className="mb-4 overflow-hidden rounded-2xl shadow-sm transition-colors duration-300" style={{ border: `1px solid ${dc.borderPrimary}` }}>
             <ChatTable title={message.table.title} columns={message.table.columns} rows={message.table.rows} />
@@ -102,6 +141,7 @@ const AnswerCard = ({ message, onCitationClick, onRegenerate }) => {
             paragraphCitations={message.paragraphCitations}
             citations={message.citations}
             onCitationClick={onCitationClick}
+            isStreaming={message.isStreaming}
           />
         )}
       </div>

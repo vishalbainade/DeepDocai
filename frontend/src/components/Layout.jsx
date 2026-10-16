@@ -5,12 +5,16 @@ import PersonalizationModal from './PersonalizationModal';
 import ProjectsModal from './ProjectsModal';
 import MultiFileUploadModal from './MultiFileUploadModal';
 import LiveAudioModal from './LiveAudioModal';
+import ClaudeSettingsModal from './ClaudeSettingsModal';
 import { useChat } from '../contexts/ChatContext';
 import { useIsDark } from '../utils/darkMode';
 
 const Layout = () => {
   const { 
     sidebarCollapsed,
+    isSettingsModalOpen,
+    setIsSettingsModalOpen,
+    settingsInitialTab,
     isUsageModalOpen,
     setIsUsageModalOpen,
     isPersonalizationModalOpen,
@@ -24,16 +28,19 @@ const Layout = () => {
     isLiveAudioOpen,
     setIsLiveAudioOpen,
     projects,
+    userDocuments,
     loadProjects,
+    loadUserDocuments,
     loadUsageSummary,
     activeProject,
+    selectProject,
   } = useChat();
   const isDark = useIsDark();
 
   return (
     <div
       className="h-screen w-screen flex overflow-hidden"
-      style={{ backgroundColor: isDark ? '#0f172a' : '#f8fafc' }}
+      style={{ backgroundColor: isDark ? '#1f1e1d' : '#faf9f5' }}
     >
       {/* Sidebar */}
       <Sidebar />
@@ -57,12 +64,18 @@ const Layout = () => {
       <ProjectsModal 
         isOpen={isProjectsModalOpen} 
         projectToEdit={projectToEdit}
+        existingDocuments={userDocuments}
         onClose={() => {
           setIsProjectsModalOpen(false);
           setProjectToEdit(null);
         }}
-        onProjectSaved={() => {
+        onProjectSaved={(project) => {
           loadProjects();
+          if (project?.deleted && activeProject?.id === project.id) {
+            selectProject(null);
+          } else if (project?.id && activeProject?.id === project.id) {
+            selectProject(project).catch(() => {});
+          }
         }}
       />
 
@@ -71,15 +84,23 @@ const Layout = () => {
         projects={projects}
         selectedProjectId={activeProject?.id || null}
         onClose={() => setIsMultiUploadOpen(false)}
-        onUploadComplete={() => {
-          loadProjects();
-          loadUsageSummary();
+        onUploadComplete={async () => {
+          await Promise.all([loadProjects(), loadUserDocuments(), loadUsageSummary()]);
+          if (activeProject?.id) {
+            selectProject(activeProject).catch(() => {});
+          }
         }}
       />
 
       <LiveAudioModal
         isOpen={isLiveAudioOpen}
         onClose={() => setIsLiveAudioOpen(false)}
+      />
+
+      <ClaudeSettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+        initialTab={settingsInitialTab}
       />
     </div>
   );

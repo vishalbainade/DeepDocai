@@ -7,15 +7,20 @@ import logger from '../../utils/logger.js';
  */
 export const PROVIDER_SLUG = 'google';
 
-// Model aliases fallback for stable Google AI endpoints
-const FALLBACK_CANDIDATES = ['gemini-2.5-flash', 'gemini-2.5-pro'];
+// Model candidates fallback if selected model hits a temporary demand spike or quota limit
+const FALLBACK_CANDIDATES = [
+  'gemini-3.1-flash-lite',
+  'gemini-2.5-flash-lite',
+  'gemma-4-26b-a4b-it',
+  'gemma-4-31b-it',
+  'gemini-3.8-flash',
+];
 
 const resolveModelName = (name) => {
-  if (!name) return 'gemini-2.5-flash';
-  const clean = name.trim().toLowerCase();
-  if (clean === 'gemini-2.5-pro' || clean.includes('2.5-pro')) return 'gemini-2.5-pro';
-  if (clean.includes('gemini') || clean.includes('flash') || clean.includes('gemma')) return 'gemini-2.5-flash';
-  return name;
+  if (!name) return 'gemini-3.1-flash-lite';
+  const clean = String(name).trim();
+  // Strip any 'models/' prefix, keep exact model name intact!
+  return clean.replace(/^models\//i, '');
 };
 
 export const generateText = async ({ apiKey, modelName, prompt, config = {} }) => {
@@ -95,8 +100,23 @@ export const generateText = async ({ apiKey, modelName, prompt, config = {} }) =
       };
     } catch (err) {
       lastError = err;
-      if (err.message?.includes('404') || err.message?.includes('not found') || err.message?.includes('bidiGenerateContent') || err.message?.includes('WebSocket') || err.status === 404 || err.status === 400) {
-        providerLogger.warn('PROVIDER', `Model ${currentModel} not available on REST endpoint, attempting candidate fallback...`);
+      const isCandidateRetryable =
+        err.message?.includes('404') ||
+        err.message?.includes('429') ||
+        err.message?.includes('quota') ||
+        err.message?.includes('Quota') ||
+        err.message?.includes('503') ||
+        err.message?.includes('500') ||
+        err.message?.includes('not found') ||
+        err.message?.includes('demand') ||
+        err.message?.includes('Unavailable') ||
+        err.status === 404 ||
+        err.status === 429 ||
+        err.status === 503 ||
+        err.status === 400;
+
+      if (isCandidateRetryable) {
+        providerLogger.warn('PROVIDER', `Model ${currentModel} error (${err.message}), attempting candidate fallback...`);
         continue;
       }
       break;
@@ -157,6 +177,9 @@ export const generateTextStream = async function* ({ apiKey, modelName, prompt, 
     } catch (initError) {
       const isRetryable =
         initError.message?.includes('404') ||
+        initError.message?.includes('429') ||
+        initError.message?.includes('quota') ||
+        initError.message?.includes('Quota') ||
         initError.message?.includes('503') ||
         initError.message?.includes('500') ||
         initError.message?.includes('not found') ||
@@ -165,10 +188,11 @@ export const generateTextStream = async function* ({ apiKey, modelName, prompt, 
         initError.message?.includes('bidiGenerateContent') ||
         initError.message?.includes('WebSocket') ||
         initError.status === 404 ||
+        initError.status === 429 ||
         initError.status === 503;
 
       if (isRetryable) {
-        providerLogger.warn('PROVIDER', `Stream model ${currentModel} error (${initError.message}), trying candidate...`);
+        providerLogger.warn('PROVIDER', `Stream model ${currentModel} error (${initError.message}), trying next candidate...`);
         continue;
       }
       providerLogger.error('PROVIDER', 'Gemini stream initialization failed', {

@@ -24,10 +24,10 @@ router.post('/', async (req, res) => {
     let validDocumentId = null;
 
     if (documentId && UUID_REGEX.test(documentId)) {
-      // Verify document exists
+      // A conversation may only be created against one of this user's files.
       const docResult = await query(
-        'SELECT id FROM documents WHERE id = $1',
-        [documentId]
+        'SELECT id FROM documents WHERE id = $1 AND user_id = $2',
+        [documentId, userId]
       );
       if (docResult.rows.length > 0) {
         validDocumentId = documentId;
@@ -36,7 +36,13 @@ router.post('/', async (req, res) => {
 
     let validProjectId = null;
     if (projectId && UUID_REGEX.test(projectId)) {
-      validProjectId = projectId;
+      const projectResult = await query(
+        'SELECT id FROM projects WHERE id = $1 AND user_id = $2',
+        [projectId, userId]
+      );
+      if (projectResult.rows.length > 0) {
+        validProjectId = projectId;
+      }
     }
 
     // Create new chat
@@ -82,13 +88,21 @@ router.get('/', async (req, res) => {
         c.id,
         c.title,
         c.document_id,
+        c.project_id,
         c.created_at,
         c.updated_at,
         d.file_name as document_name,
+        p.name as project_name,
         (SELECT COUNT(*) FROM chat_history WHERE chat_id = c.id) as message_count
        FROM chats c
        LEFT JOIN documents d ON c.document_id = d.id
+       LEFT JOIN projects p ON c.project_id = p.id
        WHERE c.user_id = $1
+         AND EXISTS (
+           SELECT 1
+           FROM chat_history h
+           WHERE h.chat_id = c.id
+         )
        ORDER BY c.updated_at DESC
        LIMIT 100`,
       [userId]
@@ -100,6 +114,8 @@ router.get('/', async (req, res) => {
         id: row.id,
         title: row.title,
         documentId: row.document_id,
+        projectId: row.project_id,
+        projectName: row.project_name,
         documentName: row.document_name,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
@@ -126,7 +142,7 @@ router.get('/:chatId', async (req, res) => {
 
     // Verify chat exists and belongs to user
     const chatResult = await query(
-      'SELECT id, title, document_id, created_at, updated_at FROM chats WHERE id = $1 AND user_id = $2',
+      'SELECT id, title, document_id, project_id, created_at, updated_at FROM chats WHERE id = $1 AND user_id = $2',
       [chatId, userId]
     );
 
@@ -144,6 +160,7 @@ router.get('/:chatId', async (req, res) => {
         id: chat.id,
         title: chat.title,
         documentId: chat.document_id,
+        projectId: chat.project_id,
         createdAt: chat.created_at,
         updatedAt: chat.updated_at,
       },
@@ -168,7 +185,7 @@ router.get('/:chatId/messages', async (req, res) => {
 
     // Verify chat exists and belongs to user
     const chatResult = await query(
-      'SELECT id, title, document_id FROM chats WHERE id = $1 AND user_id = $2',
+      'SELECT id, title, document_id, project_id FROM chats WHERE id = $1 AND user_id = $2',
       [chatId, userId]
     );
 
@@ -180,8 +197,8 @@ router.get('/:chatId/messages', async (req, res) => {
 
     const chat = chatResult.rows[0];
 
-    // Get chat history - include messages with chat_id OR messages without chat_id but for this document
-    // This handles legacy messages that might not have chat_id set
+    // Chat sessions are isolated. A new conversation must never inherit
+    // messages from another session that happens to reference the same file.
     const messagesResult = await query(
       `SELECT 
         id,
@@ -189,9 +206,9 @@ router.get('/:chatId/messages', async (req, res) => {
         content,
         created_at
        FROM chat_history
-       WHERE (chat_id = $1 OR (chat_id IS NULL AND document_id = $2))
+       WHERE chat_id = $1
        ORDER BY created_at ASC`,
-      [chatId, chat.document_id]
+      [chatId]
     );
 
     res.json({
@@ -200,6 +217,7 @@ router.get('/:chatId/messages', async (req, res) => {
         id: chat.id,
         title: chat.title,
         documentId: chat.document_id,
+        projectId: chat.project_id,
       },
       messages: messagesResult.rows.map((row) => ({
         id: row.id,
@@ -212,6 +230,61 @@ router.get('/:chatId/messages', async (req, res) => {
     console.error('Error fetching chat messages:', error);
     res.status(500).json({
       error: 'Failed to fetch chat messages',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * PATCH /api/chats/:chatId/document
+ * Scope one uploaded file to an existing chat session.
+ */
+router.patch('/:chatId/document', async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const { documentId } = req.body;
+    const userId = getUserId(req);
+
+    const chatResult = await query(
+      'SELECT id FROM chats WHERE id = $1 AND user_id = $2',
+      [chatId, userId]
+    );
+    if (chatResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Chat not found' });
+    }
+
+    let validDocumentId = null;
+    if (documentId) {
+      const documentResult = await query(
+        'SELECT id FROM documents WHERE id = $1 AND user_id = $2',
+        [documentId, userId]
+      );
+      if (documentResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Document not found' });
+      }
+      validDocumentId = documentResult.rows[0].id;
+    }
+
+    const updated = await query(
+      `UPDATE chats
+       SET document_id = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2 AND user_id = $3
+       RETURNING id, document_id, updated_at`,
+      [validDocumentId, chatId, userId]
+    );
+
+    return res.json({
+      success: true,
+      chat: {
+        id: updated.rows[0].id,
+        documentId: updated.rows[0].document_id,
+        updatedAt: updated.rows[0].updated_at,
+      },
+    });
+  } catch (error) {
+    console.error('Error attaching document to chat:', error);
+    return res.status(500).json({
+      error: 'Failed to attach document to chat',
       message: error.message,
     });
   }

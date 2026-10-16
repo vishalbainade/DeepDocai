@@ -372,16 +372,29 @@ export const generateAnswerStream = async function* (question, documentId, inten
     });
 
     let fullAnswer = '';
-    for await (const chunk of generator) {
-      fullAnswer += chunk;
-      yield chunk;
+    let generatorMeta = null;
+    while (true) {
+      const { value, done } = await generator.next();
+      if (done) {
+        generatorMeta = value;
+        break;
+      }
+      if (value) {
+        fullAnswer += value;
+        yield value;
+      }
     }
+    const combinedWebSources = [
+      ...(generatorMeta?.webSources || []),
+      ...(webResults || []),
+    ];
     return {
       answer_type: 'text',
       answer: fullAnswer.trim(),
       sources: [],
       paragraphCitations: [],
-      webSources: webResults,
+      webSources: combinedWebSources,
+      modelUsed: generatorMeta?.modelName || preferredModel,
     };
   }
 
@@ -472,7 +485,10 @@ export const generateAnswerStream = async function* (question, documentId, inten
     inputTokens,
     outputTokens,
     totalTokens: inputTokens + outputTokens,
-    webSources: meta?.webSources?.length ? meta.webSources : (webResults || []),
+    webSources: [
+      ...(meta?.webSources || []),
+      ...(webResults || []),
+    ],
   };
 };
 

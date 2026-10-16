@@ -1,0 +1,745 @@
+{
+  "documentId": "609d4c62-a7c3-4f3f-a6c3-28fcd1999cd5",
+  "fileName": "sainathreq.pdf",
+  "extractedAt": "2026-10-14T02:34:21.744Z",
+  "pageCount": 6,
+  "pages": [
+    {
+      "page_num": 1,
+      "image_width": 2480,
+      "image_height": 3509,
+      "created_at": "2026-10-14T02:34:14.563867+00:00",
+      "blocks": [
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_1_block_000",
+          "coordinates": {
+            "x1": 593,
+            "y1": 327,
+            "x2": 1885,
+            "y2": 407
+          },
+          "layout_tag": "headline",
+          "confidence": 0.7202,
+          "reading_order": 1,
+          "text": "Assignment: Inventory Management with Stock Validation"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_1_block_001",
+          "coordinates": {
+            "x1": 294.32,
+            "y1": 403.03,
+            "x2": 1190.77,
+            "y2": 652.68
+          },
+          "layout_tag": "sidebar",
+          "confidence": 0.4479,
+          "reading_order": 2,
+          "text": "Duration: 1 Hour\nFrontend: Vue 3\nBackend: Java (Spring Boot) OR Golang\nDatabase: MySQL OR PostgreSQL"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_1_block_002",
+          "coordinates": {
+            "x1": 303,
+            "y1": 751,
+            "x2": 538,
+            "y2": 801
+          },
+          "layout_tag": "section-title",
+          "confidence": 0.6299,
+          "reading_order": 3,
+          "text": "Objective"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_1_block_003",
+          "coordinates": {
+            "x1": 299,
+            "y1": 836,
+            "x2": 1458,
+            "y2": 890
+          },
+          "layout_tag": "paragraph",
+          "confidence": 0.771,
+          "reading_order": 4,
+          "text": "Build a Mini Inventory Management System where:"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_1_block_004",
+          "coordinates": {
+            "x1": 361.89,
+            "y1": 908.36,
+            "x2": 1739.78,
+            "y2": 1345.99
+          },
+          "layout_tag": "unordered-list",
+          "confidence": 0.9314,
+          "reading_order": 5,
+          "text": "• Admin can add products\n\n• Users can view products\n\n• Users can place orders\n\n• Stock must reduce after order placement\n\n• System must prevent ordering more than available stock"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_1_block_005",
+          "coordinates": {
+            "x1": 288,
+            "y1": 1459,
+            "x2": 1218,
+            "y2": 1514
+          },
+          "layout_tag": "section-title",
+          "confidence": 0.6504,
+          "reading_order": 6,
+          "text": "Section 1: Database Design (10 Marks)"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_1_block_006",
+          "coordinates": {
+            "x1": 288,
+            "y1": 1552,
+            "x2": 1027,
+            "y2": 1607
+          },
+          "layout_tag": "section-title",
+          "confidence": 0.603,
+          "reading_order": 7,
+          "text": "1. Create the following tables:"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_1_block_007",
+          "coordinates": {
+            "x1": 288,
+            "y1": 1649,
+            "x2": 719,
+            "y2": 1703
+          },
+          "layout_tag": "image-caption",
+          "confidence": 0.7925,
+          "reading_order": 8,
+          "text": "Table 1: products"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_1_block_008",
+          "coordinates": {
+            "x1": 294,
+            "y1": 1735,
+            "x2": 1458,
+            "y2": 2440
+          },
+          "layout_tag": "table",
+          "confidence": 0.9458,
+          "reading_order": 9,
+          "text": "<table>\n<thead>\n<tr>\n<th>Column</th>\n<th>Type</th>\n<th>Constraints</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>id</td>\n<td>Primary Key</td>\n<td>Auto Increment</td>\n</tr>\n<tr>\n<td>name</td>\n<td>Varchar</td>\n<td>Not Null</td>\n</tr>\n<tr>\n<td>price</td>\n<td>Decimal</td>\n<td>Not Null</td>\n</tr>\n<tr>\n<td>stock_quantity</td>\n<td>Integer</td>\n<td>Not Null</td>\n</tr>\n<tr>\n<td>created_at</td>\n<td>Timestamp</td>\n<td>Default Current Time</td>\n</tr>\n</tbody>\n</table>"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_1_block_009",
+          "coordinates": {
+            "x1": 342,
+            "y1": 2834,
+            "x2": 699,
+            "y2": 2884
+          },
+          "layout_tag": "paragraph",
+          "confidence": 0.54,
+          "reading_order": 10,
+          "text": "Table 2: orders"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_1_block_010",
+          "coordinates": {
+            "x1": 127,
+            "y1": 3084,
+            "x2": 287,
+            "y2": 3132
+          },
+          "layout_tag": "footer",
+          "confidence": 0.3342,
+          "reading_order": 11,
+          "text": "Internal"
+        }
+      ]
+    },
+    {
+      "page_num": 2,
+      "image_width": 2480,
+      "image_height": 3509,
+      "created_at": "2026-10-14T02:34:14.873189+00:00",
+      "blocks": [
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_2_block_000",
+          "coordinates": {
+            "x1": 354,
+            "y1": 626,
+            "x2": 1747,
+            "y2": 1477
+          },
+          "layout_tag": "paragraph",
+          "confidence": 0.8447,
+          "reading_order": 1,
+          "text": "| Column | Type | Constraints |\n| :--- | :--- | :--- |\n| id | Primary Key | Auto Increment |\n| product_id | Foreign Key → products(id) | Not Null |\n| quantity | Integer | Not Null |\n| total_price | Decimal | Not Null |\n| created_at | Timestamp | Default Current Time |"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_2_block_001",
+          "coordinates": {
+            "x1": 359,
+            "y1": 1553,
+            "x2": 1426,
+            "y2": 1647
+          },
+          "layout_tag": "section-title",
+          "confidence": 0.7812,
+          "reading_order": 2,
+          "text": "Section 2: Backend Development (40 Marks)"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_2_block_002",
+          "coordinates": {
+            "x1": 361,
+            "y1": 1664,
+            "x2": 1334,
+            "y2": 1756
+          },
+          "layout_tag": "paragraph",
+          "confidence": 0.8174,
+          "reading_order": 3,
+          "text": "You must implement the following APIs:"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_2_block_003",
+          "coordinates": {
+            "x1": 380,
+            "y1": 1743,
+            "x2": 2468,
+            "y2": 3062
+          },
+          "layout_tag": "paragraph",
+          "confidence": 0.2905,
+          "reading_order": 4,
+          "text": "A) Add Product\n\nPOST /api/products\n\nRequest:\n\n{\n  \"name\": \"Laptop\",\n  \"price\": 50000,\n  \"stock_quantity\": 10\n}\n\nResponse:\n\n• 201 Created\n\n• Proper error handling"
+        }
+      ]
+    },
+    {
+      "page_num": 3,
+      "image_width": 2480,
+      "image_height": 3509,
+      "created_at": "2026-10-14T02:34:15.147465+00:00",
+      "blocks": [
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_3_block_000",
+          "coordinates": {
+            "x1": 197,
+            "y1": 115,
+            "x2": 2152,
+            "y2": 3144
+          },
+          "layout_tag": "paragraph",
+          "confidence": 0.5283,
+          "reading_order": 1,
+          "text": "GET /api/products\n\nResponse:\n\n[\n  {\n    \"id\": 1,\n    \"name\": \"Laptop\",\n    \"price\": 50000,\n    \"stock_quantity\": 8\n  }\n]\n\nC) Place Order (Critical Logic)\n\nPOST /api/orders\n\nRequest:\n\n{\n  \"product_id\": 1,\n  \"quantity\": 2\n}\n\nMandatory Business Rules\n\n1. If stock_quantity < quantity\n   o Return 400 Bad Request\n   o Message: \"Insufficient stock\"\n\n2. On successful order:\n   o Deduct stock\n   o Insert record in orders\n   o Calculate total_price = price × quantity\n\n3. Must use Database Transaction\n   o If any step fails → rollback"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_3_block_001",
+          "coordinates": {
+            "x1": 11.9,
+            "y1": 3020.71,
+            "x2": 927.87,
+            "y2": 3455.52
+          },
+          "layout_tag": "footer",
+          "confidence": 0.3072,
+          "reading_order": 2,
+          "text": "! Additional Requirements\n\nnternal"
+        }
+      ]
+    },
+    {
+      "page_num": 4,
+      "image_width": 2480,
+      "image_height": 3509,
+      "created_at": "2026-10-14T02:34:15.747082+00:00",
+      "blocks": [
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_4_block_000",
+          "coordinates": {
+            "x1": 408.66,
+            "y1": 339.57,
+            "x2": 1440.33,
+            "y2": 778.99
+          },
+          "layout_tag": "unordered-list",
+          "confidence": 0.8955,
+          "reading_order": 1,
+          "text": "• Proper status codes\n\n• Proper error response format\n\n• Validation (no negative quantity)\n\n• Clean folder structure\n\n• Business logic should NOT be inside controller"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_4_block_001",
+          "coordinates": {
+            "x1": 342,
+            "y1": 872,
+            "x2": 1154,
+            "y2": 960
+          },
+          "layout_tag": "section-title",
+          "confidence": 0.853,
+          "reading_order": 2,
+          "text": "Section 3: Frontend (Vue 3) (25 Marks)"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_4_block_002",
+          "coordinates": {
+            "x1": 341,
+            "y1": 978,
+            "x2": 845,
+            "y2": 1055
+          },
+          "layout_tag": "paragraph",
+          "confidence": 0.7378,
+          "reading_order": 3,
+          "text": "Create a simple UI with:"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_4_block_003",
+          "coordinates": {
+            "x1": 341,
+            "y1": 1068,
+            "x2": 984,
+            "y2": 1152
+          },
+          "layout_tag": "section-title",
+          "confidence": 0.5449,
+          "reading_order": 4,
+          "text": "Page 1: Product Management"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_4_block_004",
+          "coordinates": {
+            "x1": 404,
+            "y1": 1167,
+            "x2": 867,
+            "y2": 1246
+          },
+          "layout_tag": "paragraph",
+          "confidence": 0.7812,
+          "reading_order": 5,
+          "text": "• Add product form"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_4_block_005",
+          "coordinates": {
+            "x1": 402,
+            "y1": 1260,
+            "x2": 913,
+            "y2": 1340
+          },
+          "layout_tag": "paragraph",
+          "confidence": 0.7964,
+          "reading_order": 6,
+          "text": "• Product listing table"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_4_block_006",
+          "coordinates": {
+            "x1": 334,
+            "y1": 1363,
+            "x2": 784,
+            "y2": 1437
+          },
+          "layout_tag": "section-title",
+          "confidence": 0.6167,
+          "reading_order": 7,
+          "text": "Page 2: Place Order"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_4_block_007",
+          "coordinates": {
+            "x1": 395.65,
+            "y1": 1454.58,
+            "x2": 1165.49,
+            "y2": 1848.4
+          },
+          "layout_tag": "unordered-list",
+          "confidence": 0.9083,
+          "reading_order": 8,
+          "text": "• Select product\n\n• Enter quantity\n\n• Submit order\n\n• Display success/error message"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_4_block_008",
+          "coordinates": {
+            "x1": 328,
+            "y1": 1984,
+            "x2": 705,
+            "y2": 2052
+          },
+          "layout_tag": "section-title",
+          "confidence": 0.8286,
+          "reading_order": 9,
+          "text": "UI Expectations"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_4_block_009",
+          "coordinates": {
+            "x1": 401,
+            "y1": 2077.93,
+            "x2": 1241.04,
+            "y2": 2484.69
+          },
+          "layout_tag": "unordered-list",
+          "confidence": 0.9061,
+          "reading_order": 10,
+          "text": "• Clean layout\n\n• API integration using Axios\n\n• Basic validation\n\n• Display updated stock after order"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_4_block_010",
+          "coordinates": {
+            "x1": 345,
+            "y1": 2614,
+            "x2": 1293,
+            "y2": 2690
+          },
+          "layout_tag": "section-title",
+          "confidence": 0.8345,
+          "reading_order": 11,
+          "text": "Section 4: Edge Case Handling (10 Marks)"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_4_block_011",
+          "coordinates": {
+            "x1": 347,
+            "y1": 2726,
+            "x2": 861,
+            "y2": 2798
+          },
+          "layout_tag": "paragraph",
+          "confidence": 0.7905,
+          "reading_order": 12,
+          "text": "System should handle:"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_4_block_012",
+          "coordinates": {
+            "x1": 421.46,
+            "y1": 2822.97,
+            "x2": 1696.72,
+            "y2": 3119.44
+          },
+          "layout_tag": "unordered-list",
+          "confidence": 0.9199,
+          "reading_order": 13,
+          "text": "• Ordering non-existing product\n\n• Ordering zero/negative quantity\n\n• Concurrent order attempt (basic handling awareness)"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_4_block_013",
+          "coordinates": {
+            "x1": 156,
+            "y1": 3318,
+            "x2": 314,
+            "y2": 3370
+          },
+          "layout_tag": "footer",
+          "confidence": 0.561,
+          "reading_order": 14,
+          "text": "Internal"
+        }
+      ]
+    },
+    {
+      "page_num": 5,
+      "image_width": 2480,
+      "image_height": 3509,
+      "created_at": "2026-10-14T02:34:15.872100+00:00",
+      "blocks": [
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_5_block_000",
+          "coordinates": {
+            "x1": 374.81,
+            "y1": 306.63,
+            "x2": 1440.31,
+            "y2": 780.08
+          },
+          "layout_tag": "unordered-list",
+          "confidence": 0.878,
+          "reading_order": 1,
+          "text": "• Proper status codes\n\n• Proper error response format\n\n• Validation (no negative quantity)\n\n• Clean folder structure\n\n• Business logic should NOT be inside controller"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_5_block_001",
+          "coordinates": {
+            "x1": 314,
+            "y1": 878,
+            "x2": 1147,
+            "y2": 968
+          },
+          "layout_tag": "section-title",
+          "confidence": 0.8584,
+          "reading_order": 2,
+          "text": "Section 3: Frontend (Vue 3) (25 Marks)"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_5_block_002",
+          "coordinates": {
+            "x1": 314,
+            "y1": 988,
+            "x2": 831,
+            "y2": 1067
+          },
+          "layout_tag": "paragraph",
+          "confidence": 0.7754,
+          "reading_order": 3,
+          "text": "Create a simple UI with:"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_5_block_003",
+          "coordinates": {
+            "x1": 316,
+            "y1": 1083,
+            "x2": 977,
+            "y2": 1167
+          },
+          "layout_tag": "paragraph",
+          "confidence": 0.5137,
+          "reading_order": 4,
+          "text": "Page 1: Product Management"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_5_block_004",
+          "coordinates": {
+            "x1": 385,
+            "y1": 1185,
+            "x2": 858,
+            "y2": 1268
+          },
+          "layout_tag": "paragraph",
+          "confidence": 0.7847,
+          "reading_order": 5,
+          "text": "• Add product form"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_5_block_005",
+          "coordinates": {
+            "x1": 388,
+            "y1": 1285,
+            "x2": 907,
+            "y2": 1365
+          },
+          "layout_tag": "paragraph",
+          "confidence": 0.8057,
+          "reading_order": 6,
+          "text": "• Product listing table"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_5_block_006",
+          "coordinates": {
+            "x1": 318,
+            "y1": 1389,
+            "x2": 778,
+            "y2": 1468
+          },
+          "layout_tag": "section-title",
+          "confidence": 0.5244,
+          "reading_order": 7,
+          "text": "Page 2: Place Order"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_5_block_007",
+          "coordinates": {
+            "x1": 384.92,
+            "y1": 1482.66,
+            "x2": 1171.48,
+            "y2": 1894.25
+          },
+          "layout_tag": "unordered-list",
+          "confidence": 0.9093,
+          "reading_order": 8,
+          "text": "• Select product\n\n• Enter quantity\n\n• Submit order\n\n• Display success/error message"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_5_block_008",
+          "coordinates": {
+            "x1": 327,
+            "y1": 2030,
+            "x2": 708,
+            "y2": 2102
+          },
+          "layout_tag": "section-title",
+          "confidence": 0.8276,
+          "reading_order": 9,
+          "text": "UI Expectations"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_5_block_009",
+          "coordinates": {
+            "x1": 403.22,
+            "y1": 2122.91,
+            "x2": 1252.91,
+            "y2": 2542.57
+          },
+          "layout_tag": "unordered-list",
+          "confidence": 0.8958,
+          "reading_order": 10,
+          "text": "• Clean layout\n\n• API integration using Axios\n\n• Basic validation\n\n• Display updated stock after order"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_5_block_010",
+          "coordinates": {
+            "x1": 357,
+            "y1": 2670,
+            "x2": 1313,
+            "y2": 2746
+          },
+          "layout_tag": "section-title",
+          "confidence": 0.8403,
+          "reading_order": 11,
+          "text": "Section 4: Edge Case Handling (10 Marks)"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_5_block_011",
+          "coordinates": {
+            "x1": 362,
+            "y1": 2786,
+            "x2": 876,
+            "y2": 2854
+          },
+          "layout_tag": "paragraph",
+          "confidence": 0.7788,
+          "reading_order": 12,
+          "text": "System should handle:"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_5_block_012",
+          "coordinates": {
+            "x1": 444.06,
+            "y1": 2873.61,
+            "x2": 1715.02,
+            "y2": 3180.19
+          },
+          "layout_tag": "unordered-list",
+          "confidence": 0.9155,
+          "reading_order": 13,
+          "text": "• Ordering non-existing product\n\n• Ordering zero/negative quantity\n\n• Concurrent order attempt (basic handling awareness)"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_5_block_013",
+          "coordinates": {
+            "x1": 188,
+            "y1": 3382,
+            "x2": 338,
+            "y2": 3428
+          },
+          "layout_tag": "footer",
+          "confidence": 0.6699,
+          "reading_order": 14,
+          "text": "Internal"
+        }
+      ]
+    },
+    {
+      "page_num": 6,
+      "image_width": 2480,
+      "image_height": 3509,
+      "created_at": "2026-10-14T02:34:15.935616+00:00",
+      "blocks": [
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_6_block_000",
+          "coordinates": {
+            "x1": 298,
+            "y1": 248,
+            "x2": 811,
+            "y2": 311
+          },
+          "layout_tag": "header",
+          "confidence": 0.7642,
+          "reading_order": 1,
+          "text": "• Invalid JSON body"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_6_block_001",
+          "coordinates": {
+            "x1": 222,
+            "y1": 459,
+            "x2": 1324,
+            "y2": 529
+          },
+          "layout_tag": "section-title",
+          "confidence": 0.8369,
+          "reading_order": 2,
+          "text": "Section 5: Code Quality & AI Usage (15 Marks)"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_6_block_002",
+          "coordinates": {
+            "x1": 224,
+            "y1": 563,
+            "x2": 804,
+            "y2": 629
+          },
+          "layout_tag": "paragraph",
+          "confidence": 0.7363,
+          "reading_order": 3,
+          "text": "Candidate must submit:"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_6_block_003",
+          "coordinates": {
+            "x1": 290.17,
+            "y1": 654.53,
+            "x2": 1297.53,
+            "y2": 1290.29
+          },
+          "layout_tag": "ordered-list",
+          "confidence": 0.8763,
+          "reading_order": 4,
+          "text": "1. Project folder (Backend + Frontend)\n\n2. README file including:\n\no Setup instructions\n\no AI tools used\n\no Prompts used (copy paste)\n\no Any debugging done manually"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_6_block_004",
+          "coordinates": {
+            "x1": 242,
+            "y1": 1402,
+            "x2": 1038,
+            "y2": 1469
+          },
+          "layout_tag": "section-title",
+          "confidence": 0.8188,
+          "reading_order": 5,
+          "text": "Bonus (Optional - 5 Marks Extra)"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_6_block_005",
+          "coordinates": {
+            "x1": 324,
+            "y1": 1510,
+            "x2": 737,
+            "y2": 1573
+          },
+          "layout_tag": "paragraph",
+          "confidence": 0.7881,
+          "reading_order": 6,
+          "text": "• Add DB index"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_6_block_006",
+          "coordinates": {
+            "x1": 327,
+            "y1": 1602,
+            "x2": 949,
+            "y2": 1677
+          },
+          "layout_tag": "paragraph",
+          "confidence": 0.7944,
+          "reading_order": 7,
+          "text": "• Add Swagger/OpenAPI"
+        },
+        {
+          "block_id": "20261014_1710d712-0c39-40a0-8457-a7a5fc0288c2_6_block_007",
+          "coordinates": {
+            "x1": 126,
+            "y1": 3300,
+            "x2": 278,
+            "y2": 3340
+          },
+          "layout_tag": "footer",
+          "confidence": 0.4426,
+          "reading_order": 8,
+          "text": "Internal"
+        }
+      ]
+    }
+  ]
+}

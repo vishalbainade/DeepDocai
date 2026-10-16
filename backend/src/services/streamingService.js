@@ -5,18 +5,23 @@ import { recordUsage } from './usageService.js';
 import logger from '../utils/logger.js';
 
 const writeSse = (res, { event, data }) => {
-  if (event) {
-    res.write(`event: ${event}\n`);
+  if (res.writableEnded || res.destroyed) return;
+  try {
+    if (event) {
+      res.write(`event: ${event}\n`);
+    }
+
+    const payload = typeof data === 'string' ? data : JSON.stringify(data);
+    String(payload)
+      .split(/\r?\n/)
+      .forEach((line) => {
+        res.write(`data: ${line}\n`);
+      });
+
+    res.write('\n');
+  } catch {
+    // Client connection closed, ignore write failure
   }
-
-  const payload = typeof data === 'string' ? data : JSON.stringify(data);
-  String(payload)
-    .split(/\r?\n/)
-    .forEach((line) => {
-      res.write(`data: ${line}\n`);
-    });
-
-  res.write('\n');
 };
 
 const persistAssistantMessage = async ({ chatId, documentId, finalResult, accumulatedText }) => {
@@ -80,7 +85,7 @@ export const streamRagResponse = async (req, res, {
     connectionClosed = true;
     clearInterval(heartbeat);
     if (!streamCompleted) {
-      requestLogger.error('ERROR', 'Streaming connection closed', { area: 'STREAM' });
+      requestLogger.info('STREAM_DISCONNECT', 'Client stream connection closed', { area: 'STREAM' });
     }
   };
 
@@ -122,6 +127,7 @@ export const streamRagResponse = async (req, res, {
     }
 
     if (connectionClosed) {
+      generator.return?.();
       return;
     }
 
@@ -207,14 +213,19 @@ export const streamRagResponse = async (req, res, {
     res.end();
   } catch (error) {
     clearInterval(heartbeat);
-    requestLogger.error('ERROR', 'Streaming failed', {
-      area: 'STREAM',
-      error: error.message,
-    });
-
     if (!connectionClosed) {
+      requestLogger.error('ERROR', 'Streaming failed', {
+        area: 'STREAM',
+        error: error.message,
+      });
+
       writeSse(res, { event: 'error', data: { error: error.message } });
-      res.end();
+      try { res.end(); } catch {}
+    } else {
+      requestLogger.info('STREAM_DISCONNECT', 'Streaming aborted after client disconnect', {
+        area: 'STREAM',
+        reason: error.message,
+      });
     }
   } finally {
     res.off?.('close', handleConnectionClosed);

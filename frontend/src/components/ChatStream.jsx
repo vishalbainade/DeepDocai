@@ -23,19 +23,26 @@ const parseSseBlock = (block) => {
   };
 };
 
+const inFlightStreamIds = new Set();
+
 const ChatStream = ({
   request,
   onToken,
   onChatId,
   onCitations,
+  onWebSources,
+  onUsage,
   onComplete,
   onError,
   onDone,
 }) => {
+  const startedRef = useRef(false);
   const handlersRef = useRef({
     onToken,
     onChatId,
     onCitations,
+    onWebSources,
+    onUsage,
     onComplete,
     onError,
     onDone,
@@ -46,15 +53,28 @@ const ChatStream = ({
       onToken,
       onChatId,
       onCitations,
+      onWebSources,
+      onUsage,
       onComplete,
       onError,
       onDone,
     };
-  }, [onToken, onChatId, onCitations, onComplete, onError, onDone]);
+  }, [onToken, onChatId, onCitations, onWebSources, onUsage, onComplete, onError, onDone]);
 
   useEffect(() => {
     if (!request?.question) {
       return undefined;
+    }
+
+    if (request?.id && inFlightStreamIds.has(request.id)) {
+      return undefined;
+    }
+    if (startedRef.current) {
+      return undefined;
+    }
+    startedRef.current = true;
+    if (request?.id) {
+      inFlightStreamIds.add(request.id);
     }
 
     const controller = new AbortController();
@@ -251,11 +271,14 @@ const ChatStream = ({
       }
     };
 
-    run();
+    run().finally(() => {
+      if (request?.id) inFlightStreamIds.delete(request.id);
+    });
 
     return () => {
       stopped = true;
       controller.abort();
+      if (request?.id) inFlightStreamIds.delete(request.id);
     };
   }, [request]);
 

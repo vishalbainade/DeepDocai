@@ -17,61 +17,17 @@ html.dark {
 }
 
 html.dark body {
-  background-color: #0f172a;
-  color: #f1f5f9;
+  background-color: #1f1e1d;
+  color: #f3f1ec;
 }
 
-/* Surfaces */
-html.dark div[class*="bg-white"],
-html.dark nav[class*="bg-white"],
-html.dark header[class*="bg-white"],
-html.dark section[class*="bg-white"] {
-  background-color: #1e293b !important;
+/* Claude Font Classes */
+.font-claude-serif {
+  font-family: 'Newsreader', 'Lora', Georgia, 'Times New Roman', serif;
 }
 
-html.dark div[class*="bg-gray-50"],
-html.dark main[class*="bg-gray-50"] {
-  background-color: #0f172a !important;
-}
-
-/* Borders */
-html.dark div[class*="border-"],
-html.dark nav[class*="border-"],
-html.dark details[class*="border-"],
-html.dark button[class*="border-"] {
-  border-color: #334155 !important;
-}
-
-/* Text overrides for dark mode */
-html.dark h1, html.dark h2, html.dark h3 {
-  color: #f1f5f9 !important;
-}
-
-html.dark p[class*="text-slate-"],
-html.dark span[class*="text-slate-"],
-html.dark div[class*="text-slate-"] {
-  color: #cbd5e1 !important;
-}
-
-html.dark p[class*="text-gray-"],
-html.dark span[class*="text-gray-"],
-html.dark li[class*="text-gray-"] {
-  color: #cbd5e1 !important;
-}
-
-/* Inputs */
-html.dark input,
-html.dark select,
-html.dark textarea {
-  background-color: #0f172a !important;
-  color: #f1f5f9 !important;
-  border-color: #334155 !important;
-}
-
-html.dark input:focus,
-html.dark select:focus,
-html.dark textarea:focus {
-  border-color: #8E84B8 !important;
+.font-claude-sans {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 /* Shadows */

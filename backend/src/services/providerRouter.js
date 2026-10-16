@@ -352,24 +352,33 @@ export const routeStreamRequest = async function* ({ modelIdentifier, prompt, co
 
   // Yield tokens and track metadata
   let tokenCount = 0;
-  for await (const token of generator) {
-    tokenCount++;
-    yield token;
+  let streamMeta = null;
+  while (true) {
+    const { value, done } = await generator.next();
+    if (done) {
+      streamMeta = value;
+      break;
+    }
+    if (value) {
+      tokenCount++;
+      yield value;
+    }
   }
 
   routeLogger.info('ROUTER', 'Stream completed', {
     event: 'STREAM_COMPLETE',
-    model: model.modelName,
+    model: streamMeta?.modelName || model.modelName,
     provider: model.providerSlug,
     tokenCount,
   });
 
   // Return metadata as the generator return value
   return {
-    modelName: model.modelName,
+    modelName: streamMeta?.modelName || model.modelName,
     displayName: model.displayName,
     provider: model.providerSlug,
     tokenCount,
+    webSources: streamMeta?.webSources || [],
   };
 };
 

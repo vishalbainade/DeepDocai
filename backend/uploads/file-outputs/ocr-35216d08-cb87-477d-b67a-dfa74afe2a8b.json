@@ -1,0 +1,185 @@
+{
+  "documentId": "35216d08-cb87-477d-b67a-dfa74afe2a8b",
+  "fileName": "Coursera 1.pdf",
+  "extractedAt": "2026-10-14T00:51:04.800Z",
+  "pageCount": 1,
+  "pages": [
+    {
+      "page_num": 1,
+      "image_width": 3300,
+      "image_height": 2550,
+      "created_at": "2026-10-14T00:51:00.503471+00:00",
+      "blocks": [
+        {
+          "block_id": "20261014_56913ff3-f97d-4fa9-b554-a58206d97b85_1_block_000",
+          "coordinates": {
+            "x1": 344,
+            "y1": 354,
+            "x2": 654,
+            "y2": 417
+          },
+          "layout_tag": "header",
+          "confidence": 0.7842,
+          "reading_order": 1,
+          "text": "Google Cloud"
+        },
+        {
+          "block_id": "20261014_56913ff3-f97d-4fa9-b554-a58206d97b85_1_block_001",
+          "coordinates": {
+            "x1": 318,
+            "y1": 785,
+            "x2": 560,
+            "y2": 833
+          },
+          "layout_tag": "paragraph",
+          "confidence": 0.7612,
+          "reading_order": 2,
+          "text": "11 Jun, 2022"
+        },
+        {
+          "block_id": "20261014_56913ff3-f97d-4fa9-b554-a58206d97b85_1_block_002",
+          "coordinates": {
+            "x1": 320,
+            "y1": 902,
+            "x2": 1740,
+            "y2": 1021
+          },
+          "layout_tag": "headline",
+          "confidence": 0.7812,
+          "reading_order": 3,
+          "text": "Vishal Sunilsingh Bainade"
+        },
+        {
+          "block_id": "20261014_56913ff3-f97d-4fa9-b554-a58206d97b85_1_block_003",
+          "coordinates": {
+            "x1": 317,
+            "y1": 1079,
+            "x2": 811,
+            "y2": 1137
+          },
+          "layout_tag": "paragraph",
+          "confidence": 0.7871,
+          "reading_order": 4,
+          "text": "has successfully completed"
+        },
+        {
+          "block_id": "20261014_56913ff3-f97d-4fa9-b554-a58206d97b85_1_block_004",
+          "coordinates": {
+            "x1": 317,
+            "y1": 1192,
+            "x2": 1647,
+            "y2": 1348
+          },
+          "layout_tag": "paragraph",
+          "confidence": 0.8862,
+          "reading_order": 5,
+          "text": "Preparing for Your Associate Cloud Engineer Journey"
+        },
+        {
+          "block_id": "20261014_56913ff3-f97d-4fa9-b554-a58206d97b85_1_block_005",
+          "coordinates": {
+            "x1": 321,
+            "y1": 1400,
+            "x2": 1779,
+            "y2": 1459
+          },
+          "layout_tag": "paragraph",
+          "confidence": 0.7891,
+          "reading_order": 6,
+          "text": "an online non-credit course authorized by Google Cloud and offered through Coursera"
+        },
+        {
+          "block_id": "20261014_56913ff3-f97d-4fa9-b554-a58206d97b85_1_block_006",
+          "coordinates": {
+            "x1": 338,
+            "y1": 1849,
+            "x2": 1131,
+            "y2": 1944
+          },
+          "layout_tag": "paragraph",
+          "confidence": 0.6523,
+          "reading_order": 7,
+          "text": "Google Cloud Training"
+        },
+        {
+          "block_id": "20261014_56913ff3-f97d-4fa9-b554-a58206d97b85_1_block_007",
+          "coordinates": {
+            "x1": 2300,
+            "y1": 312,
+            "x2": 2770,
+            "y2": 470
+          },
+          "layout_tag": "paragraph",
+          "confidence": 0.3137,
+          "reading_order": 8,
+          "text": "COURSE\nCERTIFICATE"
+        },
+        {
+          "block_id": "20261014_56913ff3-f97d-4fa9-b554-a58206d97b85_1_block_008",
+          "coordinates": {
+            "x1": 2244,
+            "y1": 948,
+            "x2": 2876,
+            "y2": 1574
+          },
+          "layout_tag": "image",
+          "confidence": 0.8252,
+          "reading_order": 9,
+          "text": "छवि में एक गोलाकार लोगो है जिसमें \"coursera\" शब्द बोल्ड, लोअरकेस फ़ॉन्ट में केंद्र में प्रमुखता से प्रदर्शित है। लोगो के चारों ओर एक गोलाकार बैंड है जिसमें \"EDUCATION FOR EVERYONE\" और \"COURSE CERTIFICATE\" वाक्यांश शामिल हैं, जो वृत्त के ऊपरी और निचले किनारों के साथ समान रूप से दूरी पर हैं। डिज़ाइन में एक बिंदीदार रेखा सीमा शामिल है, जो इसे एक मुहर जैसा रूप देती है। समग्र रंग योजना मोनोक्रोमैटिक है, जिसमें एक हल्के पृष्ठभूमि के खिलाफ ग्रे के रंगों का उपयोग किया गया है।"
+        },
+        {
+          "block_id": "20261014_56913ff3-f97d-4fa9-b554-a58206d97b85_1_block_009",
+          "coordinates": {
+            "x1": 2750,
+            "y1": 2218,
+            "x2": 2932,
+            "y2": 2258
+          },
+          "layout_tag": "footnote",
+          "confidence": 0.2563,
+          "reading_order": 10,
+          "text": "Verify at:"
+        },
+        {
+          "block_id": "20261014_56913ff3-f97d-4fa9-b554-a58206d97b85_1_block_010",
+          "coordinates": {
+            "x1": 2126,
+            "y1": 2254,
+            "x2": 2932,
+            "y2": 2304
+          },
+          "layout_tag": "footer",
+          "confidence": 0.3433,
+          "reading_order": 11,
+          "text": "https://coursera.org/verify/9VQBGWZ83ZQL"
+        },
+        {
+          "block_id": "20261014_56913ff3-f97d-4fa9-b554-a58206d97b85_1_block_011",
+          "coordinates": {
+            "x1": 1972,
+            "y1": 2320,
+            "x2": 2946,
+            "y2": 2400
+          },
+          "layout_tag": "footer",
+          "confidence": 0.814,
+          "reading_order": 12,
+          "text": "Coursera has confirmed the identity of this individual and their participation in the course."
+        },
+        {
+          "block_id": "20261014_56913ff3-f97d-4fa9-b554-a58206d97b85_1_block_012",
+          "coordinates": {
+            "x1": 3186,
+            "y1": 2440,
+            "x2": 3234,
+            "y2": 2484
+          },
+          "layout_tag": "page-number",
+          "confidence": 0.3452,
+          "reading_order": 13,
+          "text": "☐"
+        }
+      ]
+    }
+  ]
+}

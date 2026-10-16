@@ -1,36 +1,38 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Upload, 
   FolderPlus, 
-  FolderUp, 
   Folder, 
   Brain, 
   Globe, 
   ArrowUp, 
-  Cpu, 
   Sliders, 
   Sparkles, 
   FileText, 
   Layers, 
-  Zap, 
   ChevronRight,
   Plus,
   Mic,
   Eye,
-  CheckCircle2
+  CheckCircle2,
+  X,
+  Paperclip,
+  Check,
+  ChevronDown
 } from 'lucide-react';
 import { uploadDocument, getUser, getAvailableModels } from '../services/api';
 import ClaudeModelSelector, { DEFAULT_TEXT_MODELS } from './ClaudeModelSelector';
 import ReconstructedOCRModal from './ReconstructedOCRModal';
 import { useChat } from '../contexts/ChatContext';
 import { useDarkColors, useIsDark } from '../utils/darkMode';
+import deepDocLogo from '../assets/deepdoc-logo.png';
 
 const QUICK_STARTERS = [
-  { icon: '⚖️', label: 'Indemnity & Liabilities', prompt: 'Audit all indemnity, limitation of liability, and warranty clauses across my documents.' },
-  { icon: '📜', label: 'Termination & Breaches', prompt: 'Summarize the breach conditions, notice periods, and termination procedures.' },
-  { icon: '🛡️', label: 'Compliance & Regulatory', prompt: 'Check compliance risks against statutory data protection and governing law standards.' },
-  { icon: '📊', label: 'Extract Clause Matrix', prompt: 'Create a structured comparative table of parties, payment terms, and key covenants.' },
+  { icon: '</>', label: 'Clauses', prompt: 'Audit all indemnity, limitation of liability, and warranty clauses across my documents.' },
+  { icon: '✏️', label: 'Summarize', prompt: 'Summarize key covenants, parties, payment schedules, and breach penalties.' },
+  { icon: '🎓', label: 'Precedents', prompt: 'Check statutory compliance and legal precedents relevant to these agreements.' },
+  { icon: '⚖️', label: 'Liabilities', prompt: 'Highlight high-risk liability clauses, uncapped exposure, and dispute resolution venues.' },
 ];
 
 const HomePage = () => {
@@ -43,13 +45,11 @@ const HomePage = () => {
     loadUserDocuments,
     projects,
     activeProject,
-    setActiveProject,
+    selectProject,
     setIsProjectsModalOpen,
     setProjectToEdit,
     setIsMultiUploadOpen,
-    setIsUsageModalOpen,
-    setIsPersonalizationModalOpen,
-    usageSummary,
+    openSettings,
     thinkingMode,
     setThinkingMode,
     webMode,
@@ -62,9 +62,36 @@ const HomePage = () => {
   const [viewingOCRDoc, setViewingOCRDoc] = useState(null);
   const [selectedModel, setSelectedModel] = useState('gemini-3.8-flash');
   const [availableModels, setAvailableModels] = useState(DEFAULT_TEXT_MODELS);
+  const [chatMode, setChatMode] = useState('chat'); // default to 'chat'
+  const [attachMenuOpen, setAttachMenuOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [user, setUser] = useState(null);
+
+  const fileInputRef = useRef(null);
+  const attachMenuRef = useRef(null);
+  const textareaRef = useRef(null);
   const dc = useDarkColors();
   const isDark = useIsDark();
+
+  const workspaceDocuments = Array.isArray(activeProject?.documents) && activeProject.documents.length > 0
+    ? activeProject.documents
+    : userDocuments;
+
+  // Ensure new chats start completely clean with NO document pre-attached
+  useEffect(() => {
+    setSelectedDocId(null);
+    setCurrentDocumentId(null);
+  }, [setCurrentDocumentId]);
+
+  // Time-aware greeting
+  const getTimeGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 12) return 'Morning thoughts';
+    if (hour >= 12 && hour < 17) return 'Afternoon thoughts';
+    if (hour >= 17 && hour < 22) return 'Evening thoughts';
+    return 'Night thoughts';
+  };
 
   useEffect(() => {
     setUser(getUser());
@@ -77,492 +104,474 @@ const HomePage = () => {
     });
   }, []);
 
-  // Sync selectedDocId when documents load
+  // Close attach menu on outside click
   useEffect(() => {
-    if (!selectedDocId && userDocuments.length > 0) {
-      setSelectedDocId(userDocuments[0].id);
+    const handleClickOutside = (e) => {
+      if (attachMenuRef.current && !attachMenuRef.current.contains(e.target)) {
+        setAttachMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Auto-resize textarea
+  const handleTextareaChange = (e) => {
+    setPromptInput(e.target.value);
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 220)}px`;
     }
-  }, [userDocuments, selectedDocId]);
+  };
+
+  // Find currently selected document
+  const activeDocument = workspaceDocuments.find((d) => d.id === selectedDocId) || null;
+
+  const handleModeChange = (mode) => {
+    setChatMode(mode);
+    if (mode === 'cowork') {
+      if (!selectedDocId) {
+        setAttachMenuOpen(true);
+      }
+    }
+  };
 
   const handleStartPrompt = async (textToSend) => {
     const q = textToSend || promptInput;
-    if (!q.trim()) return;
+    if (!q.trim() || isSubmitting) return;
 
-    // Save prompt & model into session storage so ChatPage automatically executes it
-    sessionStorage.setItem('initial_user_prompt', q.trim());
-    sessionStorage.setItem('initial_model', selectedModel);
+    let targetDocId = null;
 
-    // Pick target document: explicitly selected -> activeProject document -> first uploaded doc -> null
-    const docId = selectedDocId || activeProject?.documents?.[0]?.id || userDocuments?.[0]?.id || null;
-    if (docId) {
-      setCurrentDocumentId(docId);
+    if (chatMode === 'cowork') {
+      // Legal RAG mode requires an active document
+      targetDocId = selectedDocId || null;
+      if (!targetDocId) {
+        alert('Please attach or upload a document for Legal RAG analysis, or continue in Chat mode.');
+        setAttachMenuOpen(true);
+        return;
+      }
+      setSelectedDocId(targetDocId);
+      setCurrentDocumentId(targetDocId);
+    } else {
+      // General Chat mode
+      targetDocId = selectedDocId || null;
+      if (targetDocId) {
+        setCurrentDocumentId(targetDocId);
+      }
     }
 
     try {
-      const newChat = await createNewChat(docId, activeProject?.id || null);
+      setIsSubmitting(true);
+      const newChat = await createNewChat(targetDocId, activeProject?.id || null);
       if (newChat) {
-        navigate(`/chat/${newChat.id}`);
+        navigate(`/chat/${newChat.id}`, {
+          state: {
+            initialPrompt: q.trim(),
+            initialModel: selectedModel,
+            intent: chatMode === 'cowork' ? 'legal_rag' : 'general',
+          },
+        });
       } else {
         navigate('/chat');
       }
     } catch (err) {
       console.error('Failed to create chat:', err);
-      // Navigate to chat anyway rather than opening upload popup
       navigate('/chat');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleStartPrompt();
+    }
+  };
+
+  // Handle direct file upload from the + button
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsUploading(true);
+      setAttachMenuOpen(false);
+      const res = await uploadDocument(file, activeProject?.id || null);
+      await loadUserDocuments();
+      if (res?.document?.id) {
+        setSelectedDocId(res.document.id);
+        setCurrentDocumentId(res.document.id);
+        setChatMode('cowork');
+      }
+    } catch (err) {
+      console.error('Upload failed:', err);
+      alert('File upload failed: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : 'V';
+
   return (
     <div 
-      className="h-full w-full overflow-y-auto transition-colors duration-300"
-      style={{ backgroundColor: isDark ? '#101013' : '#fcfcfc' }}
+      className="h-full w-full overflow-y-auto flex flex-col justify-between transition-colors duration-200"
+      style={{ backgroundColor: isDark ? '#1f1e1d' : '#faf9f5' }}
     >
-      <div className="max-w-4xl mx-auto px-6 py-10 flex flex-col items-center">
+      {/* Hidden File Input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,.doc,.docx,.txt"
+        className="hidden"
+        onChange={handleFileUpload}
+      />
+
+      {/* Top Bar: Clean User Avatar */}
+      <div className="w-full px-6 pt-5 pb-2 flex items-center justify-end shrink-0">
+        <button
+          onClick={() => openSettings('account')}
+          className="w-8 h-8 rounded-full flex items-center justify-center font-medium text-xs text-[#2d2b28] dark:text-[#eceae6] border hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+          style={{
+            backgroundColor: isDark ? '#2e2d2a' : '#eae8e1',
+            borderColor: isDark ? '#3d3b37' : '#dad7cf',
+          }}
+          title={user?.email || 'Settings'}
+        >
+          {userInitial}
+        </button>
+      </div>
+
+      {/* Center Container */}
+      <div className="w-full max-w-2xl mx-auto px-4 py-8 flex-1 flex flex-col items-center justify-center">
         
-        {/* Top Status Bar (Claude-style subtle pills) */}
-        <div className="w-full flex flex-wrap items-center justify-between gap-3 mb-8 text-xs">
-          {/* Active Project Indicator */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                setProjectToEdit(null);
-                setIsProjectsModalOpen(true);
-              }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all hover:bg-slate-500/5 cursor-pointer font-medium"
-              style={{
-                borderColor: activeProject ? activeProject.color : (isDark ? '#27272a' : '#e4e4e7'),
-                backgroundColor: activeProject ? `${activeProject.color}15` : (isDark ? '#18181b' : '#ffffff'),
-                color: activeProject ? activeProject.color : dc.textPrimary,
-              }}
-            >
-              <Folder size={13} style={{ color: activeProject?.color || '#da7756' }} />
-              <span>{activeProject ? `Project: ${activeProject.name}` : 'All Projects & Files'}</span>
-              <ChevronRight size={12} className="opacity-50" />
-            </button>
-          </div>
-
-          {/* Quick Metrics & Personalization Pill */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsUsageModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border font-mono transition-all hover:border-amber-500/50 cursor-pointer text-[11px]"
-              style={{
-                borderColor: isDark ? '#27272a' : '#e4e4e7',
-                backgroundColor: isDark ? '#18181b' : '#ffffff',
-                color: dc.textPrimary,
-              }}
-              title="Click to view detailed usage and quotas"
-            >
-              <Zap size={13} className="text-emerald-500" />
-              <span>{Math.round((usageSummary?.aiTokens?.totalTokens ?? 12300) / 1000)}k AI</span>
-              <span className="opacity-40">•</span>
-              <FileText size={12} className="text-amber-500" />
-              <span>{usageSummary?.ocrPages ?? 12} OCR pgs</span>
-              <span className="opacity-40">•</span>
-              <Layers size={12} className="text-indigo-400" />
-              <span>{Math.round((usageSummary?.embeddingTokens ?? 18450) / 1000)}k Embed</span>
-            </button>
-
-            <button
-              onClick={() => setIsPersonalizationModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all hover:bg-slate-500/5 cursor-pointer"
-              style={{
-                borderColor: isDark ? '#27272a' : '#e4e4e7',
-                backgroundColor: isDark ? '#18181b' : '#ffffff',
-                color: dc.textPrimary,
-              }}
-            >
-              <Sliders size={13} className="text-amber-500" />
-              <span className="font-medium">Personalize</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Claude Greeting Header */}
-        <div className="text-center max-w-xl mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl mb-3 shadow-sm"
-            style={{ backgroundColor: 'rgba(218, 119, 86, 0.15)', color: '#da7756' }}
+        {/* Active Project Banner if in a Project Context */}
+        {activeProject && (
+          <div 
+            className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium shadow-xs"
+            style={{
+              backgroundColor: isDark ? '#262522' : '#ffffff',
+              borderColor: isDark ? '#383733' : '#e5e3da',
+              color: dc.textPrimary,
+            }}
           >
-            <Sparkles size={24} />
-          </div>
-          <h1 className="text-3xl font-extrabold tracking-tight mb-2" style={{ color: dc.textPrimary }}>
-            Welcome, {user?.name || 'Counsel'}
-          </h1>
-          <p className="text-sm leading-relaxed" style={{ color: dc.textSecondary }}>
-            Analyze multi-party legal agreements, search statutes with real-time web grounding, and organize case files in Claude-style projects.
-          </p>
-        </div>
-
-        {/* Claude-style Uploaded Documents & Knowledge Pills */}
-        {userDocuments.length > 0 && (
-          <div className="w-full mb-3">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5" style={{ color: dc.textSecondary }}>
-                <FileText size={13} className="text-amber-500" />
-                <span>Uploaded Files & OCR Knowledge ({userDocuments.length})</span>
-              </span>
-              <span className="text-[10px] text-amber-500/90 font-medium">
-                Click any file to open Reconstructed OCR View
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2 overflow-x-auto pb-1.5 scrollbar-thin">
-              {userDocuments.map((doc) => {
-                const isSelected = selectedDocId === doc.id || (!selectedDocId && userDocuments[0]?.id === doc.id);
-                return (
-                  <div
-                    key={doc.id}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all cursor-pointer group shrink-0 ${
-                      isSelected 
-                        ? 'border-amber-500/80 bg-amber-500/10 shadow-sm' 
-                        : 'hover:border-slate-400 bg-white dark:bg-[#18181b]'
-                    }`}
-                    style={{
-                      borderColor: isSelected ? '#da7756' : (isDark ? '#2e2e34' : '#e4e4e7'),
-                    }}
-                    onClick={() => {
-                      setViewingOCRDoc(doc);
-                    }}
-                    title="Click to open Reconstructed OCR View"
-                  >
-                    <div className="w-6 h-6 rounded-lg bg-amber-500/15 text-amber-500 flex items-center justify-center shrink-0">
-                      <FileText size={12} />
-                    </div>
-
-                    <div className="flex flex-col min-w-0 max-w-[170px]">
-                      <span className="text-xs font-semibold truncate group-hover:text-amber-500 transition-colors" style={{ color: dc.textPrimary }}>
-                        {doc.fileName || doc.file_name}
-                      </span>
-                      <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
-                        <span className="text-emerald-500 font-medium">OCR Ready</span>
-                        <span>•</span>
-                        <span className="text-amber-600 dark:text-amber-400 flex items-center gap-0.5">
-                          <Eye size={10} /> View OCR
-                        </span>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedDocId(doc.id);
-                        setCurrentDocumentId(doc.id);
-                      }}
-                      className={`ml-1 text-[10px] px-1.5 py-0.5 rounded font-medium transition-all ${
-                        isSelected 
-                          ? 'bg-amber-500 text-white' 
-                          : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-                      }`}
-                      title="Target this document for analysis"
-                    >
-                      {isSelected ? 'Active' : 'Target'}
-                    </button>
-                  </div>
-                );
-              })}
-
-              <button
-                type="button"
-                onClick={() => setIsMultiUploadOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-dashed text-xs font-medium hover:bg-slate-500/5 transition-colors shrink-0 cursor-pointer"
-                style={{ borderColor: isDark ? '#2e2e34' : '#cbd5e1', color: dc.textSecondary }}
-              >
-                <Upload size={12} className="text-amber-500" />
-                <span>+ Upload More</span>
-              </button>
-            </div>
+            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: activeProject.color || '#da7756' }} />
+            <span className="font-semibold">{activeProject.name}</span>
+            <span className="text-neutral-400">• Active Project</span>
+            <button
+              type="button"
+              onClick={() => selectProject(null)}
+              className="p-0.5 rounded-full hover:bg-neutral-200 dark:hover:bg-neutral-800 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors ml-1 cursor-pointer"
+              title="Exit project"
+            >
+              <X size={12} />
+            </button>
           </div>
         )}
 
-        {/* Claude-style Centered Prompt Box */}
-        <div 
-          className="w-full rounded-2xl border shadow-xl p-3.5 mb-8 transition-all relative focus-within:ring-2 focus-within:ring-amber-500/40"
-          style={{
-            backgroundColor: isDark ? '#18181b' : '#ffffff',
-            borderColor: isDark ? '#2e2e34' : '#e4e4e7',
-          }}
-        >
-          <textarea
-            value={promptInput}
-            onChange={(e) => setPromptInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleStartPrompt();
-              }
-            }}
-            placeholder="Ask anything about your contracts, verify clauses, or search legal precedents..."
-            rows={3}
-            className="w-full bg-transparent resize-none text-sm outline-none leading-relaxed placeholder:text-slate-400"
-            style={{ color: dc.textPrimary }}
+        {/* DeepDoc AI Logo & Time-aware Greeting Header */}
+        <div className="flex items-center gap-3.5 mb-8 select-none">
+          <img 
+            src={deepDocLogo} 
+            alt="DeepDoc AI Logo" 
+            className="w-10 h-10 object-contain rounded-xl shadow-xs" 
           />
-
-          {/* Controls Bar inside the input box */}
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t mt-2"
-            style={{ borderColor: isDark ? '#27272a' : '#f4f4f5' }}
+          <h1 
+            className="text-3xl sm:text-4xl font-serif font-normal tracking-tight"
+            style={{ color: isDark ? '#f3f1ec' : '#2d2b28' }}
           >
-            <div className="flex flex-wrap items-center gap-1.5">
-              {/* Multi-File Upload button */}
-              <button
-                type="button"
-                onClick={() => setIsMultiUploadOpen(true)}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border hover:bg-slate-500/5 transition-colors"
-                style={{ borderColor: isDark ? '#27272a' : '#e4e4e7', color: dc.textSecondary }}
-                title="Upload multiple files or folders"
-              >
-                <Upload size={13} className="text-amber-500" />
-                <span>Upload Files</span>
-              </button>
+            {getTimeGreeting()}
+          </h1>
+        </div>
 
-              {/* Target Document Indicator Pill */}
-              {selectedDocId && (
+        {/* Rounded Prompt Box */}
+        <div className="w-full relative">
+          <div 
+            className="w-full rounded-3xl border shadow-sm transition-all focus-within:shadow-md p-3.5 sm:p-4 flex flex-col justify-between min-h-[140px]"
+            style={{
+              backgroundColor: isDark ? '#262522' : '#ffffff',
+              borderColor: isDark ? '#383734' : '#e5e3da',
+            }}
+          >
+            {/* Attached File Chip inside Prompt Box */}
+            {activeDocument && (
+              <div className="mb-2 flex items-center gap-2">
                 <div 
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border bg-amber-500/10 border-amber-500/40 text-amber-600 dark:text-amber-400 cursor-pointer"
-                  onClick={() => {
-                    const doc = userDocuments.find(d => d.id === selectedDocId);
-                    if (doc) setViewingOCRDoc(doc);
-                  }}
-                  title="Click to view reconstructed OCR for targeted document"
-                >
-                  <FileText size={12} className="text-amber-500" />
-                  <span className="truncate max-w-[130px]">
-                    {userDocuments.find(d => d.id === selectedDocId)?.fileName || userDocuments.find(d => d.id === selectedDocId)?.file_name || 'Active Document'}
-                  </span>
-                  <Eye size={11} className="opacity-70" />
-                </div>
-              )}
-
-              {/* Thinking Mode Toggle */}
-              <button
-                type="button"
-                onClick={() => setThinkingMode(!thinkingMode)}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
-                  thinkingMode 
-                    ? 'border-amber-500 bg-amber-500/15 text-amber-600 dark:text-amber-400 font-semibold' 
-                    : 'border-transparent text-slate-500 hover:bg-slate-500/5'
-                }`}
-                title="Extended Deep Reasoning trace before answers"
-              >
-                <Brain size={13} className={thinkingMode ? 'text-amber-500' : 'text-slate-400'} />
-                <span>Thinking: {thinkingMode ? 'ON' : 'OFF'}</span>
-              </button>
-
-              {/* Web Mode Toggle */}
-              <button
-                type="button"
-                onClick={() => setWebMode(!webMode)}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
-                  webMode 
-                    ? 'border-blue-500 bg-blue-500/15 text-blue-600 dark:text-blue-400 font-semibold' 
-                    : 'border-transparent text-slate-500 hover:bg-slate-500/5'
-                }`}
-                title="Real-time Web Search Grounding for live legal intelligence"
-              >
-                <Globe size={13} className={webMode ? 'text-blue-500' : 'text-slate-400'} />
-                <span>Web: {webMode ? 'ON' : 'OFF'}</span>
-              </button>
-
-              {/* Claude Model Selector */}
-              <ClaudeModelSelector
-                selectedModel={selectedModel}
-                onModelChange={setSelectedModel}
-                availableModels={availableModels}
-                placement="bottom-up"
-                compact={false}
-              />
-            </div>
-
-            <div className="flex items-center gap-2">
-              {/* Gemini Live Button */}
-              <button
-                type="button"
-                onClick={() => setIsLiveAudioOpen(true)}
-                className="h-8 px-2.5 rounded-xl flex items-center gap-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:opacity-90 text-white font-medium text-xs shadow-sm transition-all cursor-pointer group"
-                title="Open Gemini Live Voice Session"
-              >
-                <div className="flex items-center gap-0.5 h-3">
-                  <span className="w-0.5 h-2 bg-white rounded-full group-hover:h-3 transition-all animate-pulse" />
-                  <span className="w-0.5 h-3 bg-white rounded-full group-hover:h-3.5 transition-all animate-pulse delay-75" />
-                  <span className="w-0.5 h-2.5 bg-white rounded-full group-hover:h-3 transition-all animate-pulse delay-150" />
-                  <span className="w-0.5 h-1.5 bg-white rounded-full group-hover:h-2.5 transition-all animate-pulse delay-200" />
-                </div>
-                <span className="font-semibold tracking-tight text-[11px]">Live</span>
-              </button>
-
-              {/* Send Button */}
-              <button
-                onClick={() => handleStartPrompt()}
-                disabled={!promptInput.trim()}
-                className="w-8 h-8 rounded-xl flex items-center justify-center text-white transition-all disabled:opacity-40 cursor-pointer shadow"
-                style={{ backgroundColor: '#da7756' }}
-              >
-                <ArrowUp size={16} />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Starters (Claude Prompts) */}
-        <div className="w-full mb-10">
-          <span className="text-[11px] font-bold uppercase tracking-wider block mb-3" style={{ color: dc.textSecondary }}>
-            Recommended Analysis Prompts
-          </span>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {QUICK_STARTERS.map((s, idx) => (
-              <button
-                key={idx}
-                onClick={() => handleStartPrompt(s.prompt)}
-                className="p-3.5 rounded-xl border text-left transition-all hover:border-amber-500/50 hover:shadow-sm group cursor-pointer"
-                style={{
-                  backgroundColor: isDark ? '#141417' : '#ffffff',
-                  borderColor: isDark ? '#232328' : '#e4e4e7',
-                }}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-base">{s.icon}</span>
-                  <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 group-hover:text-amber-500 transition-colors">
-                    {s.label}
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1">
-                  {s.prompt}
-                </p>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Projects Folders Grid */}
-        <div className="w-full mb-8">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: dc.textSecondary }}>
-              Projects Knowledge Folders
-            </span>
-            <button
-              onClick={() => {
-                setProjectToEdit(null);
-                setIsProjectsModalOpen(true);
-              }}
-              className="text-xs font-medium text-amber-500 hover:underline flex items-center gap-1"
-            >
-              <Plus size={13} /> New Project Folder
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {/* Create Project Card */}
-            <div
-              onClick={() => {
-                setProjectToEdit(null);
-                setIsProjectsModalOpen(true);
-              }}
-              className="p-4 rounded-xl border border-dashed flex flex-col items-center justify-center text-center cursor-pointer hover:bg-slate-500/5 transition-all min-h-[110px]"
-              style={{ borderColor: isDark ? '#2e2e34' : '#cbd5e1' }}
-            >
-              <div className="w-8 h-8 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center mb-2">
-                <FolderPlus size={16} />
-              </div>
-              <p className="text-xs font-semibold">New Project Folder</p>
-              <p className="text-[10px] text-slate-400">Scoped system prompt & files</p>
-            </div>
-
-            {/* Existing Projects */}
-            {projects.map((proj) => {
-              const isActive = activeProject?.id === proj.id;
-              return (
-                <div
-                  key={proj.id}
-                  onClick={() => setActiveProject(isActive ? null : proj)}
-                  className={`p-4 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between ${
-                    isActive ? 'ring-2 ring-amber-500 shadow-md' : 'hover:border-slate-400'
-                  }`}
+                  className="inline-flex items-center gap-2 px-2.5 py-1 rounded-xl text-xs border transition-all"
                   style={{
-                    backgroundColor: isDark ? '#141417' : '#ffffff',
-                    borderColor: isDark ? '#232328' : '#e4e4e7',
+                    backgroundColor: isDark ? '#1f1e1d' : '#f5f4ef',
+                    borderColor: isDark ? '#3d3b37' : '#eae8e1',
+                    color: isDark ? '#eceae6' : '#2d2b28',
                   }}
                 >
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: proj.color || '#da7756' }}
-                      />
-                      <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-slate-500/10 text-slate-400">
-                        {proj.document_count || 0} files
-                      </span>
-                    </div>
-                    <h3 className="text-xs font-bold line-clamp-1 mb-1">{proj.name}</h3>
-                    {proj.description && (
-                      <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
-                        {proj.description}
-                      </p>
+                  <FileText size={13} className="text-amber-500 shrink-0" />
+                  <span className="font-medium truncate max-w-[170px] sm:max-w-[240px]">
+                    {activeDocument.fileName || activeDocument.file_name}
+                  </span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-medium">
+                    OCR Ready
+                  </span>
+                  
+                  {/* Click to Open Reconstructed OCR Modal */}
+                  <button
+                    type="button"
+                    onClick={() => setViewingOCRDoc(activeDocument)}
+                    className="flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400 hover:underline cursor-pointer ml-1"
+                    title="View Reconstructed Sarvam OCR"
+                  >
+                    <Eye size={11} />
+                    <span>OCR View</span>
+                  </button>
+
+                  {/* Detach document */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedDocId(null);
+                      setCurrentDocumentId(null);
+                    }}
+                    className="p-0.5 rounded-full hover:bg-neutral-300/50 dark:hover:bg-neutral-700/50 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors cursor-pointer"
+                    title="Detach document"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Uploading Status */}
+            {isUploading && (
+              <div className="mb-2 flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                <span>Running Sarvam OCR & chunking document...</span>
+              </div>
+            )}
+
+            {/* Main Prompt Textarea */}
+            <textarea
+              ref={textareaRef}
+              value={promptInput}
+              onChange={handleTextareaChange}
+              onKeyDown={handleKeyDown}
+              rows={2}
+              placeholder={
+                chatMode === 'cowork'
+                  ? (activeDocument ? `Ask anything about ${activeDocument.fileName || activeDocument.file_name} with Legal RAG...` : 'Attach a contract or case file for Legal RAG analysis...')
+                  : 'Ask any legal or contract question, or type / for skills...'
+              }
+              className="w-full bg-transparent resize-none border-none outline-none text-[15px] sm:text-base leading-relaxed placeholder:text-neutral-400 select-text"
+              style={{ color: isDark ? '#f3f1ec' : '#2d2b28' }}
+            />
+
+            {/* Bottom Controls Row inside Prompt Box */}
+            <div className="flex items-center justify-between gap-2 pt-2 mt-1">
+              {/* Left group: + Attachment button & Chat / Legal RAG pills */}
+              <div className="flex items-center gap-2 relative" ref={attachMenuRef}>
+                {/* + Attachment Button */}
+                <button
+                  type="button"
+                  onClick={() => setAttachMenuOpen(!attachMenuOpen)}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-200/60 dark:hover:bg-neutral-800/60 transition-colors cursor-pointer"
+                  title="Attach file or knowledge"
+                >
+                  <Plus size={18} />
+                </button>
+
+                {/* Attachment Dropdown Popover */}
+                {attachMenuOpen && (
+                  <div 
+                    className="absolute bottom-full left-0 mb-2 w-64 rounded-2xl shadow-xl border bg-white dark:bg-[#262522] border-neutral-200 dark:border-neutral-800 py-1.5 z-50 text-xs animate-in fade-in zoom-in-95"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800/70 transition-colors cursor-pointer text-left"
+                    >
+                      <Upload size={14} className="text-[#da7756]" />
+                      <div className="flex flex-col">
+                        <span className="font-medium">Upload Document</span>
+                        <span className="text-[10px] text-neutral-400">PDF, DOCX with OCR auto-reconstruction</span>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAttachMenuOpen(false);
+                        setIsMultiUploadOpen(true);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800/70 transition-colors cursor-pointer text-left"
+                    >
+                      <FolderPlus size={14} className="text-amber-500" />
+                      <div className="flex flex-col">
+                        <span className="font-medium">Ingest Folder / Batch</span>
+                        <span className="text-[10px] text-neutral-400">Process multi-document folder</span>
+                      </div>
+                    </button>
+
+                    {workspaceDocuments.length > 0 && (
+                      <>
+                        <div className="my-1 border-t border-neutral-100 dark:border-neutral-800" />
+                        <div className="px-3 py-1 text-[10px] uppercase font-bold text-neutral-400 tracking-wider">
+                          Attach from Knowledge Base
+                        </div>
+                        <div className="max-h-40 overflow-y-auto">
+                          {workspaceDocuments.map((doc) => {
+                            const isAttached = selectedDocId === doc.id;
+                            return (
+                              <button
+                                key={doc.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedDocId(isAttached ? null : doc.id);
+                                  setCurrentDocumentId(isAttached ? null : doc.id);
+                                  if (!isAttached) setChatMode('cowork');
+                                  setAttachMenuOpen(false);
+                                }}
+                                className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800/70 transition-colors text-left"
+                              >
+                                <span className="truncate text-neutral-700 dark:text-neutral-300 pr-2">
+                                  {doc.fileName || doc.file_name}
+                                </span>
+                                {isAttached && <Check size={12} className="text-emerald-500 shrink-0" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </>
                     )}
                   </div>
-                  <div className="mt-3 pt-2 border-t flex items-center justify-between text-[10px] text-slate-400"
-                    style={{ borderColor: isDark ? '#232328' : '#f4f4f5' }}
+                )}
+
+                {/* Mode Segmented Controls: Chat & Legal RAG */}
+                <div 
+                  className="flex items-center p-0.5 rounded-xl border text-xs"
+                  style={{
+                    backgroundColor: isDark ? '#1f1e1d' : '#f5f4ef',
+                    borderColor: isDark ? '#383734' : '#e5e3da',
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleModeChange('chat')}
+                    className={`px-2.5 py-1 rounded-lg font-medium transition-all cursor-pointer ${
+                      chatMode === 'chat'
+                        ? 'bg-white dark:bg-[#262522] text-[#2d2b28] dark:text-[#eceae6] shadow-xs'
+                        : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100'
+                    }`}
                   >
-                    <span>{isActive ? 'Active Folder' : 'Click to select'}</span>
-                    <ChevronRight size={12} />
-                  </div>
+                    Chat
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleModeChange('cowork')}
+                    className={`px-2.5 py-1 rounded-lg font-medium transition-all cursor-pointer ${
+                      chatMode === 'cowork'
+                        ? 'bg-white dark:bg-[#262522] text-[#2d2b28] dark:text-[#eceae6] shadow-xs font-semibold'
+                        : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100'
+                    }`}
+                    title="Legal RAG with statutory search and citation grounding"
+                  >
+                    Legal RAG
+                  </button>
                 </div>
-              );
-            })}
+
+                {/* Web Search Grounding Toggle */}
+                <button
+                  type="button"
+                  onClick={() => setWebMode(!webMode)}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
+                    webMode 
+                      ? 'bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400 font-semibold' 
+                      : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'
+                  }`}
+                  title="Toggle real-time Google Web Search Grounding"
+                >
+                  <Globe size={13} className={webMode ? 'text-blue-500' : 'text-neutral-400'} />
+                  <span>Web: {webMode ? 'ON' : 'OFF'}</span>
+                </button>
+              </div>
+
+              {/* Right group: Model selector, Mic, Live audio, Circular Send arrow */}
+              <div className="flex items-center gap-2">
+                {/* Claude Model Selector Dropdown */}
+                <ClaudeModelSelector
+                  selectedModel={selectedModel}
+                  onModelChange={setSelectedModel}
+                  availableModels={availableModels}
+                  placement="bottom-up"
+                  compact={true}
+                />
+
+                {/* Mic Icon Button */}
+                <button
+                  type="button"
+                  onClick={() => alert('Voice dictation active. Speak clearly into your microphone.')}
+                  className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-200/50 dark:hover:bg-neutral-800/50 transition-colors cursor-pointer"
+                  title="Voice input"
+                >
+                  <Mic size={16} />
+                </button>
+
+                {/* Live Voice Audio Waveform Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsLiveAudioOpen(true)}
+                  className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-200/50 dark:hover:bg-neutral-800/50 transition-colors cursor-pointer flex items-center gap-0.5"
+                  title="Open Gemini Live Voice Session"
+                >
+                  <span className="w-0.5 h-3 bg-neutral-400 rounded-full" />
+                  <span className="w-0.5 h-4 bg-[#da7756] rounded-full" />
+                  <span className="w-0.5 h-2.5 bg-neutral-400 rounded-full" />
+                </button>
+
+                {/* Circular Send Arrow */}
+                <button
+                  type="button"
+                  onClick={() => handleStartPrompt()}
+                  disabled={!promptInput.trim()}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+                    promptInput.trim()
+                      ? 'bg-[#da7756] text-white hover:opacity-90 shadow-sm'
+                      : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-400 cursor-not-allowed opacity-50'
+                  }`}
+                  title="Send message"
+                >
+                  <ArrowUp size={16} />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Direct Ingestion Action Card */}
-        <div 
-          className="w-full p-5 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-4"
-          style={{
-            backgroundColor: isDark ? '#16161a' : '#f8fafc',
-            borderColor: isDark ? '#26262b' : '#e2e8f0',
-          }}
-        >
-          <div className="flex items-center gap-3 text-center sm:text-left">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
-              <FolderUp size={20} />
-            </div>
-            <div>
-              <h3 className="text-xs font-bold text-slate-800 dark:text-slate-100">
-                Batch Upload Legal Contracts & Entire Folders
-              </h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Multi-page Sarvam OCR, 768-dim vector embeddings, and digital layout reconstruction.
-              </p>
-            </div>
-          </div>
-
-          <button
-            onClick={() => setIsMultiUploadOpen(true)}
-            className="px-4 py-2 rounded-xl text-xs font-semibold text-white shrink-0 flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
-            style={{ backgroundColor: '#da7756' }}
-          >
-            <Upload size={14} /> Ingest Files / Folder
-          </button>
+        {/* Quick starter chips */}
+        <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
+          {QUICK_STARTERS.map((s, idx) => (
+            <button
+              key={idx}
+              onClick={() => handleStartPrompt(s.prompt)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all hover:bg-neutral-200/40 dark:hover:bg-neutral-800/40 cursor-pointer shadow-xs"
+              style={{
+                backgroundColor: isDark ? '#262522' : '#ffffff',
+                borderColor: isDark ? '#383734' : '#e5e3da',
+                color: isDark ? '#eceae6' : '#2d2b28',
+              }}
+            >
+              <span>{s.icon}</span>
+              <span>{s.label}</span>
+            </button>
+          ))}
         </div>
-
-        {/* Reconstructed OCR View Modal */}
-        <ReconstructedOCRModal
-          isOpen={!!viewingOCRDoc}
-          documentId={viewingOCRDoc?.id}
-          fileName={viewingOCRDoc?.fileName || viewingOCRDoc?.file_name}
-          onClose={() => setViewingOCRDoc(null)}
-          onSelectForChat={async (docId) => {
-            setSelectedDocId(docId);
-            setCurrentDocumentId(docId);
-            try {
-              const newChat = await createNewChat(docId, activeProject?.id || null);
-              if (newChat) {
-                navigate(`/chat/${newChat.id}`);
-              }
-            } catch (err) {
-              console.error('Failed to create chat from OCR modal:', err);
-            }
-          }}
-        />
-
       </div>
+
+      {/* OCR Reconstruction Viewer Modal */}
+      <ReconstructedOCRModal
+        isOpen={!!viewingOCRDoc}
+        document={viewingOCRDoc}
+        onClose={() => setViewingOCRDoc(null)}
+      />
     </div>
   );
 };

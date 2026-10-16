@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { getChats, getChatMessages, createChat, getProjects, getUsageSummary, getDocuments } from '../services/api';
+import { getChats, getChatMessages, createChat, getProjects, getProject, getUsageSummary, getDocuments } from '../services/api';
 
 const ChatContext = createContext(null);
 
@@ -49,12 +49,31 @@ export function ChatProvider({ children }) {
   const [usageSummary, setUsageSummary] = useState(null);
 
   // Modals state
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState('general');
   const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
   const [isPersonalizationModalOpen, setIsPersonalizationModalOpen] = useState(false);
   const [isProjectsModalOpen, setIsProjectsModalOpen] = useState(false);
   const [projectToEdit, setProjectToEdit] = useState(null);
   const [isMultiUploadOpen, setIsMultiUploadOpen] = useState(false);
   const [isLiveAudioOpen, setIsLiveAudioOpen] = useState(false);
+
+  const openSettings = useCallback((tab = 'general') => {
+    setSettingsInitialTab(tab);
+    setIsSettingsModalOpen(true);
+  }, []);
+
+  // Global Claude shortcut: Ctrl+Shift+, toggles settings
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === '<' || e.key === ',')) {
+        e.preventDefault();
+        setIsSettingsModalOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Load sidebar collapse state from localStorage on mount
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -67,22 +86,10 @@ export function ChatProvider({ children }) {
     localStorage.setItem('sidebar_collapsed', String(sidebarCollapsed));
   }, [sidebarCollapsed]);
 
-  // Load currentDocumentId from localStorage on mount
+  // Ensure document ID is never persisted globally in localStorage across sessions
   useEffect(() => {
-    const savedDocId = localStorage.getItem('currentDocumentId');
-    if (savedDocId) {
-      setCurrentDocumentId(savedDocId);
-    }
+    localStorage.removeItem('currentDocumentId');
   }, []);
-
-  // Save currentDocumentId to localStorage when it changes
-  useEffect(() => {
-    if (currentDocumentId) {
-      localStorage.setItem('currentDocumentId', currentDocumentId);
-    } else {
-      localStorage.removeItem('currentDocumentId');
-    }
-  }, [currentDocumentId]);
 
   // Load chats list
   const loadChats = useCallback(async () => {
@@ -141,9 +148,11 @@ export function ChatProvider({ children }) {
     try {
       const result = await createChat(documentId, projectId);
       if (result?.chat) {
-        if (result.chat.documentId) {
-          setCurrentDocumentId(result.chat.documentId);
-        }
+        // A new route must never inherit the previous conversation's id or messages.
+        // Without this, the first prompt of a new chat can be streamed into an older chat.
+        setCurrentChatId(result.chat.id);
+        setChatHistory([]);
+        setCurrentDocumentId(result.chat.documentId || null);
         // Reload chats list
         await loadChats();
         return result.chat;
@@ -195,12 +204,15 @@ export function ChatProvider({ children }) {
 
       setChatHistory(formattedMessages);
       setCurrentChatId(chatId);
-      if (result?.chat?.documentId) {
-        setCurrentDocumentId(result.chat.documentId);
-      }
+      // The document belongs to this chat session. Clear any file retained
+      // from the previous route when this is a fresh, unassigned chat.
+      setCurrentDocumentId(result?.chat?.documentId || null);
     } catch (error) {
       console.error('Error loading chat messages:', error);
       setChatHistory([]);
+      setCurrentChatId(null);
+      setCurrentDocumentId(null);
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -215,9 +227,25 @@ export function ChatProvider({ children }) {
   const updateMessage = useCallback((messageId, updates) => {
     setChatHistory((prev) =>
       prev.map((msg) =>
-        msg.id === messageId ? { ...msg, ...updates } : msg
+        msg.id === messageId
+          ? { ...msg, ...(typeof updates === 'function' ? updates(msg) : updates) }
+          : msg
       )
     );
+  }, []);
+
+  // Project list rows intentionally stay lightweight. Load the selected project
+  // before making it active so its document list is available everywhere.
+  const selectProject = useCallback(async (project) => {
+    if (!project?.id) {
+      setActiveProject(null);
+      return null;
+    }
+
+    const result = await getProject(project.id);
+    const hydratedProject = result?.project || project;
+    setActiveProject(hydratedProject);
+    return hydratedProject;
   }, []);
 
   // Refresh chats list
@@ -266,6 +294,7 @@ export function ChatProvider({ children }) {
     projects,
     activeProject,
     setActiveProject,
+    selectProject,
     loadProjects,
     // Thinking & Web Mode
     thinkingMode,
@@ -276,6 +305,11 @@ export function ChatProvider({ children }) {
     usageSummary,
     loadUsageSummary,
     // Modals
+    isSettingsModalOpen,
+    setIsSettingsModalOpen,
+    settingsInitialTab,
+    setSettingsInitialTab,
+    openSettings,
     isUsageModalOpen,
     setIsUsageModalOpen,
     isPersonalizationModalOpen,

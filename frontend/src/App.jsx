@@ -14,6 +14,8 @@ import ChatPage from './components/ChatPage';
 import ChatHistoryPage from './components/ChatHistoryPage';
 import SettingsPage from './pages/SettingsPage';
 import HelpPage from './pages/HelpPage';
+import ProjectsPage from './pages/ProjectsPage';
+import AppErrorBoundary from './components/AppErrorBoundary';
 
 function App() {
   return (
@@ -33,12 +35,16 @@ function App() {
           <Route
             element={
               <ProtectedRoute>
-                <Layout />
+                <AppErrorBoundary>
+                  <Layout />
+                </AppErrorBoundary>
               </ProtectedRoute>
             }
           >
             <Route path="chat" element={<HomePage />} />
             <Route path="chat/:chatId" element={<ChatPage />} />
+            <Route path="projects" element={<ProjectsPage />} />
+            <Route path="artifacts" element={<ChatHistoryPage />} />
             <Route path="history" element={<ChatHistoryPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="help" element={<HelpPage />} />

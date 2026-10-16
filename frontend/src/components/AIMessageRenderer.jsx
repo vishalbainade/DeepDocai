@@ -2,16 +2,29 @@ import { useMemo } from 'react';
 import { useDarkColors } from '../utils/darkMode';
 import { formatAIResponse } from '../utils/responseFormatter';
 
+// Safe normalizer to guarantee an array of citation objects
+const normalizeCitationList = (input) => {
+  if (!input) return [];
+  if (Array.isArray(input)) return input.filter((item) => item && typeof item === 'object');
+  if (typeof input === 'object') {
+    if ('page' in input || 'text' in input || 'chunkId' in input) {
+      return [input];
+    }
+    try {
+      const flattened = Object.values(input).flat();
+      return Array.isArray(flattened) ? flattened.filter((item) => item && typeof item === 'object') : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
 // Inline tags mapped inside text
 function renderWithCitations(text, onCitationClick, dc, citations = []) {
   if (!text) return null;
   
-  // Track how many times each page has been mentioned in THIS block of text
-  // However, citations are usually global to the message.
-  // A better way is to have a global counter or a more specific mapping.
-  // For now, let's try to match them.
-  
-  const fullTextContext = text;
+  const safeCitations = normalizeCitationList(citations);
   let pageCounters = {};
 
   // Split by [Pg. X] or [Pg.X]
@@ -27,13 +40,12 @@ function renderWithCitations(text, onCitationClick, dc, citations = []) {
 
       // Find the corresponding citation in the provided citations array
       // Match by page and occurrence index
-      const pageCitations = citations.filter(c => parseInt(c.page) === pageNum);
+      const pageCitations = safeCitations.filter((c) => c && parseInt(c.page, 10) === pageNum);
       
       // Fallback text context (the text chunk immediately preceding this citation tag)
-      // The split regex (\[Pg\.\s*\d+\]) means tags are even-indexed if text starts with non-tag
       const textParts = text.split(/(\[Pg\.\s*\d+\])/g);
-      const precedingText = i > 0 ? textParts[i-1] : '';
-      const fallbackText = precedingText.trim().slice(-100); // Last 100 chars for context
+      const precedingText = i > 0 ? textParts[i - 1] : '';
+      const fallbackText = precedingText.trim().slice(-100);
 
       const realCitation = pageCitations[occurrence - 1] || pageCitations[0] || { 
         page: pageNum, 
@@ -53,7 +65,6 @@ function renderWithCitations(text, onCitationClick, dc, citations = []) {
           onClick={(e) => {
             e.stopPropagation();
             if (onCitationClick) {
-              // Pass the REAL citation object if found, otherwise the dummy with page
               onCitationClick(realCitation);
             }
           }}
@@ -69,23 +80,40 @@ function renderWithCitations(text, onCitationClick, dc, citations = []) {
   });
 }
 
-const AIMessageRenderer = ({ rawText, onCitationClick, citations = [], paragraphCitations = [] }) => {
+const AIMessageRenderer = ({ rawText, onCitationClick, citations = [], paragraphCitations = [], isStreaming = false }) => {
   const dc = useDarkColors();
   const { sections } = useMemo(() => formatAIResponse(rawText), [rawText]);
 
   // Combine all citations for mapping
   const allCitations = useMemo(() => {
     const seen = new Set();
-    const combined = [...(citations || [])];
-    
-    (paragraphCitations || []).forEach(p => {
-       (p.citations || []).forEach(c => {
-         const key = `${c.page}-${JSON.stringify(c.bbox)}`;
-         if (!seen.has(key)) {
-           seen.add(key);
-           combined.push(c);
-         }
-       });
+    const combined = [];
+
+    const safeCitations = normalizeCitationList(citations);
+    safeCitations.forEach((c) => {
+      const page = c?.page || 1;
+      const key = `${page}-${JSON.stringify(c?.bbox || c?.chunkId || c?.text || '')}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        combined.push(c);
+      }
+    });
+
+    const safeParagraphCitations = Array.isArray(paragraphCitations) 
+      ? paragraphCitations 
+      : (paragraphCitations && typeof paragraphCitations === 'object' ? Object.values(paragraphCitations) : []);
+
+    safeParagraphCitations.forEach((p) => {
+      if (!p) return;
+      const pCits = normalizeCitationList(p.citations || p);
+      pCits.forEach((c) => {
+        const page = c?.page || 1;
+        const key = `${page}-${JSON.stringify(c?.bbox || c?.chunkId || c?.text || '')}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          combined.push(c);
+        }
+      });
     });
     
     return combined;
@@ -93,6 +121,15 @@ const AIMessageRenderer = ({ rawText, onCitationClick, citations = [], paragraph
 
   return (
     <div className="space-y-5">
+      {sections.length === 0 && rawText && (
+        <p className="text-[15px] leading-relaxed whitespace-pre-wrap break-words" style={{ color: dc.textSecondary }}>
+          {rawText}
+          {isStreaming && (
+            <span className="inline-block w-1.5 h-4 ml-1 align-middle bg-[#da7756] animate-pulse rounded-xs" />
+          )}
+        </p>
+      )}
+
       {sections.map((sec, i) => (
         <div key={i} className={i !== 0 && sec.title ? "mt-6" : ""}>
           {sec.title && (
@@ -110,7 +147,12 @@ const AIMessageRenderer = ({ rawText, onCitationClick, citations = [], paragraph
                   {sec.points.length > 1 && !sec.title ? null : (
                     <span className="mr-2.5 mt-[6px] block h-1.5 w-1.5 shrink-0 rounded-full transition-colors duration-300" style={{ backgroundColor: dc.borderPrimary }}></span>
                   )}
-                  <span className="flex-1 min-w-0 break-words whitespace-pre-wrap">{renderWithCitations(p, onCitationClick, dc, allCitations)}</span>
+                  <span className="flex-1 min-w-0 break-words whitespace-pre-wrap">
+                    {renderWithCitations(p, onCitationClick, dc, allCitations)}
+                    {isStreaming && i === sections.length - 1 && j === sec.points.length - 1 && (
+                      <span className="inline-block w-1.5 h-4 ml-1 align-middle bg-[#da7756] animate-pulse rounded-xs" />
+                    )}
+                  </span>
                 </li>
             ))}
           </ul>
